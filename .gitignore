@@ -1,0 +1,54 @@
+# Dependencies
+node_modules/
+.pnp/
+.pnp.js
+
+# Build
+.next/
+out/
+build/
+dist/
+
+# Environment
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Debug
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Pencil design mockups
+*.pen
+
+# GNUCash files (never commit financial data)
+*.gnucash
+*.gnucash.LNK
+*.gnucash.LCK
+
+# Claude Code
+.claude/
+
+# Docker
+.docker/
+
+# Test coverage
+coverage/
+
+# Misc
+*.log
+*.tsbuildinfo
+next-env.d.ts
