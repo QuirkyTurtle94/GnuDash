@@ -159,7 +159,7 @@ export function SpendingPieCard({ monthlyExpenses, categoryColors, currency, tit
                 </button>
               )}
               <div className="mb-2 text-center">
-                <span className="text-2xl font-bold text-[#1A1D1F]">
+                <span className="text-2xl font-bold text-[#1A1D1F]" data-v>
                   {formatCurrency(showAverage ? activeTotal / monthCount : activeTotal, currency, { decimals: 0 })}
                 </span>
                 <p className="text-[11px] text-[#9A9FA5]">
@@ -239,7 +239,7 @@ export function SpendingPieCard({ monthlyExpenses, categoryColors, currency, tit
                       <span className={`truncate text-xs ${isSelected ? "font-medium text-[#1A1D1F]" : "text-[#6F767E]"}`}>{cat.name}</span>
                     </div>
                     <div className="flex shrink-0 items-center gap-1">
-                      <span className="text-xs font-medium text-[#1A1D1F]">
+                      <span className="text-xs font-medium text-[#1A1D1F]" data-v>
                         {formatCurrency(showAverage ? cat.amount / monthCount : cat.amount, currency)}
                       </span>
                       {!isExcluded && (

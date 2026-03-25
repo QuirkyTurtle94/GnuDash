@@ -8,6 +8,7 @@ import {
   YAxis,
   CartesianGrid,
   Tooltip,
+  ReferenceLine,
   ResponsiveContainer,
 } from "recharts";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -57,6 +58,7 @@ interface NetWorthChartProps {
 export function NetWorthChart({ series, currentNetWorth, currency }: NetWorthChartProps) {
   const [period, setPeriod] = useState<TimePeriod>("all-time");
   const [showDropdown, setShowDropdown] = useState(false);
+  const [showBreakdown, setShowBreakdown] = useState(false);
 
   const filtered = useMemo(() => {
     switch (period) {
@@ -66,19 +68,34 @@ export function NetWorthChart({ series, currentNetWorth, currency }: NetWorthCha
     }
   }, [series, period]);
 
-  // Compute Y-axis domain with padding so the line isn't flat
-  const yDomain = useMemo(() => {
-    if (filtered.length === 0) return [0, 0];
-    const values = filtered.map((d) => d.netWorth);
-    const min = Math.min(...values);
-    const max = Math.max(...values);
-    const range = max - min;
-    const padding = range > 0 ? range * 0.1 : Math.abs(max) * 0.05;
-    return [
-      Math.floor((min - padding) / 1000) * 1000,
-      Math.ceil((max + padding) / 1000) * 1000,
-    ];
-  }, [filtered]);
+  // Compute nice Y-axis ticks at multiples of 1, 2, 5 × 10^n
+  const { yDomain, yTicks } = useMemo(() => {
+    if (filtered.length === 0) return { yDomain: [0, 0] as [number, number], yTicks: [0] };
+    const values = showBreakdown
+      ? [...filtered.map((d) => d.netWorth), ...filtered.map((d) => d.assets), ...filtered.map((d) => d.liabilities)]
+      : filtered.map((d) => d.netWorth);
+    const rawMin = Math.min(...values);
+    const rawMax = Math.max(...values);
+    const range = rawMax - rawMin || Math.abs(rawMax) || 1;
+
+    // Pick a nice step: find the order of magnitude, then pick 1, 2, or 5 × that
+    const rough = range / 4;
+    const mag = Math.pow(10, Math.floor(Math.log10(rough)));
+    const residual = rough / mag;
+    let step: number;
+    if (residual <= 1.5) step = mag;
+    else if (residual <= 3.5) step = 2 * mag;
+    else if (residual <= 7.5) step = 5 * mag;
+    else step = 10 * mag;
+
+    const niceMin = Math.floor(rawMin / step) * step;
+    const niceMax = Math.ceil(rawMax / step) * step;
+    const ticks: number[] = [];
+    for (let v = niceMin; v <= niceMax + step * 0.01; v += step) {
+      ticks.push(Math.round(v * 100) / 100);
+    }
+    return { yDomain: [niceMin, niceMax] as [number, number], yTicks: ticks };
+  }, [filtered, showBreakdown]);
 
   const pctChange = useMemo(() => {
     if (filtered.length < 2) return null;
@@ -94,7 +111,18 @@ export function NetWorthChart({ series, currentNetWorth, currency }: NetWorthCha
         <CardTitle className="text-lg font-semibold text-[#1A1D1F]">
           Net Worth
         </CardTitle>
-        <div className="relative">
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setShowBreakdown((v) => !v)}
+            className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors ${
+              showBreakdown
+                ? "border-[#6C9B8B] bg-[#6C9B8B]/10 text-[#6C9B8B]"
+                : "border-[#EFEFEF] text-[#6F767E] hover:bg-[#F4F5F7]"
+            }`}
+          >
+            Assets / Liabilities
+          </button>
+          <div className="relative">
           <button
             onClick={() => setShowDropdown(!showDropdown)}
             className="flex items-center gap-1.5 rounded-lg border border-[#EFEFEF] px-3 py-1.5 transition-colors hover:bg-[#F4F5F7]"
@@ -119,11 +147,12 @@ export function NetWorthChart({ series, currentNetWorth, currency }: NetWorthCha
               ))}
             </div>
           )}
+          </div>
         </div>
       </CardHeader>
       <CardContent>
         <div className="mb-1">
-          <span className="text-3xl font-bold tracking-tight text-[#1A1D1F]">
+          <span className="text-3xl font-bold tracking-tight text-[#1A1D1F]" data-v>
             {formatCurrency(currentNetWorth, currency, { decimals: 0 })}
           </span>
         </div>
@@ -135,6 +164,7 @@ export function NetWorthChart({ series, currentNetWorth, currency }: NetWorthCha
                   ? "bg-[#E8F0ED] text-[#6C9B8B]"
                   : "bg-red-50 text-red-500"
               }`}
+              data-v
             >
               {pctChange >= 0 ? "+" : ""}
               {pctChange.toFixed(1)}%
@@ -153,6 +183,10 @@ export function NetWorthChart({ series, currentNetWorth, currency }: NetWorthCha
                   <stop offset="0%" stopColor="#6C9B8B" stopOpacity={0.2} />
                   <stop offset="100%" stopColor="#6C9B8B" stopOpacity={0} />
                 </linearGradient>
+                <linearGradient id="assetsGradient" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="#3B6B8A" stopOpacity={0.1} />
+                  <stop offset="100%" stopColor="#3B6B8A" stopOpacity={0} />
+                </linearGradient>
               </defs>
               <CartesianGrid strokeDasharray="3 3" stroke="#EFEFEF" vertical={false} />
               <XAxis
@@ -165,27 +199,69 @@ export function NetWorthChart({ series, currentNetWorth, currency }: NetWorthCha
               />
               <YAxis
                 domain={yDomain}
+                ticks={yTicks}
+                interval={0}
                 tickFormatter={(v) => formatCurrencyShort(v, currency)}
                 tick={{ fontSize: 11, fill: "#9A9FA5" }}
                 axisLine={false}
                 tickLine={false}
                 width={55}
               />
+              <ReferenceLine y={0} stroke="#1A1D1F" strokeWidth={1} strokeOpacity={0.3} />
               <Tooltip
-                formatter={(value) => [formatCurrency(Number(value), currency, { decimals: 0 }), "Net Worth"]}
-                labelFormatter={(label) => {
-                  if (typeof label !== "string") return label;
-                  const [y, m] = label.split("-");
+                content={({ active, payload, label }) => {
+                  if (!active || !payload?.length) return null;
+                  const data = payload[0]?.payload as MonthlyNetWorth | undefined;
+                  if (!data) return null;
+                  const [y, m] = (label as string).split("-");
                   const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-                  return `${months[parseInt(m) - 1]} ${y}`;
-                }}
-                contentStyle={{
-                  backgroundColor: "white",
-                  border: "1px solid #EFEFEF",
-                  borderRadius: "10px",
-                  fontSize: "13px",
+                  return (
+                    <div className="rounded-[10px] border border-[#EFEFEF] bg-white px-3 py-2 text-[13px] shadow-md">
+                      <p className="mb-1.5 text-xs font-medium text-[#6F767E]">{months[parseInt(m) - 1]} {y}</p>
+                      <div className="flex flex-col gap-1">
+                        <div className="flex items-center justify-between gap-4">
+                          <span className="flex items-center gap-1.5 text-[#3B6B8A]">
+                            <span className="inline-block h-2 w-2 rounded-full bg-[#3B6B8A]" />Assets
+                          </span>
+                          <span className="font-medium text-[#1A1D1F]">{formatCurrency(data.assets, currency, { decimals: 0 })}</span>
+                        </div>
+                        <div className="flex items-center justify-between gap-4">
+                          <span className="flex items-center gap-1.5 text-[#F87171]">
+                            <span className="inline-block h-2 w-2 rounded-full bg-[#F87171]" />Liabilities
+                          </span>
+                          <span className="font-medium text-[#1A1D1F]">{formatCurrency(data.liabilities, currency, { decimals: 0 })}</span>
+                        </div>
+                        <div className="mt-0.5 flex items-center justify-between gap-4 border-t border-[#EFEFEF] pt-1">
+                          <span className="flex items-center gap-1.5 text-[#6C9B8B]">
+                            <span className="inline-block h-2 w-2 rounded-full bg-[#6C9B8B]" />Net Worth
+                          </span>
+                          <span className="font-semibold text-[#1A1D1F]">{formatCurrency(data.netWorth, currency, { decimals: 0 })}</span>
+                        </div>
+                      </div>
+                    </div>
+                  );
                 }}
               />
+              {showBreakdown && (
+                <Area
+                  type="monotone"
+                  dataKey="assets"
+                  stroke="#3B6B8A"
+                  strokeWidth={1.5}
+                  strokeDasharray="4 3"
+                  fill="url(#assetsGradient)"
+                />
+              )}
+              {showBreakdown && (
+                <Area
+                  type="monotone"
+                  dataKey="liabilities"
+                  stroke="#F87171"
+                  strokeWidth={1.5}
+                  strokeDasharray="4 3"
+                  fill="none"
+                />
+              )}
               <Area
                 type="monotone"
                 dataKey="netWorth"

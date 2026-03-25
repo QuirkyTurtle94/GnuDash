@@ -98,7 +98,7 @@ export function CashFlowChart({ series, currency }: CashFlowChartProps) {
       </CardHeader>
       <CardContent>
         <div className="mb-1">
-          <span className="text-3xl font-bold tracking-tight text-[#1A1D1F]">
+          <span className="text-3xl font-bold tracking-tight text-[#1A1D1F]" data-v>
             {formatCurrency(totalNet, currency)}
           </span>
           <p className="mt-0.5 text-xs text-[#9A9FA5]">Net cash flow</p>
@@ -174,19 +174,19 @@ export function CashFlowChart({ series, currency }: CashFlowChartProps) {
           <div className="flex gap-4 pt-2">
             <div className="flex-1 rounded-xl bg-[#F4F5F7] p-4">
               <p className="text-xs text-[#9A9FA5]">Income</p>
-              <p className="mt-1 text-xl font-bold text-[#1A1D1F]">
+              <p className="mt-1 text-xl font-bold text-[#1A1D1F]" data-v>
                 {formatCurrency(filtered[0]?.income ?? 0, currency)}
               </p>
             </div>
             <div className="flex-1 rounded-xl bg-[#F4F5F7] p-4">
               <p className="text-xs text-[#9A9FA5]">Expenses</p>
-              <p className="mt-1 text-xl font-bold text-[#1A1D1F]">
+              <p className="mt-1 text-xl font-bold text-[#1A1D1F]" data-v>
                 {formatCurrency(filtered[0]?.expenses ?? 0, currency)}
               </p>
             </div>
             <div className="flex-1 rounded-xl bg-[#F4F5F7] p-4">
               <p className="text-xs text-[#9A9FA5]">Net</p>
-              <p className={`mt-1 text-xl font-bold ${(filtered[0]?.net ?? 0) >= 0 ? "text-[#6C9B8B]" : "text-[#F87171]"}`}>
+              <p className={`mt-1 text-xl font-bold ${(filtered[0]?.net ?? 0) >= 0 ? "text-[#6C9B8B]" : "text-[#F87171]"}`} data-v>
                 {formatCurrency(filtered[0]?.net ?? 0, currency)}
               </p>
             </div>

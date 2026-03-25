@@ -269,7 +269,7 @@ export function SpendingOverview({ monthlyExpenses, categoryColors, currency, li
                 </button>
               )}
               <div className="mb-2 text-center">
-                <span className="text-2xl font-bold text-[#1A1D1F]">
+                <span className="text-2xl font-bold text-[#1A1D1F]" data-v>
                   {formatCurrency(activeTotal, currency, { decimals: 0 })}
                 </span>
                 <p className="text-[11px] text-[#9A9FA5]">
@@ -347,7 +347,7 @@ export function SpendingOverview({ monthlyExpenses, categoryColors, currency, li
                       </span>
                     </div>
                     <div className="flex shrink-0 items-center gap-1">
-                      <span className="text-xs font-medium text-[#1A1D1F]">
+                      <span className="text-xs font-medium text-[#1A1D1F]" data-v>
                         {formatCurrency(cat.amount, currency)}
                       </span>
                       {!isExcluded && (

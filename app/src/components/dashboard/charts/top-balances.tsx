@@ -44,14 +44,14 @@ export function TopBalances({ balances, currency, filterType }: TopBalancesProps
         <div className="flex items-center gap-4">
           <div>
             <span className="text-xs text-[#9A9FA5]">Assets </span>
-            <span className="text-sm font-semibold text-[#6C9B8B]">
+            <span className="text-sm font-semibold text-[#6C9B8B]" data-v>
               {formatCurrency(totalAssets, currency, { decimals: 0 })}
             </span>
           </div>
           {totalLiabilities !== 0 && (
             <div>
               <span className="text-xs text-[#9A9FA5]">Liabilities </span>
-              <span className="text-sm font-semibold text-[#F87171]">
+              <span className="text-sm font-semibold text-[#F87171]" data-v>
                 {formatCurrency(Math.abs(totalLiabilities), currency, { decimals: 0 })}
               </span>
             </div>
@@ -108,6 +108,7 @@ export function TopBalances({ balances, currency, filterType }: TopBalancesProps
                   className={`w-[140px] text-right text-[13px] font-semibold ${
                     isNegative ? "text-[#F87171]" : "text-[#1A1D1F]"
                   }`}
+                  data-v
                 >
                   {formatCurrency(bal.value, currency)}
                 </span>

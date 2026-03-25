@@ -128,3 +128,22 @@
     @apply font-sans;
   }
 }
+
+@layer utilities {
+  /* Privacy mode — blur monetary values */
+  .privacy-mode [data-v] {
+    filter: blur(10px);
+    -webkit-filter: blur(10px);
+    user-select: none;
+  }
+  .privacy-mode .recharts-tooltip-wrapper [data-v],
+  .privacy-mode .recharts-tooltip-wrapper .recharts-tooltip-item-value {
+    filter: blur(10px);
+    -webkit-filter: blur(10px);
+    user-select: none;
+  }
+  .privacy-mode .recharts-yAxis .recharts-cartesian-axis-tick-value {
+    filter: blur(8px);
+    -webkit-filter: blur(8px);
+  }
+}

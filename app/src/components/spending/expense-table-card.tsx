@@ -98,7 +98,7 @@ export function ExpenseTableCard({ transactions, currency, title = "Expenses" }:
                       <td className="hidden py-2.5 pr-4 text-xs text-[#6F767E] sm:table-cell">
                         {tx.fullPath}
                       </td>
-                      <td className="whitespace-nowrap py-2.5 text-right text-xs font-medium text-[#1A1D1F]">
+                      <td className="whitespace-nowrap py-2.5 text-right text-xs font-medium text-[#1A1D1F]" data-v>
                         {formatCurrency(tx.amount, currency)}
                       </td>
                     </tr>

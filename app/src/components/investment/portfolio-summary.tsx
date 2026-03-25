@@ -44,6 +44,7 @@ export function PortfolioSummary({ holdings, currency }: PortfolioSummaryProps) 
           <p
             className="mt-1 text-lg font-bold sm:text-xl"
             style={{ color: c.color ?? "#1A1D1F" }}
+            data-v
           >
             {c.value}
           </p>

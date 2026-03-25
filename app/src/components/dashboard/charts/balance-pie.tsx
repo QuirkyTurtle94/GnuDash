@@ -10,33 +10,7 @@ import {
 } from "recharts";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatCurrency } from "@/lib/format";
-import type { AccountNode, InvestmentHolding } from "@/lib/types/gnucash";
-
-const INVESTMENT_TYPES = new Set(["STOCK", "MUTUAL"]);
-
-interface BalancePieProps {
-  accounts: AccountNode[];
-  currency: string;
-  title: string;
-  accountTypes: string[];
-  accentColor: string;
-  colorPalette: string[];
-  /** Investment holdings — used to get market value instead of cost basis for STOCK/MUTUAL */
-  investments?: InvestmentHolding[];
-  /** Group by account type (BANK, CASH, STOCK, etc.) instead of account name */
-  groupByType?: boolean;
-  /** Currently selected slice (fullPath), for cross-filtering */
-  selectedSlice?: string | null;
-  /** Called when a slice is clicked */
-  onSelectSlice?: (fullPath: string | null) => void;
-}
-
-interface BalanceEntry {
-  name: string;
-  fullPath: string;
-  amount: number;
-  color: string;
-}
+import type { TopBalance } from "@/lib/types/gnucash";
 
 const TYPE_LABELS: Record<string, string> = {
   ASSET: "Asset",
@@ -50,123 +24,89 @@ const TYPE_LABELS: Record<string, string> = {
   PAYABLE: "Payable",
 };
 
-interface LeafBalance {
+interface BalancePieProps {
+  balances: TopBalance[];
+  currency: string;
+  title: string;
+  accentColor: string;
+  colorPalette: string[];
+  /** Group by account type instead of account name */
+  groupByType?: boolean;
+  /** Currently selected slice (fullPath or type key) */
+  selectedSlice?: string | null;
+  /** Called when a slice is clicked */
+  onSelectSlice?: (key: string | null) => void;
+}
+
+interface PieEntry {
   name: string;
-  fullPath: string;
+  key: string;
   amount: number;
-  type: string;
+  color: string;
 }
 
-function collectLeafBalances(
-  node: AccountNode,
-  accountTypes: string[],
-  parentPath: string,
-  investmentValues: Map<string, number>
-): LeafBalance[] {
-  const path = parentPath ? `${parentPath}:${node.name}` : node.name;
-
-  const childResults: LeafBalance[] = [];
-  for (const child of node.children) {
-    childResults.push(...collectLeafBalances(child, accountTypes, path, investmentValues));
-  }
-
-  if (childResults.length > 0) return childResults;
-
-  if (accountTypes.includes(node.type)) {
-    const value = INVESTMENT_TYPES.has(node.type)
-      ? investmentValues.get(node.name) ?? 0
-      : node.balance;
-    if (Math.abs(value) >= 0.01) {
-      return [{ name: node.name, fullPath: path, amount: Math.abs(value), type: node.type }];
-    }
-  }
-  return [];
-}
-
-function getBreakdown(
-  accounts: AccountNode[],
-  accountTypes: string[],
-  investmentValues: Map<string, number>,
-  groupByType: boolean
-): { name: string; fullPath: string; amount: number }[] {
-  const containers = accounts.filter((a) => accountTypes.includes(a.type));
-
-  // Collect all leaves
-  const allLeaves: LeafBalance[] = [];
-  for (const container of containers) {
-    for (const child of container.children) {
-      allLeaves.push(...collectLeafBalances(child, accountTypes, "", investmentValues));
-    }
-  }
-
-  if (groupByType) {
-    // Group by account type
-    const byType = new Map<string, number>();
-    for (const leaf of allLeaves) {
-      byType.set(leaf.type, (byType.get(leaf.type) ?? 0) + leaf.amount);
-    }
-    return [...byType.entries()]
-      .map(([type, amount]) => ({
-        name: TYPE_LABELS[type] ?? type,
-        fullPath: type,
-        amount,
-      }))
-      .filter((e) => e.amount >= 0.01)
-      .sort((a, b) => b.amount - a.amount);
-  } else {
-    // Group by top-level child account
-    const byAccount = new Map<string, number>();
-    for (const container of containers) {
-      for (const child of container.children) {
-        const leaves = collectLeafBalances(child, accountTypes, "", investmentValues);
-        const total = leaves.reduce((s, l) => s + l.amount, 0);
-        if (total >= 0.01) {
-          byAccount.set(child.name, (byAccount.get(child.name) ?? 0) + total);
-        }
-      }
-    }
-    return [...byAccount.entries()]
-      .map(([name, amount]) => ({ name, fullPath: name, amount }))
-      .sort((a, b) => b.amount - a.amount);
-  }
-}
-
-export function BalancePie({ accounts, currency, title, accountTypes, accentColor, colorPalette, investments, groupByType = false, selectedSlice, onSelectSlice }: BalancePieProps) {
+export function BalancePie({
+  balances,
+  currency,
+  title,
+  accentColor,
+  colorPalette,
+  groupByType = false,
+  selectedSlice,
+  onSelectSlice,
+}: BalancePieProps) {
   const [excluded, setExcluded] = useState<Set<string>>(new Set());
 
-  // Build map of account name → market value from investment holdings
-  const investmentValues = useMemo(() => {
-    const map = new Map<string, number>();
-    if (!investments) return map;
-    for (const h of investments) {
-      // Accumulate in case multiple holdings share an account name
-      map.set(h.accountName, (map.get(h.accountName) ?? 0) + h.marketValue);
-    }
-    return map;
-  }, [investments]);
-
   const categories = useMemo(() => {
-    const items = getBreakdown(accounts, accountTypes, investmentValues, groupByType);
-    return items.map((item, i) => ({
-      ...item,
-      color: colorPalette[i % colorPalette.length],
-    }));
-  }, [accounts, accountTypes, colorPalette, investmentValues, groupByType]);
+    if (groupByType) {
+      const byType = new Map<string, number>();
+      for (const b of balances) {
+        byType.set(b.type, (byType.get(b.type) ?? 0) + Math.abs(b.value));
+      }
+      return [...byType.entries()]
+        .map(([type, amount], i) => ({
+          name: TYPE_LABELS[type] ?? type,
+          key: type,
+          amount,
+          color: colorPalette[i % colorPalette.length],
+        }))
+        .filter((e) => e.amount >= 0.01)
+        .sort((a, b) => b.amount - a.amount);
+    } else {
+      // Group by top-level parent (first segment of fullPath)
+      const byParent = new Map<string, number>();
+      for (const b of balances) {
+        const parts = b.fullPath.split(":");
+        // Use second segment (first is the root type account like "Assets")
+        const topLevel = parts.length > 1 ? parts[1] : parts[0];
+        byParent.set(topLevel, (byParent.get(topLevel) ?? 0) + Math.abs(b.value));
+      }
+      return [...byParent.entries()]
+        .map(([name, amount], i) => ({
+          name,
+          key: name,
+          amount,
+          color: colorPalette[i % colorPalette.length],
+        }))
+        .filter((e) => e.amount >= 0.01)
+        .sort((a, b) => b.amount - a.amount);
+    }
+  }, [balances, groupByType, colorPalette]);
 
   const { activeCategories, activeTotal } = useMemo(() => {
-    const active = categories.filter((c) => !excluded.has(c.fullPath));
+    const active = categories.filter((c) => !excluded.has(c.key));
     return { activeCategories: active, activeTotal: active.reduce((s, c) => s + c.amount, 0) };
   }, [categories, excluded]);
 
   const pieData = useMemo(() => {
     if (activeTotal === 0) return [];
-    const significant: BalanceEntry[] = [];
+    const significant: PieEntry[] = [];
     let othersTotal = 0;
     for (const cat of activeCategories) {
       if ((cat.amount / activeTotal) * 100 >= 3) significant.push(cat);
       else othersTotal += cat.amount;
     }
-    if (othersTotal > 0) significant.push({ name: "Others", fullPath: "", amount: othersTotal, color: "#D4DAE0" });
+    if (othersTotal > 0) significant.push({ name: "Others", key: "", amount: othersTotal, color: "#D4DAE0" });
     return significant;
   }, [activeCategories, activeTotal]);
 
@@ -182,7 +122,7 @@ export function BalancePie({ accounts, currency, title, accountTypes, accentColo
           <div className="flex flex-col gap-4 sm:flex-row">
             <div className="flex shrink-0 flex-col items-center sm:w-[220px]">
               <div className="mb-2 text-center">
-                <span className="text-2xl font-bold text-[#1A1D1F]">
+                <span className="text-2xl font-bold text-[#1A1D1F]" data-v>
                   {formatCurrency(activeTotal, currency, { decimals: 0 })}
                 </span>
                 <p className="text-[11px] text-[#9A9FA5]">Total</p>
@@ -200,9 +140,9 @@ export function BalancePie({ accounts, currency, title, accountTypes, accentColo
                       dataKey="amount"
                       stroke="none"
                       onClick={(_, index) => {
-                        const fp = pieData[index].fullPath;
-                        if (!fp || !onSelectSlice) return;
-                        onSelectSlice(selectedSlice === fp ? null : fp);
+                        const k = pieData[index].key;
+                        if (!k || !onSelectSlice) return;
+                        onSelectSlice(selectedSlice === k ? null : k);
                       }}
                       style={onSelectSlice ? { cursor: "pointer" } : undefined}
                     >
@@ -210,7 +150,7 @@ export function BalancePie({ accounts, currency, title, accountTypes, accentColo
                         <Cell
                           key={`cell-${i}`}
                           fill={entry.color}
-                          opacity={selectedSlice && entry.fullPath !== selectedSlice ? 0.3 : 1}
+                          opacity={selectedSlice && entry.key !== selectedSlice ? 0.3 : 1}
                         />
                       ))}
                     </Pie>
@@ -234,16 +174,16 @@ export function BalancePie({ accounts, currency, title, accountTypes, accentColo
             </div>
             <div className="flex flex-1 flex-col justify-center gap-1.5 overflow-y-auto">
               {categories.map((cat) => {
-                const isExcluded = excluded.has(cat.fullPath);
-                const isSelected = selectedSlice === cat.fullPath;
+                const isExcluded = excluded.has(cat.key);
+                const isSelected = selectedSlice === cat.key;
                 return (
                   <div
-                    key={cat.fullPath}
+                    key={cat.key}
                     onClick={() => {
                       if (isExcluded) {
-                        setExcluded((prev) => { const next = new Set(prev); next.delete(cat.fullPath); return next; });
+                        setExcluded((prev) => { const next = new Set(prev); next.delete(cat.key); return next; });
                       } else if (onSelectSlice) {
-                        onSelectSlice(isSelected ? null : cat.fullPath);
+                        onSelectSlice(isSelected ? null : cat.key);
                       }
                     }}
                     className={`group flex items-center justify-between gap-2 rounded-md px-1 py-0.5 transition-colors ${
@@ -260,14 +200,14 @@ export function BalancePie({ accounts, currency, title, accountTypes, accentColo
                       <span className="truncate text-xs text-[#6F767E]">{cat.name}</span>
                     </div>
                     <div className="flex shrink-0 items-center gap-1">
-                      <span className="text-xs font-medium text-[#1A1D1F]">
+                      <span className="text-xs font-medium text-[#1A1D1F]" data-v>
                         {formatCurrency(cat.amount, currency)}
                       </span>
                       {!isExcluded && (
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
-                            setExcluded((prev) => new Set(prev).add(cat.fullPath));
+                            setExcluded((prev) => new Set(prev).add(cat.key));
                           }}
                           className="ml-0.5 hidden h-4 w-4 items-center justify-center rounded text-[#9A9FA5] transition-colors hover:bg-[#EFEFEF] hover:text-[#6F767E] group-hover:flex"
                         >

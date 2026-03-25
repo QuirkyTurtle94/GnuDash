@@ -9,8 +9,8 @@ import { IncomeOverview } from "@/components/dashboard/charts/income-overview";
 import { BalancePie } from "@/components/dashboard/charts/balance-pie";
 import { TopBalances } from "@/components/dashboard/charts/top-balances";
 
-const ASSET_TYPES = ["ASSET", "BANK", "CASH", "STOCK", "MUTUAL", "RECEIVABLE"];
-const LIABILITY_TYPES = ["LIABILITY", "CREDIT", "PAYABLE"];
+const ASSET_TYPES = new Set(["ASSET", "BANK", "CASH", "STOCK", "MUTUAL", "RECEIVABLE"]);
+const LIABILITY_TYPES = new Set(["LIABILITY", "CREDIT", "PAYABLE"]);
 
 const ASSET_COLORS = [
   "#4A7A6B", "#5C8C7C", "#6C9B8B", "#7DAA9A", "#8FB9A9",
@@ -28,6 +28,8 @@ export default function DashboardPage() {
   if (!data) return null;
 
   const c = data.currency;
+  const assetBalances = data.topBalances?.filter((b) => ASSET_TYPES.has(b.type)) ?? [];
+  const liabilityBalances = data.topBalances?.filter((b) => LIABILITY_TYPES.has(b.type)) ?? [];
 
   return (
     <div className="flex flex-col gap-4 sm:gap-6">
@@ -65,22 +67,19 @@ export default function DashboardPage() {
       {/* Row 4: Assets + Liabilities */}
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-5">
         <BalancePie
-          accounts={data.accounts}
+          balances={assetBalances}
           currency={c}
           title="Assets"
-          accountTypes={ASSET_TYPES}
           accentColor="#6C9B8B"
           colorPalette={ASSET_COLORS}
-          investments={data.investments}
           groupByType
           selectedSlice={selectedAssetType}
           onSelectSlice={setSelectedAssetType}
         />
         <BalancePie
-          accounts={data.accounts}
+          balances={liabilityBalances}
           currency={c}
           title="Liabilities"
-          accountTypes={LIABILITY_TYPES}
           accentColor="#8B4A4A"
           colorPalette={LIABILITY_COLORS}
         />

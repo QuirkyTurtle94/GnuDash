@@ -96,19 +96,19 @@ export function HoldingsTable({ activeItems, allItems, currency, selectedTicker,
                       <div className="text-xs font-medium text-[#1A1D1F]">{h.ticker}</div>
                       <div className="text-[11px] text-[#9A9FA5]">{h.accountName}</div>
                     </td>
-                    <td className="whitespace-nowrap py-2.5 text-right text-xs font-medium text-[#1A1D1F]">
+                    <td className="whitespace-nowrap py-2.5 text-right text-xs font-medium text-[#1A1D1F]" data-v>
                       {formatCurrency(h.marketValue, currency)}
                     </td>
-                    <td className="hidden whitespace-nowrap py-2.5 text-right text-xs text-[#6F767E] sm:table-cell">
+                    <td className="hidden whitespace-nowrap py-2.5 text-right text-xs text-[#6F767E] sm:table-cell" data-v>
                       {formatCurrency(h.costBasis, currency)}
                     </td>
                     <td className="whitespace-nowrap py-2.5 text-right text-xs font-medium">
-                      <span className={h.gainLoss >= 0 ? "text-[#6C9B8B]" : "text-[#F87171]"}>
+                      <span className={h.gainLoss >= 0 ? "text-[#6C9B8B]" : "text-[#F87171]"} data-v>
                         {h.gainLoss >= 0 ? "+" : ""}{formatCurrency(h.gainLoss, currency)}
                       </span>
                     </td>
                     <td className="hidden whitespace-nowrap py-2.5 text-right text-xs font-medium md:table-cell">
-                      <span className={h.gainLossPct >= 0 ? "text-[#6C9B8B]" : "text-[#F87171]"}>
+                      <span className={h.gainLossPct >= 0 ? "text-[#6C9B8B]" : "text-[#F87171]"} data-v>
                         {h.gainLossPct >= 0 ? "+" : ""}{h.gainLossPct.toFixed(1)}%
                       </span>
                     </td>

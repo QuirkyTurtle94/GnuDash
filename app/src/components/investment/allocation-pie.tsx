@@ -98,7 +98,7 @@ export function AllocationPie({ items, currency, selectedTicker, onSelect, group
           <div className="flex flex-col gap-4 sm:flex-row">
             <div className="flex shrink-0 flex-col items-center sm:w-[200px]">
               <div className="mb-2 text-center">
-                <span className="text-2xl font-bold text-[#1A1D1F]">
+                <span className="text-2xl font-bold text-[#1A1D1F]" data-v>
                   {formatCurrency(totalValue, currency, { decimals: 0 })}
                 </span>
                 <p className="text-[11px] text-[#9A9FA5]">Total value</p>
@@ -173,10 +173,10 @@ export function AllocationPie({ items, currency, selectedTicker, onSelect, group
                       </span>
                     </div>
                     <div className="flex shrink-0 items-center gap-2">
-                      <span className="text-xs font-medium text-[#1A1D1F]">
+                      <span className="text-xs font-medium text-[#1A1D1F]" data-v>
                         {formatCurrency(entry.value, currency, { decimals: 0 })}
                       </span>
-                      <span className="w-[36px] text-right text-[11px] text-[#9A9FA5]">
+                      <span className="w-[36px] text-right text-[11px] text-[#9A9FA5]" data-v>
                         {pct}%
                       </span>
                     </div>

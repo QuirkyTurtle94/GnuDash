@@ -1,17 +1,15 @@
 "use client";
 
 import { useState } from "react";
-import { Menu, X } from "lucide-react";
+import { Menu, Eye, EyeOff } from "lucide-react";
 import { useDashboard } from "@/lib/dashboard-context";
+import { PrivacyProvider, usePrivacy } from "@/lib/privacy-context";
 import { FileUpload } from "@/components/upload/file-upload";
 import { Sidebar } from "@/components/dashboard/sidebar";
 
-export default function DashboardLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+function DashboardInner({ children }: { children: React.ReactNode }) {
   const { data } = useDashboard();
+  const { hideValues, toggleHideValues } = usePrivacy();
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   if (!data) {
@@ -19,7 +17,7 @@ export default function DashboardLayout({
   }
 
   return (
-    <div className="flex h-screen bg-[#F4F5F7]">
+    <div className={`flex h-screen bg-[#F4F5F7] ${hideValues ? "privacy-mode" : ""}`}>
       {/* Mobile overlay */}
       {sidebarOpen && (
         <div
@@ -28,7 +26,7 @@ export default function DashboardLayout({
         />
       )}
 
-      {/* Sidebar — always visible on md+, drawer on mobile */}
+      {/* Sidebar */}
       <div
         className={`fixed inset-y-0 left-0 z-40 transition-transform duration-200 md:static md:translate-x-0 ${
           sidebarOpen ? "translate-x-0" : "-translate-x-full"
@@ -50,6 +48,18 @@ export default function DashboardLayout({
             <h1 className="text-sm font-medium text-[#1A1D1F] sm:text-[15px]">Home page</h1>
           </div>
           <div className="flex items-center gap-2 sm:gap-3">
+            <button
+              onClick={toggleHideValues}
+              className={`flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors ${
+                hideValues
+                  ? "border-[#6C9B8B] bg-[#6C9B8B]/10 text-[#6C9B8B]"
+                  : "border-[#EFEFEF] text-[#6F767E] hover:bg-[#F4F5F7]"
+              }`}
+              title={hideValues ? "Show values" : "Hide values"}
+            >
+              {hideValues ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+              <span className="hidden sm:inline">{hideValues ? "Show values" : "Hide values"}</span>
+            </button>
             <div className="h-8 w-8 rounded-full bg-[#D4DAE0] sm:h-9 sm:w-9" />
             <span className="hidden text-sm font-medium text-[#1A1D1F] sm:block">
               My Dashboard
@@ -63,5 +73,17 @@ export default function DashboardLayout({
         </div>
       </main>
     </div>
+  );
+}
+
+export default function DashboardLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  return (
+    <PrivacyProvider>
+      <DashboardInner>{children}</DashboardInner>
+    </PrivacyProvider>
   );
 }
