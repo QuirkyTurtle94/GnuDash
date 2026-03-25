@@ -9,9 +9,11 @@ import type {
   ExpenseCategory,
   MonthlyExpenseByCategory,
   InvestmentHolding,
+  MonthlyInvestmentValue,
   TopBalance,
   RecentTransaction,
   UpcomingBill,
+  ExpenseTransaction,
   DashboardData,
 } from "@/lib/types/gnucash";
 
@@ -51,7 +53,11 @@ export function parseGnuCashFile(filePath: string): DashboardData {
     const cashFlowSeries = computeCashFlowSeries(db);
     const { categories: expenseBreakdown, monthly: monthlyExpensesByCategory, colors: expenseCategoryColors } = computeExpenseBreakdown(db, accounts);
     const investments = computeInvestments(db, accounts, commodities, prices);
+    const investmentValueSeries = computeInvestmentValueSeries(db, accounts, commodities);
     const topBalances = computeTopBalances(db, accounts, commodities, investments);
+    const expenseTransactions = getExpenseTransactions(db, accounts);
+    const { monthly: monthlyIncomeByCategory, colors: incomeCategoryColors } = computeIncomeBreakdown(db, accounts);
+    const incomeTransactions = getIncomeTransactions(db, accounts);
     const recentTransactions = getRecentTransactions(db, accounts);
     const upcomingBills = getUpcomingBills(db);
 
@@ -78,7 +84,12 @@ export function parseGnuCashFile(filePath: string): DashboardData {
       expenseBreakdown,
       monthlyExpensesByCategory,
       expenseCategoryColors,
+      expenseTransactions,
+      monthlyIncomeByCategory,
+      incomeCategoryColors,
+      incomeTransactions,
       investments,
+      investmentValueSeries,
       topBalances,
       recentTransactions,
       upcomingBills,
@@ -465,18 +476,24 @@ function computeExpenseBreakdown(
   const rootAccount = accounts.find((a) => a.account_type === "ROOT");
   if (!rootAccount) return { categories: [], monthly: [], colors: {} };
 
-  const topExpense = accounts.find(
+  // All EXPENSE accounts directly under ROOT (e.g. "Expenses", "Deductibles")
+  const topExpenseAccounts = accounts.filter(
     (a) => a.account_type === "EXPENSE" && a.parent_guid === rootAccount.guid
   );
-  if (!topExpense) return { categories: [], monthly: [], colors: {} };
+  if (topExpenseAccounts.length === 0) return { categories: [], monthly: [], colors: {} };
 
+  const topExpenseGuids = new Set(topExpenseAccounts.map((a) => a.guid));
   const accountMap = new Map(accounts.map((a) => [a.guid, a]));
 
-  // Build path parts relative to the top-level Expenses account
+  // Build path parts — stop at any top-level expense account OR root
   function getExpensePath(account: GnuCashAccount): string[] {
     const parts: string[] = [account.name];
     let current = account;
-    while (current.parent_guid && current.parent_guid !== topExpense!.guid) {
+    while (
+      current.parent_guid &&
+      !topExpenseGuids.has(current.parent_guid) &&
+      current.parent_guid !== rootAccount!.guid
+    ) {
       const parent = accountMap.get(current.parent_guid);
       if (!parent) break;
       parts.unshift(parent.name);
@@ -485,8 +502,10 @@ function computeExpenseBreakdown(
     return parts;
   }
 
-  // Assign colors to top-level expense categories
-  const topLevelChildren = accounts.filter((a) => a.parent_guid === topExpense.guid);
+  // Assign colors — children of ALL top-level expense accounts
+  const topLevelChildren = accounts.filter(
+    (a) => topExpenseGuids.has(a.parent_guid!)
+  );
   // Shades of the sage green theme color (#6C9B8B)
   const colorPalette = [
     "#4A7A6B", "#5C8C7C", "#6C9B8B", "#7DAA9A", "#8FB9A9",
@@ -497,9 +516,9 @@ function computeExpenseBreakdown(
     colorMap[cat.name] = colorPalette[i % colorPalette.length];
   });
 
-  // Get all expense accounts (non-placeholder leaf accounts + accounts with direct splits)
+  // Get all expense accounts (exclude the top-level container accounts themselves)
   const expenseAccounts = accounts.filter(
-    (a) => a.account_type === "EXPENSE" && a.guid !== topExpense.guid
+    (a) => a.account_type === "EXPENSE" && !topExpenseGuids.has(a.guid)
   );
 
   // Get monthly totals per individual expense account
@@ -524,7 +543,7 @@ function computeExpenseBreakdown(
   for (const row of rows) {
     if (row.total <= 0) continue;
     const account = accountMap.get(row.account_guid);
-    if (!account || account.guid === topExpense.guid) continue;
+    if (!account || topExpenseGuids.has(account.guid)) continue;
 
     const pathParts = getExpensePath(account);
     const fullPath = pathParts.join(":");
@@ -551,6 +570,224 @@ function computeExpenseBreakdown(
     .sort((a, b) => b.amount - a.amount);
 
   return { categories, monthly, colors: colorMap };
+}
+
+function getExpenseTransactions(
+  db: Database.Database,
+  accounts: GnuCashAccount[]
+): ExpenseTransaction[] {
+  const rootAccount = accounts.find((a) => a.account_type === "ROOT");
+  if (!rootAccount) return [];
+
+  const topExpenseGuids = new Set(
+    accounts.filter((a) => a.account_type === "EXPENSE" && a.parent_guid === rootAccount.guid).map((a) => a.guid)
+  );
+  if (topExpenseGuids.size === 0) return [];
+
+  const accountMap = new Map(accounts.map((a) => [a.guid, a]));
+
+  function getExpensePath(account: GnuCashAccount): string[] {
+    const parts: string[] = [account.name];
+    let current = account;
+    while (
+      current.parent_guid &&
+      !topExpenseGuids.has(current.parent_guid) &&
+      current.parent_guid !== rootAccount!.guid
+    ) {
+      const parent = accountMap.get(current.parent_guid);
+      if (!parent) break;
+      parts.unshift(parent.name);
+      current = parent;
+    }
+    return parts;
+  }
+
+  const rows = db
+    .prepare(
+      `SELECT
+        s.account_guid,
+        t.post_date,
+        t.description,
+        CAST(s.value_num AS REAL) / s.value_denom AS amount
+      FROM splits s
+      JOIN accounts a ON s.account_guid = a.guid
+      JOIN transactions t ON s.tx_guid = t.guid
+      WHERE a.account_type = 'EXPENSE'
+      ORDER BY t.post_date DESC`
+    )
+    .all() as { account_guid: string; post_date: string; description: string; amount: number }[];
+
+  const transactions: ExpenseTransaction[] = [];
+  for (const row of rows) {
+    if (row.amount <= 0) continue;
+    const account = accountMap.get(row.account_guid);
+    if (!account || topExpenseGuids.has(account.guid)) continue;
+
+    const pathParts = getExpensePath(account);
+    const date = parseGnuCashDate(row.post_date);
+    const dateStr = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+
+    transactions.push({
+      date: dateStr,
+      description: row.description,
+      accountName: account.name,
+      fullPath: pathParts.join(":"),
+      pathParts,
+      amount: row.amount,
+    });
+  }
+
+  return transactions;
+}
+
+function computeIncomeBreakdown(
+  db: Database.Database,
+  accounts: GnuCashAccount[]
+): { monthly: MonthlyExpenseByCategory[]; colors: Record<string, string> } {
+  const rootAccount = accounts.find((a) => a.account_type === "ROOT");
+  if (!rootAccount) return { monthly: [], colors: {} };
+
+  const topIncomeAccounts = accounts.filter(
+    (a) => a.account_type === "INCOME" && a.parent_guid === rootAccount.guid
+  );
+  if (topIncomeAccounts.length === 0) return { monthly: [], colors: {} };
+
+  const topIncomeGuids = new Set(topIncomeAccounts.map((a) => a.guid));
+  const accountMap = new Map(accounts.map((a) => [a.guid, a]));
+
+  function getIncomePath(account: GnuCashAccount): string[] {
+    const parts: string[] = [account.name];
+    let current = account;
+    while (
+      current.parent_guid &&
+      !topIncomeGuids.has(current.parent_guid) &&
+      current.parent_guid !== rootAccount!.guid
+    ) {
+      const parent = accountMap.get(current.parent_guid);
+      if (!parent) break;
+      parts.unshift(parent.name);
+      current = parent;
+    }
+    return parts;
+  }
+
+  // Color palette — blue tones to distinguish from expense greens
+  const topLevelChildren = accounts.filter(
+    (a) => topIncomeGuids.has(a.parent_guid!)
+  );
+  const colorPalette = [
+    "#3B6B8A", "#4A7A9A", "#5889A9", "#6798B8", "#76A7C7",
+    "#85B6D6", "#94C5E5", "#A3D0EE", "#B8DCF3", "#CDE8F8",
+  ];
+  const colorMap: Record<string, string> = {};
+  topLevelChildren.forEach((cat, i) => {
+    colorMap[cat.name] = colorPalette[i % colorPalette.length];
+  });
+
+  const rows = db
+    .prepare(
+      `SELECT
+        s.account_guid,
+        strftime('%Y-%m', t.post_date) AS month,
+        SUM(CAST(s.value_num AS REAL) / s.value_denom) AS total
+      FROM splits s
+      JOIN accounts a ON s.account_guid = a.guid
+      JOIN transactions t ON s.tx_guid = t.guid
+      WHERE a.account_type = 'INCOME'
+      GROUP BY s.account_guid, strftime('%Y-%m', t.post_date)
+      ORDER BY month`
+    )
+    .all() as { account_guid: string; month: string; total: number }[];
+
+  const monthly: MonthlyExpenseByCategory[] = [];
+  for (const row of rows) {
+    // Income splits are negative in GNUCash — negate for positive display
+    const amount = -row.total;
+    if (amount <= 0) continue;
+    const account = accountMap.get(row.account_guid);
+    if (!account || topIncomeGuids.has(account.guid)) continue;
+
+    const pathParts = getIncomePath(account);
+    monthly.push({
+      month: row.month,
+      category: account.name,
+      fullPath: pathParts.join(":"),
+      pathParts,
+      amount,
+    });
+  }
+
+  return { monthly, colors: colorMap };
+}
+
+function getIncomeTransactions(
+  db: Database.Database,
+  accounts: GnuCashAccount[]
+): ExpenseTransaction[] {
+  const rootAccount = accounts.find((a) => a.account_type === "ROOT");
+  if (!rootAccount) return [];
+
+  const topIncomeGuids = new Set(
+    accounts.filter((a) => a.account_type === "INCOME" && a.parent_guid === rootAccount.guid).map((a) => a.guid)
+  );
+  if (topIncomeGuids.size === 0) return [];
+
+  const accountMap = new Map(accounts.map((a) => [a.guid, a]));
+
+  function getIncomePath(account: GnuCashAccount): string[] {
+    const parts: string[] = [account.name];
+    let current = account;
+    while (
+      current.parent_guid &&
+      !topIncomeGuids.has(current.parent_guid) &&
+      current.parent_guid !== rootAccount!.guid
+    ) {
+      const parent = accountMap.get(current.parent_guid);
+      if (!parent) break;
+      parts.unshift(parent.name);
+      current = parent;
+    }
+    return parts;
+  }
+
+  const rows = db
+    .prepare(
+      `SELECT
+        s.account_guid,
+        t.post_date,
+        t.description,
+        CAST(s.value_num AS REAL) / s.value_denom AS amount
+      FROM splits s
+      JOIN accounts a ON s.account_guid = a.guid
+      JOIN transactions t ON s.tx_guid = t.guid
+      WHERE a.account_type = 'INCOME'
+      ORDER BY t.post_date DESC`
+    )
+    .all() as { account_guid: string; post_date: string; description: string; amount: number }[];
+
+  const transactions: ExpenseTransaction[] = [];
+  for (const row of rows) {
+    // Income splits are negative — negate for positive display
+    const amount = -row.amount;
+    if (amount <= 0) continue;
+    const account = accountMap.get(row.account_guid);
+    if (!account || topIncomeGuids.has(account.guid)) continue;
+
+    const pathParts = getIncomePath(account);
+    const date = parseGnuCashDate(row.post_date);
+    const dateStr = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+
+    transactions.push({
+      date: dateStr,
+      description: row.description,
+      accountName: account.name,
+      fullPath: pathParts.join(":"),
+      pathParts,
+      amount,
+    });
+  }
+
+  return transactions;
 }
 
 function computeInvestments(
@@ -594,8 +831,7 @@ function computeInvestments(
       FROM splits s
       JOIN accounts a ON s.account_guid = a.guid
       WHERE a.account_type IN ('STOCK', 'MUTUAL')
-      GROUP BY a.guid
-      HAVING shares_held != 0`
+      GROUP BY a.guid`
     )
     .all() as {
     account_guid: string;
@@ -631,6 +867,118 @@ function computeInvestments(
       change12mPct,
     };
   });
+}
+
+function computeInvestmentValueSeries(
+  db: Database.Database,
+  accounts: GnuCashAccount[],
+  commodities: GnuCashCommodity[]
+): MonthlyInvestmentValue[] {
+  const commodityMap = new Map(commodities.map((c) => [c.guid, c]));
+
+  // Get all investment splits with dates, grouped by account and month
+  // This gives us cumulative shares and cost basis at each month end
+  const splits = db
+    .prepare(
+      `SELECT
+        a.guid AS account_guid,
+        a.name AS account_name,
+        a.commodity_guid,
+        strftime('%Y-%m', t.post_date) AS month,
+        CAST(s.quantity_num AS REAL) / s.quantity_denom AS shares,
+        CAST(s.value_num AS REAL) / s.value_denom AS cost
+      FROM splits s
+      JOIN accounts a ON s.account_guid = a.guid
+      JOIN transactions t ON s.tx_guid = t.guid
+      WHERE a.account_type IN ('STOCK', 'MUTUAL')
+      ORDER BY t.post_date`
+    )
+    .all() as { account_guid: string; account_name: string; commodity_guid: string; month: string; shares: number; cost: number }[];
+
+  // Build cumulative shares and cost per account per month
+  const accountMonthly = new Map<string, Map<string, { shares: number; cost: number; commodity_guid: string }>>();
+  for (const s of splits) {
+    if (!accountMonthly.has(s.account_guid)) {
+      accountMonthly.set(s.account_guid, new Map());
+    }
+    const months = accountMonthly.get(s.account_guid)!;
+    const existing = months.get(s.month);
+    if (existing) {
+      existing.shares += s.shares;
+      existing.cost += s.cost;
+    } else {
+      months.set(s.month, { shares: s.shares, cost: s.cost, commodity_guid: s.commodity_guid });
+    }
+  }
+
+  // Get all prices sorted by date
+  const allPrices = db
+    .prepare(
+      `SELECT commodity_guid, strftime('%Y-%m', date) AS month, CAST(value_num AS REAL) / value_denom AS price
+      FROM prices
+      ORDER BY date`
+    )
+    .all() as { commodity_guid: string; month: string; price: number }[];
+
+  // Build latest price per commodity per month
+  const priceByMonth = new Map<string, Map<string, number>>();
+  for (const p of allPrices) {
+    if (!priceByMonth.has(p.commodity_guid)) {
+      priceByMonth.set(p.commodity_guid, new Map());
+    }
+    priceByMonth.get(p.commodity_guid)!.set(p.month, p.price);
+  }
+
+  // Collect all months across all accounts
+  const allMonths = new Set<string>();
+  for (const months of accountMonthly.values()) {
+    for (const m of months.keys()) allMonths.add(m);
+  }
+  for (const months of priceByMonth.values()) {
+    for (const m of months.keys()) allMonths.add(m);
+  }
+  const sortedMonths = [...allMonths].sort();
+
+  // For each account, compute cumulative shares/cost at each month, then value = shares × price
+  const result: MonthlyInvestmentValue[] = [];
+
+  for (const [accountGuid, monthlyData] of accountMonthly) {
+    // Find the ticker for this account
+    const firstEntry = [...monthlyData.values()][0];
+    if (!firstEntry) continue;
+    const commodity = commodityMap.get(firstEntry.commodity_guid);
+    const ticker = commodity?.mnemonic ?? "???";
+    const commodityPrices = priceByMonth.get(firstEntry.commodity_guid);
+
+    let cumulativeShares = 0;
+    let cumulativeCost = 0;
+    let lastKnownPrice = 0;
+
+    for (const month of sortedMonths) {
+      const delta = monthlyData.get(month);
+      if (delta) {
+        cumulativeShares += delta.shares;
+        cumulativeCost += delta.cost;
+      }
+
+      const priceThisMonth = commodityPrices?.get(month);
+      if (priceThisMonth !== undefined) {
+        lastKnownPrice = priceThisMonth;
+      }
+
+      // Only emit months where this account has had activity or has a position
+      if (cumulativeShares === 0 && cumulativeCost === 0 && !delta) continue;
+
+      result.push({
+        month,
+        ticker,
+        value: cumulativeShares * lastKnownPrice,
+        costBasis: cumulativeCost,
+      });
+    }
+  }
+
+  return result;
 }
 
 function computeTopBalances(

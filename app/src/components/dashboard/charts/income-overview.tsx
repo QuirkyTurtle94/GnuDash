@@ -26,7 +26,6 @@ function getMonthsForPeriod(period: TimePeriod): string[] {
   const now = new Date();
   const y = now.getFullYear();
   const m = now.getMonth();
-
   switch (period) {
     case "this-month":
       return [`${y}-${String(m + 1).padStart(2, "0")}`];
@@ -36,9 +35,7 @@ function getMonthsForPeriod(period: TimePeriod): string[] {
     }
     case "this-year": {
       const months: string[] = [];
-      for (let i = 0; i <= m; i++) {
-        months.push(`${y}-${String(i + 1).padStart(2, "0")}`);
-      }
+      for (let i = 0; i <= m; i++) months.push(`${y}-${String(i + 1).padStart(2, "0")}`);
       return months;
     }
     case "last-12m": {
@@ -52,119 +49,79 @@ function getMonthsForPeriod(period: TimePeriod): string[] {
   }
 }
 
-interface SpendingOverviewProps {
-  monthlyExpenses: MonthlyExpenseByCategory[];
+interface IncomeOverviewProps {
+  monthlyIncome: MonthlyExpenseByCategory[];
   categoryColors: Record<string, string>;
   currency: string;
-  /** If set, the card title links to this URL */
   linkTo?: string;
 }
 
-export function SpendingOverview({ monthlyExpenses, categoryColors, currency, linkTo }: SpendingOverviewProps) {
+export function IncomeOverview({ monthlyIncome, categoryColors, currency, linkTo }: IncomeOverviewProps) {
   const [period, setPeriod] = useState<TimePeriod>("this-month");
   const [showPeriodDropdown, setShowPeriodDropdown] = useState(false);
-  const [depth, setDepth] = useState(1);
-  const [showDepthDropdown, setShowDepthDropdown] = useState(false);
-  // Drill-down: null = top-level view, string = path prefix to filter by
   const [drillPath, setDrillPath] = useState<string | null>(null);
-  // Excluded categories (by fullPath) — hidden from pie chart
   const [excluded, setExcluded] = useState<Set<string>>(new Set());
 
-  // Determine max available depth
-  const maxDepth = useMemo(() => {
-    if (!monthlyExpenses) return 1;
-    let max = 1;
-    for (const row of monthlyExpenses) {
-      if (row.pathParts && row.pathParts.length > max) {
-        max = row.pathParts.length;
-      }
-    }
-    return max;
-  }, [monthlyExpenses]);
-
   const { categories, total } = useMemo(() => {
-    if (!monthlyExpenses) return { categories: [], total: 0 };
-
+    if (!monthlyIncome) return { categories: [], total: 0 };
     const validMonths = new Set(getMonthsForPeriod(period));
     const drillParts = drillPath ? drillPath.split(":") : null;
     const drillDepth = drillParts ? drillParts.length : 0;
     const totals = new Map<string, number>();
 
-    for (const row of monthlyExpenses) {
-      if (!validMonths.has(row.month)) continue;
-      if (!row.pathParts) continue;
-
+    for (const row of monthlyIncome) {
+      if (!validMonths.has(row.month) || !row.pathParts) continue;
       if (drillPath) {
-        // When drilled in, only include rows whose path starts with the drill prefix
         const rowPrefix = row.pathParts.slice(0, drillDepth).join(":");
         if (rowPrefix !== drillPath) continue;
-        // Must have at least one more level to show as a sub-category
         if (row.pathParts.length <= drillDepth) continue;
-        // Group by the next level below the drill path
         const groupKey = row.pathParts.slice(0, drillDepth + 1).join(":");
         totals.set(groupKey, (totals.get(groupKey) ?? 0) + row.amount);
       } else {
-        // Top-level view: group by the path truncated to selected depth
-        const groupKey = row.pathParts.slice(0, depth).join(":");
+        const groupKey = row.pathParts[0];
         totals.set(groupKey, (totals.get(groupKey) ?? 0) + row.amount);
       }
     }
 
     const cats = [...totals.entries()]
-      .map(([path, amount]) => {
-        const topLevel = path.split(":")[0];
-        // Display name: show only the last segment when drilled in
-        const displayName = drillPath ? path.split(":").slice(-1)[0] : path;
-        return {
-          name: displayName,
-          fullPath: path,
-          amount,
-          color: categoryColors[topLevel] ?? "#D4DAE0",
-        };
-      })
+      .map(([path, amount]) => ({
+        name: drillPath ? path.split(":").slice(-1)[0] : path,
+        fullPath: path,
+        amount,
+        color: categoryColors[path.split(":")[0]] ?? "#D4DAE0",
+      }))
       .sort((a, b) => b.amount - a.amount);
+    return { categories: cats, total: cats.reduce((s, c) => s + c.amount, 0) };
+  }, [monthlyIncome, categoryColors, period, drillPath]);
 
-    const t = cats.reduce((sum, c) => sum + c.amount, 0);
-    return { categories: cats, total: t };
-  }, [monthlyExpenses, categoryColors, period, depth, drillPath]);
-
-  // Active categories (not excluded) and their total
   const { activeCategories, activeTotal } = useMemo(() => {
     const active = categories.filter((c) => !excluded.has(c.fullPath));
-    const t = active.reduce((sum, c) => sum + c.amount, 0);
-    return { activeCategories: active, activeTotal: t };
+    return { activeCategories: active, activeTotal: active.reduce((s, c) => s + c.amount, 0) };
   }, [categories, excluded]);
 
-  // For the pie chart, group small slices (<3%) into "Others"
   const pieData = useMemo(() => {
     if (activeTotal === 0) return [];
-    const significant: { name: string; fullPath: string; amount: number; color: string }[] = [];
+    const significant: typeof categories = [];
     let othersTotal = 0;
     for (const cat of activeCategories) {
-      if ((cat.amount / activeTotal) * 100 >= 3) {
-        significant.push(cat);
-      } else {
-        othersTotal += cat.amount;
-      }
+      if ((cat.amount / activeTotal) * 100 >= 3) significant.push(cat);
+      else othersTotal += cat.amount;
     }
-    if (othersTotal > 0) {
-      significant.push({ name: "Others", fullPath: "", amount: othersTotal, color: "#D4DAE0" });
-    }
+    if (othersTotal > 0) significant.push({ name: "Others", fullPath: "", amount: othersTotal, color: "#D4DAE0" });
     return significant;
   }, [activeCategories, activeTotal]);
 
-  // Check if a drilled category has sub-accounts to drill into
   const canDrill = useCallback((fullPath: string) => {
-    if (!monthlyExpenses || !fullPath) return false;
+    if (!monthlyIncome || !fullPath) return false;
     const parts = fullPath.split(":");
-    return monthlyExpenses.some(
+    return monthlyIncome.some(
       (row) => row.pathParts && row.pathParts.length > parts.length &&
         row.pathParts.slice(0, parts.length).join(":") === fullPath
     );
-  }, [monthlyExpenses]);
+  }, [monthlyIncome]);
 
   const handleSliceClick = useCallback((data: { fullPath: string }) => {
-    if (!data.fullPath) return; // "Others" slice — don't drill
+    if (!data.fullPath) return;
     if (canDrill(data.fullPath)) {
       setDrillPath(data.fullPath);
       setExcluded(new Set());
@@ -176,96 +133,55 @@ export function SpendingOverview({ monthlyExpenses, categoryColors, currency, li
       <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-2 pb-2">
         <CardTitle className="text-lg font-semibold text-[#1A1D1F]">
           {linkTo ? (
-            <Link href={linkTo} className="hover:text-[#6C9B8B] transition-colors">
-              Spending Overview
-            </Link>
-          ) : (
-            "Spending Overview"
-          )}
+            <Link href={linkTo} className="hover:text-[#3B6B8A] transition-colors">Income Overview</Link>
+          ) : "Income Overview"}
         </CardTitle>
-        <div className="flex items-center gap-2">
-          {/* Depth selector */}
-          <div className="relative">
-            <button
-              onClick={() => { setShowDepthDropdown(!showDepthDropdown); setShowPeriodDropdown(false); }}
-              className="flex items-center gap-1.5 rounded-lg border border-[#EFEFEF] px-3 py-1.5 transition-colors hover:bg-[#F4F5F7]"
-            >
-              <span className="text-xs font-medium text-[#6F767E]">
-                {depth === 1 ? "Top Level" : `Depth ${depth}`}
-              </span>
-              <svg className="h-3.5 w-3.5 text-[#9A9FA5]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-              </svg>
-            </button>
-            {showDepthDropdown && (
-              <div className="absolute right-0 top-full z-10 mt-1 w-32 rounded-lg border border-[#EFEFEF] bg-white py-1 shadow-lg">
-                {Array.from({ length: maxDepth }, (_, i) => i + 1).map((d) => (
-                  <button
-                    key={d}
-                    onClick={() => { setDepth(d); setShowDepthDropdown(false); }}
-                    className={`w-full px-3 py-2 text-left text-xs transition-colors hover:bg-[#F4F5F7] ${
-                      depth === d ? "font-medium text-[#6C9B8B]" : "text-[#6F767E]"
-                    }`}
-                  >
-                    {d === 1 ? "Top Level" : `Depth ${d}`}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* Period selector */}
-          <div className="relative">
-            <button
-              onClick={() => { setShowPeriodDropdown(!showPeriodDropdown); setShowDepthDropdown(false); }}
-              className="flex items-center gap-1.5 rounded-lg border border-[#EFEFEF] px-3 py-1.5 transition-colors hover:bg-[#F4F5F7]"
-            >
-              <span className="text-xs font-medium text-[#6F767E]">{PERIOD_LABELS[period]}</span>
-              <svg className="h-3.5 w-3.5 text-[#9A9FA5]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-              </svg>
-            </button>
-            {showPeriodDropdown && (
-              <div className="absolute right-0 top-full z-10 mt-1 w-40 rounded-lg border border-[#EFEFEF] bg-white py-1 shadow-lg">
-                {(Object.keys(PERIOD_LABELS) as TimePeriod[]).map((p) => (
-                  <button
-                    key={p}
-                    onClick={() => { setPeriod(p); setShowPeriodDropdown(false); }}
-                    className={`w-full px-3 py-2 text-left text-xs transition-colors hover:bg-[#F4F5F7] ${
-                      period === p ? "font-medium text-[#6C9B8B]" : "text-[#6F767E]"
-                    }`}
-                  >
-                    {PERIOD_LABELS[p]}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
+        <div className="relative">
+          <button
+            onClick={() => setShowPeriodDropdown(!showPeriodDropdown)}
+            className="flex items-center gap-1.5 rounded-lg border border-[#EFEFEF] px-3 py-1.5 transition-colors hover:bg-[#F4F5F7]"
+          >
+            <span className="text-xs font-medium text-[#6F767E]">{PERIOD_LABELS[period]}</span>
+            <svg className="h-3.5 w-3.5 text-[#9A9FA5]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
+          {showPeriodDropdown && (
+            <div className="absolute right-0 top-full z-10 mt-1 w-40 rounded-lg border border-[#EFEFEF] bg-white py-1 shadow-lg">
+              {(Object.keys(PERIOD_LABELS) as TimePeriod[]).map((p) => (
+                <button
+                  key={p}
+                  onClick={() => { setPeriod(p); setShowPeriodDropdown(false); }}
+                  className={`w-full px-3 py-2 text-left text-xs transition-colors hover:bg-[#F4F5F7] ${
+                    period === p ? "font-medium text-[#3B6B8A]" : "text-[#6F767E]"
+                  }`}
+                >
+                  {PERIOD_LABELS[p]}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
       </CardHeader>
       <CardContent>
         {categories.length === 0 ? (
-          <p className="py-8 text-center text-sm text-[#9A9FA5]">No expenses in this period</p>
+          <p className="py-8 text-center text-sm text-[#9A9FA5]">No income in this period</p>
         ) : (
           <div className="flex flex-col gap-4 sm:flex-row">
-            {/* Donut chart with total above */}
             <div className="flex shrink-0 flex-col items-center sm:w-[220px]">
               {drillPath && (
                 <button
                   onClick={() => {
-                    // Go up one level, or back to top if only one level deep
                     const parts = drillPath.split(":");
                     setDrillPath(parts.length > 1 ? parts.slice(0, -1).join(":") : null);
                     setExcluded(new Set());
                   }}
-                  className="mb-1 flex items-center gap-1 self-start rounded-md px-2 py-1 text-xs text-[#6C9B8B] transition-colors hover:bg-[#F4F5F7]"
+                  className="mb-1 flex items-center gap-1 self-start rounded-md px-2 py-1 text-xs text-[#3B6B8A] transition-colors hover:bg-[#F4F5F7]"
                 >
                   <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
                   </svg>
-                  {drillPath.split(":").length > 1
-                    ? drillPath.split(":").slice(-2, -1)[0]
-                    : "All Categories"}
+                  {drillPath.split(":").length > 1 ? drillPath.split(":").slice(-2, -1)[0] : "All Categories"}
                 </button>
               )}
               <div className="mb-2 text-center">
@@ -273,7 +189,7 @@ export function SpendingOverview({ monthlyExpenses, categoryColors, currency, li
                   {formatCurrency(activeTotal, currency, { decimals: 0 })}
                 </span>
                 <p className="text-[11px] text-[#9A9FA5]">
-                  {drillPath ? drillPath.split(":").slice(-1)[0] : "Total spending"}
+                  {drillPath ? drillPath.split(":").slice(-1)[0] : "Total income"}
                 </p>
               </div>
               <div className="relative h-[180px] w-[180px]">
@@ -313,8 +229,6 @@ export function SpendingOverview({ monthlyExpenses, categoryColors, currency, li
                 </ResponsiveContainer>
               </div>
             </div>
-
-            {/* Category list */}
             <div className="flex flex-1 flex-col justify-center gap-1.5 overflow-y-auto">
               {categories.map((cat) => {
                 const drillable = canDrill(cat.fullPath);
@@ -330,21 +244,12 @@ export function SpendingOverview({ monthlyExpenses, categoryColors, currency, li
                       }
                     }}
                     className={`group flex items-center justify-between gap-2 rounded-md px-1 py-0.5 transition-colors ${
-                      isExcluded
-                        ? "cursor-pointer opacity-40"
-                        : drillable
-                          ? "cursor-pointer hover:bg-[#F4F5F7]"
-                          : ""
+                      isExcluded ? "cursor-pointer opacity-40" : drillable ? "cursor-pointer hover:bg-[#F4F5F7]" : ""
                     }`}
                   >
                     <div className="flex items-center gap-2 min-w-0">
-                      <div
-                        className="h-2 w-2 shrink-0 rounded-full"
-                        style={{ backgroundColor: cat.color }}
-                      />
-                      <span className="truncate text-xs text-[#6F767E]">
-                        {cat.name}
-                      </span>
+                      <div className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: cat.color }} />
+                      <span className="truncate text-xs text-[#6F767E]">{cat.name}</span>
                     </div>
                     <div className="flex shrink-0 items-center gap-1">
                       <span className="text-xs font-medium text-[#1A1D1F]">

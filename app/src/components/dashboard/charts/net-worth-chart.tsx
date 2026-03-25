@@ -55,7 +55,7 @@ interface NetWorthChartProps {
 }
 
 export function NetWorthChart({ series, currentNetWorth, currency }: NetWorthChartProps) {
-  const [period, setPeriod] = useState<TimePeriod>("last-6m");
+  const [period, setPeriod] = useState<TimePeriod>("all-time");
   const [showDropdown, setShowDropdown] = useState(false);
 
   const filtered = useMemo(() => {

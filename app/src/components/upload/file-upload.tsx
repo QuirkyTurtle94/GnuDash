@@ -49,9 +49,9 @@ export function FileUpload() {
   }, [handleFile]);
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-[#F4F5F7] p-8">
+    <div className="flex min-h-screen items-center justify-center bg-[#F4F5F7] p-4 sm:p-8">
       <div className="w-full max-w-lg">
-        <div className="mb-8 text-center">
+        <div className="mb-6 text-center sm:mb-8">
           <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-xl bg-[#6C9B8B]">
             <FileText className="h-7 w-7 text-white" />
           </div>
@@ -66,7 +66,7 @@ export function FileUpload() {
           onDrop={handleDrop}
           onDragOver={handleDragOver}
           onDragLeave={handleDragLeave}
-          className={`cursor-pointer rounded-2xl border-2 border-dashed p-12 text-center transition-all ${
+          className={`cursor-pointer rounded-2xl border-2 border-dashed p-8 text-center transition-all sm:p-12 ${
             isDragging
               ? "border-[#6C9B8B] bg-[#6C9B8B]/5"
               : "border-[#D4DAE0] bg-white hover:border-[#6C9B8B]/50 hover:bg-[#6C9B8B]/5"

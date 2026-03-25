@@ -125,6 +125,13 @@ export interface InvestmentHolding {
   change12mPct: number | null;
 }
 
+export interface MonthlyInvestmentValue {
+  month: string; // YYYY-MM
+  ticker: string;
+  value: number; // market value = shares held at month end × price at month end
+  costBasis: number; // cumulative cost basis at month end
+}
+
 export interface RecentTransaction {
   date: string;
   description: string;
@@ -149,6 +156,15 @@ export interface TopBalance {
   commodityMnemonic: string;
 }
 
+export interface ExpenseTransaction {
+  date: string; // YYYY-MM-DD
+  description: string;
+  accountName: string; // leaf expense account name
+  fullPath: string; // e.g. "Food:Groceries"
+  pathParts: string[];
+  amount: number;
+}
+
 export interface DashboardData {
   currency: string; // ISO 4217 code detected from GNUCash (e.g. "GBP", "USD")
   accounts: AccountNode[];
@@ -157,7 +173,12 @@ export interface DashboardData {
   expenseBreakdown: ExpenseCategory[];
   monthlyExpensesByCategory: MonthlyExpenseByCategory[];
   expenseCategoryColors: Record<string, string>;
+  expenseTransactions: ExpenseTransaction[];
+  monthlyIncomeByCategory: MonthlyExpenseByCategory[];
+  incomeCategoryColors: Record<string, string>;
+  incomeTransactions: ExpenseTransaction[];
   investments: InvestmentHolding[];
+  investmentValueSeries: MonthlyInvestmentValue[];
   topBalances: TopBalance[];
   recentTransactions: RecentTransaction[];
   upcomingBills: UpcomingBill[];

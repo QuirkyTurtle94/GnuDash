@@ -22,13 +22,16 @@ const DEFAULT_CONFIG = { icon: Wallet, color: "#9A9FA5", bg: "#9A9FA515", label:
 interface TopBalancesProps {
   balances: TopBalance[];
   currency: string;
+  /** If set, only show balances of this account type */
+  filterType?: string | null;
 }
 
-export function TopBalances({ balances, currency }: TopBalancesProps) {
-  const totalAssets = balances
+export function TopBalances({ balances, currency, filterType }: TopBalancesProps) {
+  const filtered = filterType ? balances.filter((b) => b.type === filterType) : balances;
+  const totalAssets = filtered
     .filter((b) => b.value > 0)
     .reduce((sum, b) => sum + b.value, 0);
-  const totalLiabilities = balances
+  const totalLiabilities = filtered
     .filter((b) => b.value < 0)
     .reduce((sum, b) => sum + b.value, 0);
 
@@ -64,11 +67,11 @@ export function TopBalances({ balances, currency }: TopBalancesProps) {
         </div>
 
         <div className="divide-y divide-[#EFEFEF]">
-          {balances.map((bal, i) => {
+          {filtered.map((bal, i) => {
             const config = TYPE_CONFIG[bal.type] ?? DEFAULT_CONFIG;
             const Icon = config.icon;
             const isNegative = bal.value < 0;
-            const prevPositive = i > 0 && balances[i - 1].value > 0;
+            const prevPositive = i > 0 && filtered[i - 1].value > 0;
             const showSeparator = isNegative && prevPositive;
 
             return (
