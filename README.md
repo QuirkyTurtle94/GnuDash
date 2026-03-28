@@ -1,4 +1,6 @@
-# GnuDash
+<p align="center">
+  <img src="app/public/logo.png" alt="GnuDash" height="120">
+</p>
 
 A personal finance dashboard that reads your GNUCash file and presents your financial data through a clean, interactive UI. Upload your `.gnucash` file, explore your finances — no data stored on the server.
 
