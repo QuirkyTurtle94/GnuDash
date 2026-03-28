@@ -26,9 +26,9 @@ Charts are fully interactive — click any bar or segment to drill down into bre
 |-----------|----------|
 | ![Dashboard](app/screenshots/02-dashboard.png) | ![Spending](app/screenshots/03-spending.png) |
 
-| Income | Investments |
-|--------|-------------|
-| ![Income](app/screenshots/04-income.png) | ![Investments](app/screenshots/05-investment.png) |
+| Income |
+|--------|
+| ![Income](app/screenshots/04-income.png) |
 
 ## Prerequisites
 
