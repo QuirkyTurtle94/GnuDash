@@ -44,9 +44,10 @@ export function Sidebar({ onNavigate }: SidebarProps) {
           <Image
             src="/logo.png"
             alt="GnuDash"
-            width={200}
-            height={200}
+            width={230}
+            height={153}
             className="rounded-2xl"
+            style={{ width: "auto", height: "auto" }}
           />
         </div>
 

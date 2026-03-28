@@ -56,11 +56,12 @@ export function FileUpload() {
           <Image
             src="/logo.png"
             alt="GnuDash"
-            width={360}
-            height={360}
+            width={900}
+            height={600}
             className="mx-auto mb-4 rounded-2xl"
+            loading="eager"
+            style={{ width: "auto", height: "auto" }}
           />
-          <h1 className="text-2xl font-bold text-[#1A1D1F]">GnuDash</h1>
           <p className="mt-2 text-sm text-[#6F767E]">
             Upload your .gnucash file to view your financial dashboard
           </p>
