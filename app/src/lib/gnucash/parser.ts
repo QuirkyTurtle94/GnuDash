@@ -309,23 +309,72 @@ function computeCurrentNetWorth(
 }
 
 function computeNetWorthSeries(db: Database.Database): MonthlyNetWorth[] {
-  // Step 1: Get monthly changes for non-investment accounts (value = market value)
+  // Determine base currency and FX rates (same approach as computeCurrentNetWorth)
+  const book = db
+    .prepare(`SELECT root_account_guid FROM books LIMIT 1`)
+    .get() as { root_account_guid: string } | undefined;
+  const rootAcct = book
+    ? (db.prepare(`SELECT commodity_guid FROM accounts WHERE guid = ?`).get(book.root_account_guid) as { commodity_guid: string } | undefined)
+    : null;
+  const baseCurrencyGuid = rootAcct?.commodity_guid ?? "";
+
+  const allCommodities = db
+    .prepare(`SELECT guid, namespace FROM commodities`)
+    .all() as { guid: string; namespace: string }[];
+  const commodityMap = new Map(allCommodities.map((c) => [c.guid, c]));
+
+  const allFxPrices = db
+    .prepare(
+      `SELECT p.commodity_guid, p.currency_guid,
+              CAST(p.value_num AS REAL) / p.value_denom AS price
+       FROM prices p
+       JOIN commodities c1 ON p.commodity_guid = c1.guid
+       JOIN commodities c2 ON p.currency_guid = c2.guid
+       WHERE c1.namespace = 'CURRENCY' AND c2.namespace = 'CURRENCY'
+       ORDER BY p.date DESC`
+    )
+    .all() as { commodity_guid: string; currency_guid: string; price: number }[];
+
+  const fxToBase = new Map<string, number>();
+  fxToBase.set(baseCurrencyGuid, 1.0);
+  for (const fx of allFxPrices) {
+    if (fx.currency_guid === baseCurrencyGuid && !fxToBase.has(fx.commodity_guid)) {
+      fxToBase.set(fx.commodity_guid, fx.price);
+    } else if (fx.commodity_guid === baseCurrencyGuid && !fxToBase.has(fx.currency_guid)) {
+      fxToBase.set(fx.currency_guid, 1 / fx.price);
+    }
+  }
+
+  // Step 1: Get monthly changes for non-investment accounts using quantity + FX conversion
   const nonInvRows = db
     .prepare(
       `SELECT
         strftime('%Y-%m', t.post_date) AS month,
+        a.commodity_guid,
         SUM(CASE WHEN a.account_type IN ('ASSET','BANK','CASH','RECEIVABLE')
-            THEN CAST(s.value_num AS REAL) / s.value_denom ELSE 0 END) AS asset_change,
+            THEN CAST(s.quantity_num AS REAL) / s.quantity_denom ELSE 0 END) AS asset_change,
         SUM(CASE WHEN a.account_type IN ('LIABILITY','CREDIT','PAYABLE')
-            THEN CAST(s.value_num AS REAL) / s.value_denom ELSE 0 END) AS liability_change
+            THEN CAST(s.quantity_num AS REAL) / s.quantity_denom ELSE 0 END) AS liability_change
       FROM splits s
       JOIN accounts a ON s.account_guid = a.guid
       JOIN transactions t ON s.tx_guid = t.guid
       WHERE a.account_type IN ('ASSET','BANK','CASH','RECEIVABLE','LIABILITY','CREDIT','PAYABLE')
-      GROUP BY strftime('%Y-%m', t.post_date)
+        AND a.placeholder = 0
+      GROUP BY strftime('%Y-%m', t.post_date), a.commodity_guid
       ORDER BY month`
     )
-    .all() as { month: string; asset_change: number; liability_change: number }[];
+    .all() as { month: string; commodity_guid: string; asset_change: number; liability_change: number }[];
+
+  // Aggregate non-investment rows by month, applying FX conversion
+  const nonInvByMonth = new Map<string, { asset_change: number; liability_change: number }>();
+  for (const row of nonInvRows) {
+    const commodity = commodityMap.get(row.commodity_guid);
+    const rate = (commodity?.namespace === "CURRENCY") ? (fxToBase.get(row.commodity_guid) ?? 1) : 1;
+    const existing = nonInvByMonth.get(row.month) ?? { asset_change: 0, liability_change: 0 };
+    existing.asset_change += row.asset_change * rate;
+    existing.liability_change += row.liability_change * rate;
+    nonInvByMonth.set(row.month, existing);
+  }
 
   // Step 2: For investment accounts, compute market value at end of each month
   // Get all investment accounts with their commodity
@@ -405,20 +454,14 @@ function computeNetWorthSeries(db: Database.Database): MonthlyNetWorth[] {
   }
 
   // Step 3: Collect all months and compute final series
-  for (const row of nonInvRows) allMonths.add(row.month);
+  for (const [month] of nonInvByMonth) allMonths.add(month);
   const sortedMonths = [...allMonths].sort();
-
-  // Build non-investment cumulative values
-  const nonInvMap = new Map<string, { asset_change: number; liability_change: number }>();
-  for (const row of nonInvRows) {
-    nonInvMap.set(row.month, row);
-  }
 
   let cumulativeNonInvAssets = 0;
   let cumulativeLiabilities = 0;
 
   return sortedMonths.map((month) => {
-    const nonInv = nonInvMap.get(month);
+    const nonInv = nonInvByMonth.get(month);
     if (nonInv) {
       cumulativeNonInvAssets += nonInv.asset_change;
       cumulativeLiabilities += nonInv.liability_change;

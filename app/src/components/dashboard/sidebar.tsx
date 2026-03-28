@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
@@ -39,13 +40,14 @@ export function Sidebar({ onNavigate }: SidebarProps) {
     <aside className="flex h-full w-[260px] flex-col border-r border-[#EFEFEF] bg-white">
       <div className="flex flex-col gap-6 p-5">
         {/* Logo */}
-        <div className="flex items-center gap-2.5">
-          <div className="flex h-9 w-9 items-center justify-center rounded-[10px] bg-[#6C9B8B]">
-            <span className="text-base font-bold text-white">G</span>
-          </div>
-          <span className="text-[17px] font-bold tracking-tight text-[#1A1D1F]">
-            GNUCash
-          </span>
+        <div className="flex items-center">
+          <Image
+            src="/logo.png"
+            alt="GnuDash"
+            width={200}
+            height={200}
+            className="rounded-2xl"
+          />
         </div>
 
         {/* Main Menu */}

@@ -46,39 +46,41 @@ SELECT * FROM all_nested WHERE start_guid = '<parent_guid>';
 
 ## Net Worth
 
-### Current net worth (assets - liabilities)
+> **IMPORTANT:** For account balances, always use `quantity_num/quantity_denom` (account's native commodity),
+> NOT `value_num/value_denom` (transaction currency). Apply FX conversion for multi-currency.
+> See CLAUDE.md "Split Fields: value vs quantity" for full explanation.
+
+### Current net worth (non-investment, grouped by commodity for FX conversion)
 ```sql
 SELECT
-  SUM(CAST(s.value_num AS REAL) / s.value_denom) AS net_worth
+  a.commodity_guid,
+  SUM(CAST(s.quantity_num AS REAL) / s.quantity_denom) AS balance
 FROM splits s
 JOIN accounts a ON s.account_guid = a.guid
-WHERE a.account_type IN ('ASSET', 'BANK', 'CASH', 'STOCK', 'MUTUAL', 'LIABILITY', 'CREDIT');
+WHERE a.account_type NOT IN ('STOCK', 'MUTUAL', 'ROOT', 'INCOME', 'EXPENSE', 'EQUITY', 'TRADING')
+  AND a.placeholder = 0
+GROUP BY a.commodity_guid;
 ```
-Note: Liabilities are already stored as negative values, so simple SUM gives net worth.
+Note: Multiply each commodity group's balance by its FX rate to base currency. Add investment market values (shares × latest price) separately.
 
-### Net worth over time (monthly snapshots)
+### Net worth over time (monthly snapshots, non-investment)
 ```sql
-WITH RECURSIVE account_tree AS (
-  SELECT guid, account_type
-  FROM accounts
-  WHERE account_type IN ('ASSET', 'BANK', 'CASH', 'STOCK', 'MUTUAL', 'LIABILITY', 'CREDIT')
-),
-monthly AS (
-  SELECT
-    strftime('%Y-%m', t.post_date) AS month,
-    SUM(CAST(s.value_num AS REAL) / s.value_denom) AS monthly_change
-  FROM splits s
-  JOIN accounts a ON s.account_guid = a.guid
-  JOIN transactions t ON s.tx_guid = t.guid
-  WHERE a.account_type IN ('ASSET', 'BANK', 'CASH', 'STOCK', 'MUTUAL', 'LIABILITY', 'CREDIT')
-  GROUP BY strftime('%Y-%m', t.post_date)
-  ORDER BY month
-)
 SELECT
-  month,
-  SUM(monthly_change) OVER (ORDER BY month) AS cumulative_net_worth
-FROM monthly;
+  strftime('%Y-%m', t.post_date) AS month,
+  a.commodity_guid,
+  SUM(CASE WHEN a.account_type IN ('ASSET','BANK','CASH','RECEIVABLE')
+      THEN CAST(s.quantity_num AS REAL) / s.quantity_denom ELSE 0 END) AS asset_change,
+  SUM(CASE WHEN a.account_type IN ('LIABILITY','CREDIT','PAYABLE')
+      THEN CAST(s.quantity_num AS REAL) / s.quantity_denom ELSE 0 END) AS liability_change
+FROM splits s
+JOIN accounts a ON s.account_guid = a.guid
+JOIN transactions t ON s.tx_guid = t.guid
+WHERE a.account_type IN ('ASSET','BANK','CASH','RECEIVABLE','LIABILITY','CREDIT','PAYABLE')
+  AND a.placeholder = 0
+GROUP BY strftime('%Y-%m', t.post_date), a.commodity_guid
+ORDER BY month;
 ```
+Note: Apply FX conversion per commodity group, then accumulate monthly deltas into running totals. Add investment market values (shares × price-at-month) separately.
 
 ## Income vs Expenses
 
@@ -123,7 +125,7 @@ ORDER BY total DESC;
 
 ## Account Balances
 
-### All account balances
+### All account balances (using quantity for native commodity balance)
 ```sql
 WITH RECURSIVE account_tree AS (
   SELECT guid, parent_guid, name, name AS path, account_type, commodity_guid
@@ -137,13 +139,15 @@ SELECT
   at.path,
   at.name,
   at.account_type,
-  COALESCE(SUM(CAST(s.value_num AS REAL) / s.value_denom), 0) AS balance
+  at.commodity_guid,
+  COALESCE(SUM(CAST(s.quantity_num AS REAL) / s.quantity_denom), 0) AS balance
 FROM account_tree at
 LEFT JOIN splits s ON s.account_guid = at.guid
 WHERE at.account_type NOT IN ('ROOT')
-GROUP BY at.guid, at.path, at.name, at.account_type
+GROUP BY at.guid, at.path, at.name, at.account_type, at.commodity_guid
 ORDER BY at.path;
 ```
+Note: Apply FX conversion for foreign-currency accounts to get balances in base currency.
 
 ## Investment Tracking
 

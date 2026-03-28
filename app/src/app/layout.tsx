@@ -10,7 +10,7 @@ const dmSans = DM_Sans({
 });
 
 export const metadata: Metadata = {
-  title: "GNUCash Dashboard",
+  title: "GnuDash",
   description: "Personal finance dashboard for GNUCash",
 };
 

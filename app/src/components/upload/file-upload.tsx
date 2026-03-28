@@ -1,7 +1,8 @@
 "use client";
 
 import { useCallback, useState } from "react";
-import { Upload, FileText, Loader2 } from "lucide-react";
+import Image from "next/image";
+import { Upload, Loader2 } from "lucide-react";
 import { useDashboard } from "@/lib/dashboard-context";
 
 export function FileUpload() {
@@ -52,10 +53,14 @@ export function FileUpload() {
     <div className="flex min-h-screen items-center justify-center bg-[#F4F5F7] p-4 sm:p-8">
       <div className="w-full max-w-lg">
         <div className="mb-6 text-center sm:mb-8">
-          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-xl bg-[#6C9B8B]">
-            <FileText className="h-7 w-7 text-white" />
-          </div>
-          <h1 className="text-2xl font-bold text-[#1A1D1F]">GNUCash Dashboard</h1>
+          <Image
+            src="/logo.png"
+            alt="GnuDash"
+            width={360}
+            height={360}
+            className="mx-auto mb-4 rounded-2xl"
+          />
+          <h1 className="text-2xl font-bold text-[#1A1D1F]">GnuDash</h1>
           <p className="mt-2 text-sm text-[#6F767E]">
             Upload your .gnucash file to view your financial dashboard
           </p>
