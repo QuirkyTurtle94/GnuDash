@@ -89,13 +89,13 @@ export function ExpenseTableCard({ transactions, currency, title = "Expenses" }:
                       key={`${tx.date}-${tx.description}-${i}`}
                       className="border-b border-[#EFEFEF] last:border-0"
                     >
-                      <td className="whitespace-nowrap py-2.5 pr-4 text-xs text-[#6F767E]">
+                      <td className="whitespace-nowrap py-2.5 pr-4 text-xs text-[#6F767E]" data-d>
                         {formatDate(tx.date)}
                       </td>
-                      <td className="py-2.5 pr-4 text-xs text-[#1A1D1F]">
+                      <td className="py-2.5 pr-4 text-xs text-[#1A1D1F]" data-d>
                         {tx.description}
                       </td>
-                      <td className="hidden py-2.5 pr-4 text-xs text-[#6F767E] sm:table-cell">
+                      <td className="hidden py-2.5 pr-4 text-xs text-[#6F767E] sm:table-cell" data-d>
                         {tx.fullPath}
                       </td>
                       <td className="whitespace-nowrap py-2.5 text-right text-xs font-medium text-[#1A1D1F]" data-v>

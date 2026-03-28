@@ -1,6 +1,6 @@
-<p align="center">
+<table align="center" border="0" cellpadding="16"><tr><td bgcolor="white" align="center">
   <img src="app/public/logo.png" alt="GnuDash" height="120">
-</p>
+</td></tr></table>
 
 A personal finance dashboard that reads your GNUCash file and presents your financial data through a clean, interactive UI. Upload your `.gnucash` file, explore your finances — no data stored on the server.
 
@@ -19,6 +19,16 @@ A personal finance dashboard that reads your GNUCash file and presents your fina
 - **Privacy Mode** — Toggle to blur sensitive numbers on screen
 
 Charts are fully interactive — click any bar or segment to drill down into breakdowns and individual transactions.
+
+## Screenshots
+
+| Dashboard | Spending |
+|-----------|----------|
+| ![Dashboard](app/screenshots/02-dashboard.png) | ![Spending](app/screenshots/03-spending.png) |
+
+| Income | Investments |
+|--------|-------------|
+| ![Income](app/screenshots/04-income.png) | ![Investments](app/screenshots/05-investment.png) |
 
 ## Prerequisites
 

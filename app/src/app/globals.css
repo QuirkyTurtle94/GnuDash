@@ -136,6 +136,12 @@
     -webkit-filter: blur(10px);
     user-select: none;
   }
+  /* Privacy mode — blur descriptions */
+  .privacy-mode [data-d] {
+    filter: blur(10px);
+    -webkit-filter: blur(10px);
+    user-select: none;
+  }
   .privacy-mode .recharts-tooltip-wrapper [data-v],
   .privacy-mode .recharts-tooltip-wrapper .recharts-tooltip-item-value {
     filter: blur(10px);

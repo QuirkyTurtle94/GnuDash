@@ -83,11 +83,12 @@ export function RecentTransactionsTable({ transactions, currency }: RecentTransa
                     <span
                       className="text-[13px] font-bold"
                       style={{ color }}
+                      data-d
                     >
                       {txn.description.charAt(0).toUpperCase()}
                     </span>
                   </div>
-                  <span className="truncate text-[13px] font-medium text-[#1A1D1F]">
+                  <span className="truncate text-[13px] font-medium text-[#1A1D1F]" data-d>
                     {txn.description}
                   </span>
                 </div>
