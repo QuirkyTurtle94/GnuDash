@@ -92,10 +92,10 @@ export function TopBalances({ balances, currency, filterType }: TopBalancesProps
                     <Icon className="h-4 w-4" style={{ color: config.color }} />
                   </div>
                   <div className="min-w-0">
-                    <p className="truncate text-[13px] font-medium text-[#1A1D1F]">
+                    <p className="truncate text-[13px] font-medium text-[#1A1D1F]" data-l>
                       {bal.accountName}
                     </p>
-                    <p className="truncate text-[11px] text-[#9A9FA5]">{bal.fullPath}</p>
+                    <p className="truncate text-[11px] text-[#9A9FA5]" data-l>{bal.fullPath}</p>
                   </div>
                 </div>
                 <span

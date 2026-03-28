@@ -142,6 +142,12 @@
     -webkit-filter: blur(10px);
     user-select: none;
   }
+  /* Privacy mode — blur labels (category names, account names, tickers) */
+  .privacy-mode [data-l] {
+    filter: blur(8px);
+    -webkit-filter: blur(8px);
+    user-select: none;
+  }
   .privacy-mode .recharts-tooltip-wrapper [data-v],
   .privacy-mode .recharts-tooltip-wrapper .recharts-tooltip-item-value {
     filter: blur(10px);
@@ -149,6 +155,17 @@
     user-select: none;
   }
   .privacy-mode .recharts-yAxis .recharts-cartesian-axis-tick-value {
+    filter: blur(8px);
+    -webkit-filter: blur(8px);
+  }
+  /* Privacy mode — blur X-axis labels (category/ticker names) */
+  .privacy-mode .recharts-xAxis .recharts-cartesian-axis-tick-value {
+    filter: blur(8px);
+    -webkit-filter: blur(8px);
+  }
+  /* Privacy mode — blur tooltip labels */
+  .privacy-mode .recharts-tooltip-wrapper .recharts-tooltip-item-name,
+  .privacy-mode .recharts-tooltip-wrapper .recharts-default-tooltip .recharts-tooltip-label {
     filter: blur(8px);
     -webkit-filter: blur(8px);
   }

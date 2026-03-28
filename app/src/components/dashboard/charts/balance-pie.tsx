@@ -197,7 +197,7 @@ export function BalancePie({
                   >
                     <div className="flex items-center gap-2 min-w-0">
                       <div className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: cat.color }} />
-                      <span className="truncate text-xs text-[#6F767E]">{cat.name}</span>
+                      <span className="truncate text-xs text-[#6F767E]" data-l>{cat.name}</span>
                     </div>
                     <div className="flex shrink-0 items-center gap-1">
                       <span className="text-xs font-medium text-[#1A1D1F]" data-v>

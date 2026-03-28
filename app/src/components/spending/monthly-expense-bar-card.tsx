@@ -108,7 +108,7 @@ export function MonthlyExpenseBarCard({
         <CardTitle className="text-lg font-semibold text-[#1A1D1F]">
           {title}
           {selectedCategory && (
-            <span className="ml-2 text-sm font-normal" style={{ color: barColor }}>
+            <span className="ml-2 text-sm font-normal" style={{ color: barColor }} data-l>
               {selectedCategory.split(":").slice(-1)[0]}
             </span>
           )}

@@ -168,7 +168,7 @@ export function AllocationPie({ items, currency, selectedTicker, onSelect, group
                         className="h-2 w-2 shrink-0 rounded-full"
                         style={{ backgroundColor: entry.color }}
                       />
-                      <span className={`truncate text-xs ${isSelected ? "font-medium text-[#1A1D1F]" : "text-[#6F767E]"}`}>
+                      <span className={`truncate text-xs ${isSelected ? "font-medium text-[#1A1D1F]" : "text-[#6F767E]"}`} data-l>
                         {entry.name}
                       </span>
                     </div>

@@ -57,12 +57,12 @@ export function UpcomingBills({ bills, currency }: UpcomingBillsProps) {
                       className="flex h-10 w-10 items-center justify-center rounded-[10px]"
                       style={{ backgroundColor: color }}
                     >
-                      <span className="text-lg font-bold text-white">
+                      <span className="text-lg font-bold text-white" data-l>
                         {bill.name.charAt(0)}
                       </span>
                     </div>
                     <div>
-                      <p className="text-[13px] font-medium text-[#1A1D1F]">
+                      <p className="text-[13px] font-medium text-[#1A1D1F]" data-l>
                         {bill.name}
                       </p>
                       <p className="text-[11px] text-[#9A9FA5]">
@@ -72,7 +72,7 @@ export function UpcomingBills({ bills, currency }: UpcomingBillsProps) {
                   </div>
                   <div className="text-right">
                     {bill.amount !== null && (
-                      <p className="text-[13px] font-semibold text-[#1A1D1F]">
+                      <p className="text-[13px] font-semibold text-[#1A1D1F]" data-v>
                         {new Intl.NumberFormat("en-GB", { style: "currency", currency }).format(bill.amount)}
                       </p>
                     )}

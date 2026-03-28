@@ -93,8 +93,8 @@ export function HoldingsTable({ activeItems, allItems, currency, selectedTicker,
                 {sorted.map((h) => (
                   <tr key={h.key} className="border-b border-[#EFEFEF] last:border-0">
                     <td className="py-2.5 pr-4">
-                      <div className="text-xs font-medium text-[#1A1D1F]">{h.ticker}</div>
-                      <div className="text-[11px] text-[#9A9FA5]">{h.accountName}</div>
+                      <div className="text-xs font-medium text-[#1A1D1F]" data-l>{h.ticker}</div>
+                      <div className="text-[11px] text-[#9A9FA5]" data-l>{h.accountName}</div>
                     </td>
                     <td className="whitespace-nowrap py-2.5 text-right text-xs font-medium text-[#1A1D1F]" data-v>
                       {formatCurrency(h.marketValue, currency)}

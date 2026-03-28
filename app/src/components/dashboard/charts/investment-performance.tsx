@@ -78,8 +78,8 @@ export function InvestmentPerformance({ investments, currency }: InvestmentPerfo
               totalGainLoss >= 0 ? "text-[#6C9B8B]" : "text-[#F87171]"
             }`}
           >
-            {totalGainLossPct >= 0 ? "+" : ""}
-            {totalGainLossPct.toFixed(1)}% overall
+            <span data-v>{totalGainLossPct >= 0 ? "+" : ""}
+            {totalGainLossPct.toFixed(1)}% overall</span>
           </span>
         </div>
       </CardHeader>
@@ -88,19 +88,19 @@ export function InvestmentPerformance({ investments, currency }: InvestmentPerfo
         <div className="mb-6 flex gap-6">
           <div>
             <p className="text-xs text-[#9A9FA5]">Market Value</p>
-            <p className="text-2xl font-bold tracking-tight text-[#1A1D1F]">
+            <p className="text-2xl font-bold tracking-tight text-[#1A1D1F]" data-v>
               {formatCurrency(totalMarketValue, currency, { decimals: 0 })}
             </p>
           </div>
           <div>
             <p className="text-xs text-[#9A9FA5]">Cost Basis</p>
-            <p className="text-2xl font-bold tracking-tight text-[#6F767E]">
+            <p className="text-2xl font-bold tracking-tight text-[#6F767E]" data-v>
               {formatCurrency(totalCostBasis, currency, { decimals: 0 })}
             </p>
           </div>
           <div>
             <p className="text-xs text-[#9A9FA5]">Gain / Loss</p>
-            <p className={`text-2xl font-bold tracking-tight ${totalGainLoss >= 0 ? "text-[#6C9B8B]" : "text-[#F87171]"}`}>
+            <p className={`text-2xl font-bold tracking-tight ${totalGainLoss >= 0 ? "text-[#6C9B8B]" : "text-[#F87171]"}`} data-v>
               {totalGainLoss >= 0 ? "+" : ""}{formatCurrency(totalGainLoss, currency, { decimals: 0 })}
             </p>
           </div>
@@ -173,18 +173,18 @@ export function InvestmentPerformance({ investments, currency }: InvestmentPerfo
                 className="flex items-center border-b border-[#EFEFEF] py-2.5"
               >
                 <div className="w-[100px]">
-                  <p className="text-[13px] font-semibold text-[#1A1D1F]">{inv.ticker}</p>
-                  <p className="truncate text-[11px] text-[#9A9FA5]">
+                  <p className="text-[13px] font-semibold text-[#1A1D1F]" data-l>{inv.ticker}</p>
+                  <p className="truncate text-[11px] text-[#9A9FA5]" data-l>
                     {inv.accounts.length === 1 ? inv.accounts[0] : `${inv.accounts.length} accounts`}
                   </p>
                 </div>
-                <span className="flex-1 text-right text-[13px] text-[#6F767E]">
+                <span className="flex-1 text-right text-[13px] text-[#6F767E]" data-v>
                   {formatCurrency(inv.costBasis, currency)}
                 </span>
-                <span className="flex-1 text-right text-[13px] font-medium text-[#1A1D1F]">
+                <span className="flex-1 text-right text-[13px] font-medium text-[#1A1D1F]" data-v>
                   {formatCurrency(inv.marketValue, currency)}
                 </span>
-                <span className={`w-[100px] text-right text-[13px] font-semibold ${gl >= 0 ? "text-[#6C9B8B]" : "text-[#F87171]"}`}>
+                <span className={`w-[100px] text-right text-[13px] font-semibold ${gl >= 0 ? "text-[#6C9B8B]" : "text-[#F87171]"}`} data-v>
                   {gl >= 0 ? "+" : ""}{glPct.toFixed(1)}%
                 </span>
               </div>

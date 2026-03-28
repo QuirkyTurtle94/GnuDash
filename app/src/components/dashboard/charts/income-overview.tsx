@@ -181,14 +181,14 @@ export function IncomeOverview({ monthlyIncome, categoryColors, currency, linkTo
                   <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
                   </svg>
-                  {drillPath.split(":").length > 1 ? drillPath.split(":").slice(-2, -1)[0] : "All Categories"}
+                  <span data-l>{drillPath.split(":").length > 1 ? drillPath.split(":").slice(-2, -1)[0] : "All Categories"}</span>
                 </button>
               )}
               <div className="mb-2 text-center">
                 <span className="text-2xl font-bold text-[#1A1D1F]" data-v>
                   {formatCurrency(activeTotal, currency, { decimals: 0 })}
                 </span>
-                <p className="text-[11px] text-[#9A9FA5]">
+                <p className="text-[11px] text-[#9A9FA5]" data-l>
                   {drillPath ? drillPath.split(":").slice(-1)[0] : "Total income"}
                 </p>
               </div>
@@ -249,7 +249,7 @@ export function IncomeOverview({ monthlyIncome, categoryColors, currency, linkTo
                   >
                     <div className="flex items-center gap-2 min-w-0">
                       <div className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: cat.color }} />
-                      <span className="truncate text-xs text-[#6F767E]">{cat.name}</span>
+                      <span className="truncate text-xs text-[#6F767E]" data-l>{cat.name}</span>
                     </div>
                     <div className="flex shrink-0 items-center gap-1">
                       <span className="text-xs font-medium text-[#1A1D1F]" data-v>

@@ -153,16 +153,16 @@ export function SpendingPieCard({ monthlyExpenses, categoryColors, currency, tit
                   <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
                   </svg>
-                  {selectedCategory.split(":").length > 1
+                  <span data-l>{selectedCategory.split(":").length > 1
                     ? selectedCategory.split(":").slice(-2, -1)[0]
-                    : "All Categories"}
+                    : "All Categories"}</span>
                 </button>
               )}
               <div className="mb-2 text-center">
                 <span className="text-2xl font-bold text-[#1A1D1F]" data-v>
                   {formatCurrency(showAverage ? activeTotal / monthCount : activeTotal, currency, { decimals: 0 })}
                 </span>
-                <p className="text-[11px] text-[#9A9FA5]">
+                <p className="text-[11px] text-[#9A9FA5]" data-l>
                   {showAverage ? "Monthly average" : selectedCategory ? selectedCategory.split(":").slice(-1)[0] : `Total ${title.toLowerCase().replace("breakdown", "").trim()}`}
                 </p>
               </div>
@@ -236,7 +236,7 @@ export function SpendingPieCard({ monthlyExpenses, categoryColors, currency, tit
                         className="h-2 w-2 shrink-0 rounded-full"
                         style={{ backgroundColor: cat.color }}
                       />
-                      <span className={`truncate text-xs ${isSelected ? "font-medium text-[#1A1D1F]" : "text-[#6F767E]"}`}>{cat.name}</span>
+                      <span className={`truncate text-xs ${isSelected ? "font-medium text-[#1A1D1F]" : "text-[#6F767E]"}`} data-l>{cat.name}</span>
                     </div>
                     <div className="flex shrink-0 items-center gap-1">
                       <span className="text-xs font-medium text-[#1A1D1F]" data-v>
