@@ -4,6 +4,8 @@
 
 A personal finance dashboard that reads your GNUCash file and presents your financial data through a clean, interactive UI. Upload your `.gnucash` file, explore your finances — no data stored on the server.
 
+> **Recommended: run locally.** While no data is persisted server-side, running GnuDash on your own machine ensures your financial data never leaves your computer. See [Getting Started](#getting-started) below.
+
 ![Next.js](https://img.shields.io/badge/Next.js-16-black)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)

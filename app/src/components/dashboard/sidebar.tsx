@@ -8,9 +8,6 @@ import {
   Receipt,
   CreditCard,
   TrendingUp,
-  FileText,
-  Settings,
-  Bookmark,
   LogOut,
 } from "lucide-react";
 import { useDashboard } from "@/lib/dashboard-context";
@@ -22,11 +19,6 @@ const mainNav = [
   { icon: TrendingUp, label: "Investment", href: "/investment" },
 ];
 
-const mgmtNav = [
-  { icon: FileText, label: "Financial Planning", href: "/planning" },
-  { icon: Settings, label: "Management", href: "/management" },
-  { icon: Bookmark, label: "Subscriptions", href: "/subscriptions" },
-];
 
 interface SidebarProps {
   onNavigate?: () => void;
@@ -83,30 +75,6 @@ export function Sidebar({ onNavigate }: SidebarProps) {
           </nav>
         </div>
 
-        {/* Managements */}
-        <div>
-          <p className="mb-2 px-3 text-xs text-[#9A9FA5]">Managements</p>
-          <nav className="flex flex-col gap-0.5">
-            {mgmtNav.map((item) => {
-              const isActive = pathname.startsWith(item.href);
-              return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  onClick={onNavigate}
-                  className={`flex h-[42px] items-center gap-2.5 rounded-[10px] px-3 text-left transition-colors ${
-                    isActive
-                      ? "bg-[#6C9B8B]/10 text-[#1A1D1F]"
-                      : "text-[#6F767E] hover:bg-[#F4F5F7]"
-                  }`}
-                >
-                  <item.icon className="h-[18px] w-[18px] text-[#9A9FA5]" />
-                  <span className="text-sm">{item.label}</span>
-                </Link>
-              );
-            })}
-          </nav>
-        </div>
       </div>
 
       {/* Bottom: Upload new file */}

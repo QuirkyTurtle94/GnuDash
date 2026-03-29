@@ -60,10 +60,6 @@ function DashboardInner({ children }: { children: React.ReactNode }) {
               {hideValues ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
               <span className="hidden sm:inline">{hideValues ? "Show values" : "Hide values"}</span>
             </button>
-            <div className="h-8 w-8 rounded-full bg-[#D4DAE0] sm:h-9 sm:w-9" />
-            <span className="hidden text-sm font-medium text-[#1A1D1F] sm:block">
-              My Dashboard
-            </span>
           </div>
         </header>
 
