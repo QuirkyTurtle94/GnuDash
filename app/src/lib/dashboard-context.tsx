@@ -18,6 +18,7 @@ interface DashboardContextType {
   isLoading: boolean;
   error: string | null;
   uploadFile: (file: File) => Promise<void>;
+  loadDemo: () => Promise<void>;
   clearData: () => void;
 }
 
@@ -85,6 +86,25 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
     }
   }
 
+  async function loadDemo() {
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      const response = await fetch("/api/demo");
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Failed to load demo");
+      }
+      const dashboardData = await response.json();
+      setData(dashboardData);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to load demo");
+    } finally {
+      setIsLoading(false);
+    }
+  }
+
   function clearData() {
     setData(null);
     setError(null);
@@ -93,7 +113,7 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
 
   return (
     <DashboardContext.Provider
-      value={{ data, isLoading, error, uploadFile, clearData }}
+      value={{ data, isLoading, error, uploadFile, loadDemo, clearData }}
     >
       {children}
     </DashboardContext.Provider>

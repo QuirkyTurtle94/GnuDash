@@ -2,11 +2,11 @@
 
 import { useCallback, useState } from "react";
 import Image from "next/image";
-import { Upload, Loader2 } from "lucide-react";
+import { Upload, Loader2, Play } from "lucide-react";
 import { useDashboard } from "@/lib/dashboard-context";
 
 export function FileUpload() {
-  const { uploadFile, isLoading, error } = useDashboard();
+  const { uploadFile, loadDemo, isLoading, error } = useDashboard();
   const [isDragging, setIsDragging] = useState(false);
 
   const handleFile = useCallback(
@@ -99,6 +99,21 @@ export function FileUpload() {
             </div>
           )}
         </div>
+
+        <div className="mt-4 flex items-center gap-3">
+          <div className="h-px flex-1 bg-[#D4DAE0]" />
+          <span className="text-xs text-[#9A9FA5]">or</span>
+          <div className="h-px flex-1 bg-[#D4DAE0]" />
+        </div>
+
+        <button
+          onClick={loadDemo}
+          disabled={isLoading}
+          className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl border-2 border-[#D4DAE0] bg-white px-4 py-3 text-sm font-medium text-[#6F767E] transition-all hover:border-[#6C9B8B]/50 hover:bg-[#6C9B8B]/5 hover:text-[#6C9B8B] disabled:opacity-50"
+        >
+          <Play className="h-4 w-4" />
+          Try with demo data
+        </button>
 
         {error && (
           <div className="mt-4 rounded-xl bg-red-50 p-4 text-center">
