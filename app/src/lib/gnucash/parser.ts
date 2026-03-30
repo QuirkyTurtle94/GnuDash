@@ -14,6 +14,9 @@ import type {
   RecentTransaction,
   UpcomingBill,
   ExpenseTransaction,
+  BudgetData,
+  BudgetInfo,
+  BudgetCategoryRow,
   DashboardData,
 } from "@/lib/types/gnucash";
 
@@ -60,6 +63,7 @@ export function parseGnuCashFile(filePath: string): DashboardData {
     const incomeTransactions = getIncomeTransactions(db, accounts);
     const recentTransactions = getRecentTransactions(db, accounts);
     const upcomingBills = getUpcomingBills(db);
+    const budgetData = computeBudgetData(db, accounts);
 
     // Current net worth: compute directly from account balances
     // Non-investment accounts: sum of value_num/value_denom
@@ -97,6 +101,7 @@ export function parseGnuCashFile(filePath: string): DashboardData {
       currentMonthIncome: currentIncome,
       currentMonthExpenses: currentExpenses,
       savingsRate,
+      budgetData,
     };
   } finally {
     db.close();
@@ -1251,6 +1256,213 @@ function getRecentTransactions(
       reconciled: row.reconcile_state === "y",
     };
   });
+}
+
+function computeBudgetData(
+  db: Database.Database,
+  accounts: GnuCashAccount[]
+): BudgetData | null {
+  // Check if budgets table exists
+  const tableCheck = db
+    .prepare(
+      `SELECT name FROM sqlite_master WHERE type='table' AND name='budgets'`
+    )
+    .get() as { name: string } | undefined;
+
+  if (!tableCheck) return null;
+
+  const budgetRows = db
+    .prepare(`SELECT guid, name, description, num_periods FROM budgets`)
+    .all() as { guid: string; name: string; description: string; num_periods: number }[];
+
+  if (budgetRows.length === 0) return null;
+
+  const budgets: BudgetInfo[] = budgetRows.map((b) => ({
+    guid: b.guid,
+    name: b.name,
+    description: b.description,
+    numPeriods: b.num_periods,
+  }));
+
+  // Load budget amounts for all budgets
+  const amountRows = db
+    .prepare(
+      `SELECT ba.budget_guid, ba.account_guid, ba.period_num,
+              CAST(ba.amount_num AS REAL) / ba.amount_denom AS amount
+       FROM budget_amounts ba`
+    )
+    .all() as { budget_guid: string; account_guid: string; period_num: number; amount: number }[];
+
+  // Build account lookup
+  const accountMap = new Map(accounts.map((a) => [a.guid, a]));
+  const rootAccount = accounts.find((a) => a.account_type === "ROOT");
+
+  // Build account path (excluding top-level containers like "Expenses" or "Income")
+  const topContainerGuids = new Set(
+    accounts
+      .filter((a) => (a.account_type === "EXPENSE" || a.account_type === "INCOME") && a.parent_guid === rootAccount?.guid)
+      .map((a) => a.guid)
+  );
+
+  function getAccountPath(accountGuid: string): string {
+    const parts: string[] = [];
+    let current = accountMap.get(accountGuid);
+    while (current && !topContainerGuids.has(current.guid) && current.account_type !== "ROOT") {
+      parts.unshift(current.name);
+      current = current.parent_guid ? accountMap.get(current.parent_guid) : undefined;
+    }
+    return parts.join(":");
+  }
+
+  // Get actuals per account per month for expense and income accounts
+  const actualRows = db
+    .prepare(
+      `SELECT
+        s.account_guid,
+        strftime('%m', t.post_date) AS month_num,
+        strftime('%Y', t.post_date) AS year,
+        SUM(CAST(s.quantity_num AS REAL) / s.quantity_denom) AS actual
+      FROM splits s
+      JOIN accounts a ON s.account_guid = a.guid
+      JOIN transactions t ON s.tx_guid = t.guid
+      WHERE a.account_type IN ('EXPENSE', 'INCOME')
+      GROUP BY s.account_guid, strftime('%Y', t.post_date), strftime('%m', t.post_date)`
+    )
+    .all() as { account_guid: string; month_num: string; year: string; actual: number }[];
+
+  // Group actuals by year -> account -> period
+  const allYears = new Set<number>();
+  const actualsMap = new Map<string, Map<string, Map<number, number>>>(); // account_guid -> year -> period -> actual
+  for (const row of actualRows) {
+    allYears.add(parseInt(row.year));
+    const period = parseInt(row.month_num) - 1; // 0-indexed
+    if (!actualsMap.has(row.account_guid)) {
+      actualsMap.set(row.account_guid, new Map());
+    }
+    const yearMap = actualsMap.get(row.account_guid)!;
+    if (!yearMap.has(row.year)) {
+      yearMap.set(row.year, new Map());
+    }
+    yearMap.get(row.year)!.set(period, (yearMap.get(row.year)!.get(period) ?? 0) + row.actual);
+  }
+  const availableYears = [...allYears].sort((a, b) => b - a);
+
+  // Build child-to-parent map for rolling up actuals
+  const childrenMap = new Map<string, string[]>(); // parent_guid -> [child guids]
+  for (const a of accounts) {
+    if (a.parent_guid) {
+      if (!childrenMap.has(a.parent_guid)) {
+        childrenMap.set(a.parent_guid, []);
+      }
+      childrenMap.get(a.parent_guid)!.push(a.guid);
+    }
+  }
+
+  // Collect all descendant guids (inclusive of self)
+  function getDescendants(guid: string): string[] {
+    const result = [guid];
+    const children = childrenMap.get(guid);
+    if (children) {
+      for (const child of children) {
+        result.push(...getDescendants(child));
+      }
+    }
+    return result;
+  }
+
+  // Build categories for each budget
+  // Group amounts by budget_guid -> account_guid -> period -> amount
+  const budgetAmountsMap = new Map<string, Map<string, Map<number, number>>>();
+  for (const row of amountRows) {
+    if (!budgetAmountsMap.has(row.budget_guid)) {
+      budgetAmountsMap.set(row.budget_guid, new Map());
+    }
+    const accountAmounts = budgetAmountsMap.get(row.budget_guid)!;
+    if (!accountAmounts.has(row.account_guid)) {
+      accountAmounts.set(row.account_guid, new Map());
+    }
+    accountAmounts.get(row.account_guid)!.set(row.period_num, row.amount);
+  }
+
+  // Build category rows for the first budget (default)
+  const defaultBudget = budgets[0];
+  const defaultAmounts = budgetAmountsMap.get(defaultBudget.guid);
+  const expenseCategories: BudgetCategoryRow[] = [];
+  const incomeCategories: BudgetCategoryRow[] = [];
+
+  if (defaultAmounts) {
+    for (const [accountGuid, periodAmounts] of defaultAmounts) {
+      const account = accountMap.get(accountGuid);
+      if (!account) continue;
+      if (account.account_type !== "EXPENSE" && account.account_type !== "INCOME") continue;
+
+      // Roll up actuals from this account and all descendants, per year
+      const descendantGuids = getDescendants(accountGuid);
+      const rolledUpActuals = new Map<string, Map<number, number>>();
+      for (const dGuid of descendantGuids) {
+        const dYearMap = actualsMap.get(dGuid);
+        if (dYearMap) {
+          for (const [year, periodMap] of dYearMap) {
+            if (!rolledUpActuals.has(year)) {
+              rolledUpActuals.set(year, new Map());
+            }
+            const target = rolledUpActuals.get(year)!;
+            for (const [period, amount] of periodMap) {
+              target.set(period, (target.get(period) ?? 0) + amount);
+            }
+          }
+        }
+      }
+
+      const fullPath = getAccountPath(accountGuid);
+      const currentYear = new Date().getFullYear().toString();
+      const isIncome = account.account_type === "INCOME";
+
+      let totalBudgeted = 0;
+      let totalActual = 0;
+      const periods: { period: number; budgeted: number; actual: Record<string, number> }[] = [];
+
+      for (let p = 0; p < defaultBudget.numPeriods; p++) {
+        // Income budget amounts may be negative in GNUCash, normalize to positive
+        const rawBudgeted = periodAmounts.get(p) ?? 0;
+        const budgeted = isIncome ? Math.abs(rawBudgeted) : rawBudgeted;
+        const actualByYear: Record<string, number> = {};
+        for (const year of allYears) {
+          const yearStr = year.toString();
+          // Income splits are negative in GNUCash, flip sign for display
+          const raw = rolledUpActuals.get(yearStr)?.get(p) ?? 0;
+          actualByYear[yearStr] = isIncome ? Math.abs(raw) : raw;
+        }
+        totalBudgeted += budgeted;
+        totalActual += actualByYear[currentYear] ?? 0;
+        periods.push({ period: p, budgeted, actual: actualByYear });
+      }
+
+      if (totalBudgeted === 0 && totalActual === 0) continue;
+
+      const row: BudgetCategoryRow = {
+        accountGuid,
+        accountName: account.name,
+        fullPath,
+        budgeted: totalBudgeted,
+        actual: totalActual,
+        variance: totalBudgeted - totalActual,
+        variancePct: totalBudgeted > 0 ? ((totalBudgeted - totalActual) / totalBudgeted) * 100 : 0,
+        periods,
+      };
+
+      if (isIncome) {
+        incomeCategories.push(row);
+      } else {
+        expenseCategories.push(row);
+      }
+    }
+
+    expenseCategories.sort((a, b) => b.actual - a.actual);
+    incomeCategories.sort((a, b) => b.actual - a.actual);
+  }
+
+  return { budgets, expenseCategories, incomeCategories, availableYears };
 }
 
 function getUpcomingBills(db: Database.Database): UpcomingBill[] {

@@ -8,6 +8,7 @@ import {
   Receipt,
   CreditCard,
   TrendingUp,
+  Target,
   LogOut,
 } from "lucide-react";
 import { useDashboard } from "@/lib/dashboard-context";
@@ -17,6 +18,7 @@ const mainNav = [
   { icon: Receipt, label: "Income", href: "/transactions" },
   { icon: CreditCard, label: "Spending", href: "/spending" },
   { icon: TrendingUp, label: "Investment", href: "/investment" },
+  { icon: Target, label: "Budget", href: "/budget" },
 ];
 
 

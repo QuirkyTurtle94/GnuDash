@@ -68,6 +68,21 @@ export interface GnuCashScheduledTransaction {
   auto_create: number;
 }
 
+export interface GnuCashBudget {
+  guid: string;
+  name: string;
+  description: string;
+  num_periods: number;
+}
+
+export interface GnuCashBudgetAmount {
+  budget_guid: string;
+  account_guid: string;
+  period_num: number;
+  amount_num: number;
+  amount_denom: number;
+}
+
 // Derived types for the dashboard
 
 export interface AccountNode {
@@ -165,6 +180,31 @@ export interface ExpenseTransaction {
   amount: number;
 }
 
+export interface BudgetInfo {
+  guid: string;
+  name: string;
+  description: string;
+  numPeriods: number;
+}
+
+export interface BudgetCategoryRow {
+  accountGuid: string;
+  accountName: string;
+  fullPath: string;
+  budgeted: number; // total budgeted for the selected period
+  actual: number; // actual spending for the selected period
+  variance: number; // budgeted - actual (positive = under budget)
+  variancePct: number; // variance / budgeted * 100
+  periods: { period: number; budgeted: number; actual: Record<string, number> }[]; // actual keyed by year
+}
+
+export interface BudgetData {
+  budgets: BudgetInfo[];
+  expenseCategories: BudgetCategoryRow[];
+  incomeCategories: BudgetCategoryRow[];
+  availableYears: number[];
+}
+
 export interface DashboardData {
   currency: string; // ISO 4217 code detected from GNUCash (e.g. "GBP", "USD")
   accounts: AccountNode[];
@@ -186,4 +226,5 @@ export interface DashboardData {
   currentMonthIncome: number;
   currentMonthExpenses: number;
   savingsRate: number;
+  budgetData: BudgetData | null;
 }
