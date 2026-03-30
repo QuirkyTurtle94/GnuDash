@@ -171,7 +171,7 @@ export function MonthlyExpenseBarCard({
                   radius={[4, 4, 0, 0]}
                   maxBarSize={48}
                   name="Amount"
-                  onClick={(_, index) => handleBarClick(barData[index])}
+                  onClick={(data) => handleBarClick({ month: (data as unknown as { month: string }).month })}
                   style={{ cursor: "pointer" }}
                 >
                   {barData.map((entry) => (
