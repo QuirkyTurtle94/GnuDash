@@ -44,9 +44,6 @@ Thumbs.db
 CLAUDE.md
 AGENTS.md
 
-# Investment screenshots (contain personal data)
-app/screenshots/05-investment*.png
-
 # Docker
 .docker/
 

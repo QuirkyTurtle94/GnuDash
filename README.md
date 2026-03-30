@@ -26,17 +26,32 @@ Charts are fully interactive — click any bar or segment to drill down into bre
 
 ## Screenshots
 
-| Dashboard | Spending |
-|-----------|----------|
-| ![Dashboard](app/screenshots/02-dashboard.png) | ![Spending](app/screenshots/03-spending.png) |
-
-| Income | Investment |
-|--------|------------|
-| ![Income](app/screenshots/04-income.png) | ![Investment](app/screenshots/05-investment.png) |
-
-| Budget |
-|--------|
-| ![Budget](app/screenshots/06-budget.png) |
+<table>
+  <tr>
+    <td><strong>Dashboard</strong></td>
+    <td><strong>Spending</strong></td>
+  </tr>
+  <tr>
+    <td><img src="app/screenshots/02-dashboard.png" width="450" /></td>
+    <td><img src="app/screenshots/03-spending.png" width="450" /></td>
+  </tr>
+  <tr>
+    <td><strong>Income</strong></td>
+    <td><strong>Investment</strong></td>
+  </tr>
+  <tr>
+    <td><img src="app/screenshots/04-income.png" width="450" /></td>
+    <td><img src="app/screenshots/05-investment.png" width="450" /></td>
+  </tr>
+  <tr>
+    <td><strong>Budget</strong></td>
+    <td><strong>Upload</strong></td>
+  </tr>
+  <tr>
+    <td><img src="app/screenshots/06-budget.png" width="450" /></td>
+    <td><img src="app/screenshots/01-upload.png" width="450" /></td>
+  </tr>
+</table>
 
 ## Prerequisites
 
