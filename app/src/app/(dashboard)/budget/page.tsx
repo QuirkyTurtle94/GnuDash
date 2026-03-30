@@ -199,7 +199,7 @@ function SummaryCard({
                 />
               </svg>
               <div className="absolute inset-0 flex flex-col items-center justify-center">
-                <span className="text-lg font-bold text-[#1A1D1F]">
+                <span className="text-lg font-bold text-[#1A1D1F]" data-v>
                   {Math.round(pct)}%
                 </span>
                 <span className="text-[10px] text-[#9A9FA5]">{isIncome ? "earned" : "used"}</span>
@@ -208,11 +208,11 @@ function SummaryCard({
             <div className="flex flex-col gap-2 text-sm">
               <div>
                 <span className="text-[#9A9FA5]">{isIncome ? "Target" : "Budgeted"}</span>
-                <p className="privacy-mask font-semibold text-[#1A1D1F]">{formatCurrency(totalBudgeted, currency)}</p>
+                <p className="font-semibold text-[#1A1D1F]" data-v>{formatCurrency(totalBudgeted, currency)}</p>
               </div>
               <div>
                 <span className="text-[#9A9FA5]">{isIncome ? "Earned" : "Spent"}</span>
-                <p className="privacy-mask font-semibold text-[#1A1D1F]">{formatCurrency(totalActual, currency)}</p>
+                <p className="font-semibold text-[#1A1D1F]" data-v>{formatCurrency(totalActual, currency)}</p>
               </div>
               <div>
                 <span className="text-[#9A9FA5]">
@@ -220,7 +220,7 @@ function SummaryCard({
                     ? (isOver ? "Above target" : "Below target")
                     : (isOver ? "Over budget" : "Remaining")}
                 </span>
-                <p className={`privacy-mask font-semibold`} style={{ color: statusColor }}>
+                <p className="font-semibold" style={{ color: statusColor }} data-v>
                   {formatCurrency(Math.abs(remaining), currency)}
                 </p>
               </div>
@@ -236,10 +236,12 @@ function ProgressBars({
   categories,
   currency,
   isIncome = false,
+  ytdVarianceMap,
 }: {
   categories: BudgetCategoryRow[];
   currency: string;
   isIncome?: boolean;
+  ytdVarianceMap?: Map<string, number>;
 }) {
   return (
     <Card>
@@ -255,14 +257,25 @@ function ProgressBars({
             const barColor = isIncome
               ? (pct >= 100 ? "#6C9B8B" : pct >= 80 ? "#E8B86B" : "#E87C6B")
               : (pct > 100 ? "#E87C6B" : pct > 80 ? "#E8B86B" : "#6C9B8B");
-            const overColor = isIncome ? "#6C9B8B" : "#E87C6B";
-            const overLabel = isIncome ? "above target" : "over budget";
+
+            const monthVariance = cat.budgeted - cat.actual;
+            const monthIsOver = monthVariance < 0;
+            const monthColor = isIncome
+              ? (monthIsOver ? "#6C9B8B" : "#E87C6B")
+              : (monthIsOver ? "#E87C6B" : "#6C9B8B");
+
+            const ytdVariance = ytdVarianceMap?.get(cat.accountGuid);
+            const hasYtd = ytdVariance !== undefined;
+            const ytdIsOver = hasYtd && ytdVariance < 0;
+            const ytdColor = isIncome
+              ? (ytdIsOver ? "#6C9B8B" : "#E87C6B")
+              : (ytdIsOver ? "#E87C6B" : "#6C9B8B");
 
             return (
               <div key={cat.accountGuid} className="flex flex-col gap-1">
                 <div className="flex items-center justify-between text-xs">
-                  <span className="privacy-mask font-medium text-[#1A1D1F]">{cat.fullPath || cat.accountName}</span>
-                  <span className="privacy-mask text-[#9A9FA5]">
+                  <span className="font-medium text-[#1A1D1F]" data-l>{cat.fullPath || cat.accountName}</span>
+                  <span className="text-[#9A9FA5]" data-v>
                     {formatCurrency(cat.actual, currency)} / {formatCurrency(cat.budgeted, currency)}
                   </span>
                 </div>
@@ -275,9 +288,18 @@ function ProgressBars({
                     }}
                   />
                 </div>
-                {isOver && (
-                  <span className="text-[10px] font-medium" style={{ color: overColor }}>
-                    {formatCurrency(cat.actual - cat.budgeted, currency)} {overLabel}
+                {hasYtd ? (
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-medium" style={{ color: monthColor }} data-v>
+                      {monthIsOver ? "-" : "+"}{formatCurrency(Math.abs(monthVariance), currency)} this month
+                    </span>
+                    <span className="text-[10px] font-medium" style={{ color: ytdColor }} data-v>
+                      {ytdIsOver ? "-" : "+"}{formatCurrency(Math.abs(ytdVariance), currency)} YTD
+                    </span>
+                  </div>
+                ) : isOver && (
+                  <span className="text-[10px] font-medium" style={{ color: monthColor }} data-v>
+                    {formatCurrency(Math.abs(monthVariance), currency)} {isIncome ? "above target" : "over budget"}
                   </span>
                 )}
               </div>
@@ -375,10 +397,10 @@ function VarianceTable({
                 : (exceeded ? "#E87C6B" : "#6C9B8B");
               return (
                 <tr key={cat.accountGuid} className="border-b border-[#EFEFEF]/50 last:border-0">
-                  <td className="privacy-mask py-2.5 pr-4 font-medium text-[#1A1D1F]">{cat.fullPath || cat.accountName}</td>
-                  <td className="privacy-mask py-2.5 pr-4 text-right text-[#6F767E]">{formatCurrency(cat.budgeted, currency)}</td>
-                  <td className="privacy-mask py-2.5 pr-4 text-right text-[#1A1D1F]">{formatCurrency(cat.actual, currency)}</td>
-                  <td className="privacy-mask py-2.5 pr-4 text-right font-medium" style={{ color: varColor }}>
+                  <td className="py-2.5 pr-4 font-medium text-[#1A1D1F]" data-l>{cat.fullPath || cat.accountName}</td>
+                  <td className="py-2.5 pr-4 text-right text-[#6F767E]" data-v>{formatCurrency(cat.budgeted, currency)}</td>
+                  <td className="py-2.5 pr-4 text-right text-[#1A1D1F]" data-v>{formatCurrency(cat.actual, currency)}</td>
+                  <td className="py-2.5 pr-4 text-right font-medium" style={{ color: varColor }} data-v>
                     {exceeded ? "-" : "+"}{formatCurrency(Math.abs(cat.variance), currency)}
                   </td>
                   <td className="py-2.5 text-right text-xs" style={{ color: varColor }}>
@@ -397,10 +419,10 @@ function VarianceTable({
             <tfoot>
               <tr className="border-t border-[#EFEFEF] font-semibold">
                 <td className="pt-2.5 pr-4 text-[#1A1D1F]">Total</td>
-                <td className="privacy-mask pt-2.5 pr-4 text-right text-[#6F767E]">
+                <td className="pt-2.5 pr-4 text-right text-[#6F767E]" data-v>
                   {formatCurrency(sorted.reduce((s, c) => s + c.budgeted, 0), currency)}
                 </td>
-                <td className="privacy-mask pt-2.5 pr-4 text-right text-[#1A1D1F]">
+                <td className="pt-2.5 pr-4 text-right text-[#1A1D1F]" data-v>
                   {formatCurrency(sorted.reduce((s, c) => s + c.actual, 0), currency)}
                 </td>
                 {(() => {
@@ -411,7 +433,7 @@ function VarianceTable({
                     : (exceeded ? "#E87C6B" : "#6C9B8B");
                   return (
                     <>
-                      <td className="privacy-mask pt-2.5 pr-4 text-right" style={{ color }}>
+                      <td className="pt-2.5 pr-4 text-right" style={{ color }} data-v>
                         {exceeded ? "-" : "+"}{formatCurrency(Math.abs(totalVar), currency)}
                       </td>
                       <td />
@@ -523,6 +545,25 @@ function BudgetContent({ data }: { data: NonNullable<ReturnType<typeof useDashbo
     );
   }
 
+  // Compute YTD variance per category (used in monthly view to show running total)
+  const ytdVarianceMap = useMemo(() => {
+    if (!budgetData || viewMode !== "monthly") return new Map<string, number>();
+    const source = isIncome ? budgetData.incomeCategories : budgetData.expenseCategories;
+    const map = new Map<string, number>();
+    for (const cat of source) {
+      let ytdBudgeted = 0;
+      let ytdActual = 0;
+      for (const p of cat.periods) {
+        if (p.period <= selectedMonth) {
+          ytdBudgeted += p.budgeted;
+          ytdActual += p.actual[yearStr] ?? 0;
+        }
+      }
+      map.set(cat.accountGuid, ytdBudgeted - ytdActual);
+    }
+    return map;
+  }, [budgetData, viewMode, selectedMonth, yearStr, isIncome]);
+
   const activeBudgetGuid = selectedBudget ?? budgetData.budgets[0].guid;
   const c = data.currency;
   const categories = isIncome ? incomeCategories : expenseCategories;
@@ -594,6 +635,7 @@ function BudgetContent({ data }: { data: NonNullable<ReturnType<typeof useDashbo
           categories={categories}
           currency={c}
           isIncome={isIncome}
+          ytdVarianceMap={viewMode === "monthly" ? ytdVarianceMap : undefined}
         />
       </div>
 
