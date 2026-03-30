@@ -17,8 +17,10 @@ A personal finance dashboard that reads your GNUCash file and presents your fina
 - **Spending Breakdown** — Category-level expense analysis with interactive drill-down
 - **Account Balances** — Current balances across all accounts
 - **Investment Portfolio** — Holdings, allocation, performance, and value over time
+- **Budget Tracking** — Budget vs actual with expense/income tabs, YTD variance
 - **Recent Transactions** — Searchable transaction history
 - **Privacy Mode** — Toggle to blur sensitive numbers on screen
+- **Demo Mode** — Try the dashboard instantly with realistic sample data
 
 Charts are fully interactive — click any bar or segment to drill down into breakdowns and individual transactions.
 
@@ -28,9 +30,13 @@ Charts are fully interactive — click any bar or segment to drill down into bre
 |-----------|----------|
 | ![Dashboard](app/screenshots/02-dashboard.png) | ![Spending](app/screenshots/03-spending.png) |
 
-| Income |
+| Income | Investment |
+|--------|------------|
+| ![Income](app/screenshots/04-income.png) | ![Investment](app/screenshots/05-investment.png) |
+
+| Budget |
 |--------|
-| ![Income](app/screenshots/04-income.png) |
+| ![Budget](app/screenshots/06-budget.png) |
 
 ## Prerequisites
 
