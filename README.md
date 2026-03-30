@@ -128,7 +128,9 @@ docs/
 
 ## Contributing
 
-Contributions are welcome! Please open an issue first to discuss what you'd like to change.
+Contributions are welcome! Please [open an issue](https://github.com/QuirkyTurtle94/GnuDash/issues) first to discuss what you'd like to change before submitting a pull request. This helps avoid duplicate effort and keeps the project on track.
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for full guidelines on setting up the project, submitting changes, and reporting bugs.
 
 ## License
 

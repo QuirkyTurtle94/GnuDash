@@ -50,6 +50,9 @@ AGENTS.md
 # Test coverage
 coverage/
 
+# Internal docs
+ROADMAP.md
+
 # Misc
 *.log
 *.tsbuildinfo
