@@ -15,9 +15,43 @@ interface ExpenseTableCardProps {
 
 const PAGE_SIZE = 25;
 
+type SortField = "date" | "description" | "account" | "amount";
+type SortDir = "asc" | "desc";
+
+function compareTx(a: ExpenseTransaction, b: ExpenseTransaction, field: SortField, dir: SortDir): number {
+  let cmp = 0;
+  switch (field) {
+    case "date":
+      cmp = a.date.localeCompare(b.date);
+      break;
+    case "description":
+      cmp = a.description.localeCompare(b.description, undefined, { sensitivity: "base" });
+      break;
+    case "account":
+      cmp = a.fullPath.localeCompare(b.fullPath, undefined, { sensitivity: "base" });
+      break;
+    case "amount":
+      cmp = a.amount - b.amount;
+      break;
+  }
+  return dir === "asc" ? cmp : -cmp;
+}
+
 export function ExpenseTableCard({ transactions, currency, title = "Expenses" }: ExpenseTableCardProps) {
   const { period, selectedCategory, selectedMonth, selectedAccount, excluded } = useSpendingFilter();
   const [page, setPage] = useState(0);
+  const [sortField, setSortField] = useState<SortField>("amount");
+  const [sortDir, setSortDir] = useState<SortDir>("desc");
+
+  function handleSort(field: SortField) {
+    if (field === sortField) {
+      setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    } else {
+      setSortField(field);
+      setSortDir(field === "amount" ? "desc" : "asc");
+    }
+    setPage(0);
+  }
 
   // Reset page when filters change
   const filterKey = `${period}-${selectedCategory}-${selectedMonth}-${selectedAccount}-${[...excluded].join(",")}`;
@@ -49,8 +83,8 @@ export function ExpenseTableCard({ transactions, currency, title = "Expenses" }:
       }
 
       return true;
-    }).sort((a, b) => b.amount - a.amount);
-  }, [transactions, period, selectedCategory, selectedMonth, selectedAccount, excluded]);
+    }).sort((a, b) => compareTx(a, b, sortField, sortDir));
+  }, [transactions, period, selectedCategory, selectedMonth, selectedAccount, excluded, sortField, sortDir]);
 
   // Reset page when filters change
   useMemo(() => setPage(0), [filterKey]);
@@ -77,10 +111,10 @@ export function ExpenseTableCard({ transactions, currency, title = "Expenses" }:
               <table className="w-full">
                 <thead>
                   <tr className="border-b border-[#EFEFEF]">
-                    <th className="pb-2 pr-4 text-left text-xs font-medium text-[#9A9FA5]">Date</th>
-                    <th className="pb-2 pr-4 text-left text-xs font-medium text-[#9A9FA5]">Description</th>
-                    <th className="hidden pb-2 pr-4 text-left text-xs font-medium text-[#9A9FA5] sm:table-cell">Account</th>
-                    <th className="pb-2 text-right text-xs font-medium text-[#9A9FA5]">Amount</th>
+                    <SortHeader field="date" label="Date" current={sortField} dir={sortDir} onSort={handleSort} />
+                    <SortHeader field="description" label="Description" current={sortField} dir={sortDir} onSort={handleSort} />
+                    <SortHeader field="account" label="Account" current={sortField} dir={sortDir} onSort={handleSort} className="hidden sm:table-cell" />
+                    <SortHeader field="amount" label="Amount" current={sortField} dir={sortDir} onSort={handleSort} align="right" />
                   </tr>
                 </thead>
                 <tbody>
@@ -135,6 +169,37 @@ export function ExpenseTableCard({ transactions, currency, title = "Expenses" }:
         )}
       </CardContent>
     </Card>
+  );
+}
+
+function SortHeader({
+  field,
+  label,
+  current,
+  dir,
+  onSort,
+  align,
+  className,
+}: {
+  field: SortField;
+  label: string;
+  current: SortField;
+  dir: SortDir;
+  onSort: (f: SortField) => void;
+  align?: "right";
+  className?: string;
+}) {
+  const active = field === current;
+  return (
+    <th
+      className={`cursor-pointer select-none pb-2 pr-4 text-xs font-medium text-[#9A9FA5] transition-colors hover:text-[#6F767E] ${align === "right" ? "text-right !pr-0" : "text-left"} ${className ?? ""}`}
+      onClick={() => onSort(field)}
+    >
+      {label}
+      <span className="ml-1 inline-block w-3 text-[10px]">
+        {active ? (dir === "asc" ? "▲" : "▼") : ""}
+      </span>
+    </th>
   );
 }
 

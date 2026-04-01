@@ -53,6 +53,9 @@ coverage/
 # Internal docs
 ROADMAP.md
 
+# GNUCash source reference
+gnucash-source/
+
 # Misc
 *.log
 *.tsbuildinfo
