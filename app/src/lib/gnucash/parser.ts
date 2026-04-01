@@ -35,6 +35,18 @@ function formatMonth(date: Date): string {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
 }
 
+// GNUCash stores dates as either ISO "YYYY-MM-DD HH:MM:SS" or compact "YYYYMMDDHHMMSS".
+// SQLite's strftime only handles ISO, so these helpers normalise both formats in SQL.
+function sqlMonth(col: string): string {
+  return `CASE WHEN ${col} LIKE '____-__-%' THEN strftime('%Y-%m', ${col}) ELSE substr(${col}, 1, 4) || '-' || substr(${col}, 5, 2) END`;
+}
+function sqlYear(col: string): string {
+  return `CASE WHEN ${col} LIKE '____-__-%' THEN strftime('%Y', ${col}) ELSE substr(${col}, 1, 4) END`;
+}
+function sqlMonthNum(col: string): string {
+  return `CASE WHEN ${col} LIKE '____-__-%' THEN strftime('%m', ${col}) ELSE substr(${col}, 5, 2) END`;
+}
+
 const ASSET_TYPES = ["ASSET", "BANK", "CASH", "STOCK", "MUTUAL", "RECEIVABLE"];
 const LIABILITY_TYPES = ["LIABILITY", "CREDIT", "PAYABLE"];
 const INCOME_TYPES = ["INCOME"];
@@ -354,7 +366,7 @@ function computeNetWorthSeries(db: Database.Database): MonthlyNetWorth[] {
   const nonInvRows = db
     .prepare(
       `SELECT
-        strftime('%Y-%m', t.post_date) AS month,
+        ${sqlMonth("t.post_date")} AS month,
         a.commodity_guid,
         SUM(CASE WHEN a.account_type IN ('ASSET','BANK','CASH','RECEIVABLE')
             THEN CAST(s.quantity_num AS REAL) / s.quantity_denom ELSE 0 END) AS asset_change,
@@ -365,7 +377,7 @@ function computeNetWorthSeries(db: Database.Database): MonthlyNetWorth[] {
       JOIN transactions t ON s.tx_guid = t.guid
       WHERE a.account_type IN ('ASSET','BANK','CASH','RECEIVABLE','LIABILITY','CREDIT','PAYABLE')
         AND a.placeholder = 0
-      GROUP BY strftime('%Y-%m', t.post_date), a.commodity_guid
+      GROUP BY ${sqlMonth("t.post_date")}, a.commodity_guid
       ORDER BY month`
     )
     .all() as { month: string; commodity_guid: string; asset_change: number; liability_change: number }[];
@@ -396,13 +408,13 @@ function computeNetWorthSeries(db: Database.Database): MonthlyNetWorth[] {
     .prepare(
       `SELECT
         s.account_guid,
-        strftime('%Y-%m', t.post_date) AS month,
+        ${sqlMonth("t.post_date")} AS month,
         SUM(CAST(s.quantity_num AS REAL) / s.quantity_denom) AS shares_change
       FROM splits s
       JOIN accounts a ON s.account_guid = a.guid
       JOIN transactions t ON s.tx_guid = t.guid
       WHERE a.account_type IN ('STOCK', 'MUTUAL')
-      GROUP BY s.account_guid, strftime('%Y-%m', t.post_date)
+      GROUP BY s.account_guid, ${sqlMonth("t.post_date")}
       ORDER BY month`
     )
     .all() as { account_guid: string; month: string; shares_change: number }[];
@@ -495,7 +507,7 @@ function computeCashFlowSeries(db: Database.Database): MonthlyCashFlow[] {
   const rows = db
     .prepare(
       `SELECT
-        strftime('%Y-%m', t.post_date) AS month,
+        ${sqlMonth("t.post_date")} AS month,
         SUM(CASE WHEN a.account_type = 'INCOME'
             THEN -CAST(s.value_num AS REAL) / s.value_denom ELSE 0 END) AS income,
         SUM(CASE WHEN a.account_type = 'EXPENSE'
@@ -504,7 +516,7 @@ function computeCashFlowSeries(db: Database.Database): MonthlyCashFlow[] {
       JOIN accounts a ON s.account_guid = a.guid
       JOIN transactions t ON s.tx_guid = t.guid
       WHERE a.account_type IN ('INCOME', 'EXPENSE')
-      GROUP BY strftime('%Y-%m', t.post_date)
+      GROUP BY ${sqlMonth("t.post_date")}
       ORDER BY month`
     )
     .all() as { month: string; income: number; expenses: number }[];
@@ -577,13 +589,13 @@ function computeExpenseBreakdown(
     .prepare(
       `SELECT
         s.account_guid,
-        strftime('%Y-%m', t.post_date) AS month,
+        ${sqlMonth("t.post_date")} AS month,
         SUM(CAST(s.value_num AS REAL) / s.value_denom) AS total
       FROM splits s
       JOIN accounts a ON s.account_guid = a.guid
       JOIN transactions t ON s.tx_guid = t.guid
       WHERE a.account_type = 'EXPENSE'
-      GROUP BY s.account_guid, strftime('%Y-%m', t.post_date)
+      GROUP BY s.account_guid, ${sqlMonth("t.post_date")}
       ORDER BY month`
     )
     .all() as { account_guid: string; month: string; total: number }[];
@@ -736,13 +748,13 @@ function computeIncomeBreakdown(
     .prepare(
       `SELECT
         s.account_guid,
-        strftime('%Y-%m', t.post_date) AS month,
+        ${sqlMonth("t.post_date")} AS month,
         SUM(CAST(s.value_num AS REAL) / s.value_denom) AS total
       FROM splits s
       JOIN accounts a ON s.account_guid = a.guid
       JOIN transactions t ON s.tx_guid = t.guid
       WHERE a.account_type = 'INCOME'
-      GROUP BY s.account_guid, strftime('%Y-%m', t.post_date)
+      GROUP BY s.account_guid, ${sqlMonth("t.post_date")}
       ORDER BY month`
     )
     .all() as { account_guid: string; month: string; total: number }[];
@@ -932,7 +944,7 @@ function computeInvestmentValueSeries(
         a.guid AS account_guid,
         a.name AS account_name,
         a.commodity_guid,
-        strftime('%Y-%m', t.post_date) AS month,
+        ${sqlMonth("t.post_date")} AS month,
         CAST(s.quantity_num AS REAL) / s.quantity_denom AS shares,
         CAST(s.value_num AS REAL) / s.value_denom AS cost
       FROM splits s
@@ -962,7 +974,7 @@ function computeInvestmentValueSeries(
   // Get all prices sorted by date
   const allPrices = db
     .prepare(
-      `SELECT commodity_guid, strftime('%Y-%m', date) AS month, CAST(value_num AS REAL) / value_denom AS price
+      `SELECT commodity_guid, ${sqlMonth("date")} AS month, CAST(value_num AS REAL) / value_denom AS price
       FROM prices
       ORDER BY date`
     )
@@ -1319,14 +1331,14 @@ function computeBudgetData(
     .prepare(
       `SELECT
         s.account_guid,
-        strftime('%m', t.post_date) AS month_num,
-        strftime('%Y', t.post_date) AS year,
+        ${sqlMonthNum("t.post_date")} AS month_num,
+        ${sqlYear("t.post_date")} AS year,
         SUM(CAST(s.quantity_num AS REAL) / s.quantity_denom) AS actual
       FROM splits s
       JOIN accounts a ON s.account_guid = a.guid
       JOIN transactions t ON s.tx_guid = t.guid
       WHERE a.account_type IN ('EXPENSE', 'INCOME')
-      GROUP BY s.account_guid, strftime('%Y', t.post_date), strftime('%m', t.post_date)`
+      GROUP BY s.account_guid, ${sqlYear("t.post_date")}, ${sqlMonthNum("t.post_date")}`
     )
     .all() as { account_guid: string; month_num: string; year: string; actual: number }[];
 
