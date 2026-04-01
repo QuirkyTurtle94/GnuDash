@@ -1167,7 +1167,7 @@ function computeTopBalances(
 
     let valueInBase = row.balance_in_commodity;
     if (isForeignCurrency) {
-      const rate = fxToBase.get(account.commodity_guid) ?? 0;
+      const rate = fxToBase.get(account.commodity_guid) ?? 1;
       valueInBase = row.balance_in_commodity * rate;
     }
 
