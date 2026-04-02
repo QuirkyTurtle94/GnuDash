@@ -78,7 +78,8 @@ export function MonthlyExpenseBarCard({
 
     return validMonths.map((month) => {
       // Format: "Jan", "Feb", etc. for multi-month; "Jan 2025" for single
-      const d = new Date(month + "-01");
+      const [yr, mo] = month.split("-");
+      const d = new Date(Number(yr), Number(mo) - 1, 1);
       const label =
         validMonths.length === 1
           ? d.toLocaleDateString("en-US", { month: "short", year: "numeric" })

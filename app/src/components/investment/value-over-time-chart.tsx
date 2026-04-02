@@ -43,7 +43,8 @@ export function ValueOverTimeChart({ series, currency, selectedTicker }: ValueOv
     return [...monthly.entries()]
       .sort(([a], [b]) => a.localeCompare(b))
       .map(([month, data]) => {
-        const d = new Date(month + "-01");
+        const [yr, mo] = month.split("-");
+        const d = new Date(Number(yr), Number(mo) - 1, 1);
         return {
           month,
           label: d.toLocaleDateString("en-US", { month: "short", year: "2-digit" }),
