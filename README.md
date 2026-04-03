@@ -2,13 +2,26 @@
   <img src="app/public/logo-readme.png" alt="GnuDash" height="140">
 </p>
 
-A personal finance dashboard that reads your GNUCash file and presents your financial data through a clean, interactive UI. Upload your `.gnucash` file, explore your finances — no data stored on the server.
+A personal finance dashboard **for** [GNUCash](https://gnucash.org) users. Upload your `.gnucash` file, explore your finances — everything runs in your browser.
 
-> **Recommended: run locally.** While no data is persisted server-side, running GnuDash on your own machine ensures your financial data never leaves your computer. See [Getting Started](#getting-started) below.
+> GnuDash is an independent, community project and is not affiliated with or endorsed by the GNU Project or GNUCash.
 
 ![Next.js](https://img.shields.io/badge/Next.js-16-black)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
+
+## Your data never leaves your device
+
+GnuDash is a fully client-side application. There is no server interaction with your GNUCash file at any point:
+
+1. You select your `.gnucash` file via drag-and-drop or file picker
+2. The file is read directly in your browser using the [File API](https://developer.mozilla.org/en-US/docs/Web/API/File_API)
+3. A [Web Worker](https://developer.mozilla.org/en-US/docs/Web/API/Web_Workers_API) loads the file into an in-browser SQLite database powered by [SQLite WASM](https://sqlite.org/wasm) — the official WebAssembly build of SQLite
+4. All SQL queries run locally inside the Worker, producing the same results as a native SQLite client
+5. The database is stored in your browser's [Origin Private File System (OPFS)](https://developer.mozilla.org/en-US/docs/Web/API/File_System_API/Origin_private_file_system), so it **persists across sessions** — you don't need to re-upload your file each time you visit
+6. No data is ever sent to a server. The entire app is a static site with no backend.
+
+To clear your data, use the dashboard's clear/reset option or clear your browser's site data.
 
 ## Features
 
@@ -78,40 +91,49 @@ Open [http://localhost:3000](http://localhost:3000) and drag-and-drop your `.gnu
 
 ## Production Build
 
+GnuDash builds to a fully static site — no Node.js server required in production.
+
 ```bash
 cd app
 npm run build
-npm start
 ```
 
-The app runs on port 3000 by default.
+This produces a static export in `out/`. Serve it with any static file server:
 
-## How It Works
+```bash
+npx serve out
+```
 
-1. You upload a `.gnucash` SQLite file via drag-and-drop
-2. The server reads it in-memory using `better-sqlite3`
-3. Financial data is extracted and sent to the dashboard
-4. **No financial data is persisted** — it's discarded when the session ends
+### Required HTTP Headers
+
+Your hosting server must set these headers for SQLite WASM and OPFS to work:
+
+```
+Cross-Origin-Opener-Policy: same-origin
+Cross-Origin-Embedder-Policy: require-corp
+```
+
+These are required for `SharedArrayBuffer` support, which OPFS uses internally. Most static hosts (Vercel, Netlify, Cloudflare Pages) allow you to configure custom headers.
 
 ## Tech Stack
 
 | Layer | Technology |
 |-------|-----------|
-| Framework | Next.js 16 (App Router) |
+| Framework | Next.js 16 (App Router, static export) |
 | Language | TypeScript |
 | Styling | Tailwind CSS |
 | UI Components | shadcn/ui |
 | Charts | Recharts |
-| GNUCash Parsing | better-sqlite3 |
+| Database | SQLite WASM (client-side, in-browser) |
+| Persistence | Origin Private File System (OPFS) |
 
 ## Project Structure
 
 ```
 app/
 ├── src/
-│   ├── app/              # Next.js pages and API routes
-│   │   ├── (dashboard)/  # Dashboard pages (overview, spending, investment, transactions)
-│   │   └── api/upload/   # File upload endpoint
+│   ├── app/              # Next.js pages
+│   │   └── (dashboard)/  # Dashboard pages (overview, spending, investment, etc.)
 │   ├── components/       # React components
 │   │   ├── dashboard/    # Dashboard widgets and charts
 │   │   ├── spending/     # Spending analysis components
@@ -119,7 +141,11 @@ app/
 │   │   ├── upload/       # File upload UI
 │   │   └── ui/           # shadcn/ui base components
 │   └── lib/
-│       ├── gnucash/      # GNUCash SQLite parser
+│       ├── gnucash/      # GNUCash SQLite parser and domain logic
+│       │   ├── db/       # Database adapters (WASM + better-sqlite3 for tests)
+│       │   ├── domain/   # Business logic modules (accounts, net-worth, etc.)
+│       │   ├── worker/   # Web Worker for client-side SQLite execution
+│       │   └── shared/   # Shared utilities (dates, account paths)
 │       └── types/        # TypeScript type definitions
 docs/
 ├── gnucash-sql-schema.md # GNUCash SQLite schema reference

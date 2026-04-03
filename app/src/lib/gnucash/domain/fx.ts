@@ -1,4 +1,4 @@
-import type Database from "better-sqlite3";
+import type { DbAdapter } from "../db/adapter";
 
 export interface FxRateMap {
   /** Convert an amount in the given commodity to the base currency. */
@@ -8,7 +8,7 @@ export interface FxRateMap {
 }
 
 export function buildFxRateMap(
-  db: Database.Database,
+  db: DbAdapter,
   baseCurrencyGuid: string
 ): FxRateMap {
   const allFxPrices = db

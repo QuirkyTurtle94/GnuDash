@@ -1,0 +1,26 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`computeCurrentNetWorth > snapshot 1`] = `24255`;
+
+exports[`computeNetWorthSeries > snapshot 1`] = `
+[
+  {
+    "assets": 17760,
+    "liabilities": 45,
+    "month": "2025-01",
+    "netWorth": 17715,
+  },
+  {
+    "assets": 21095,
+    "liabilities": 0,
+    "month": "2025-02",
+    "netWorth": 21095,
+  },
+  {
+    "assets": 24255,
+    "liabilities": 0,
+    "month": "2025-03",
+    "netWorth": 24255,
+  },
+]
+`;

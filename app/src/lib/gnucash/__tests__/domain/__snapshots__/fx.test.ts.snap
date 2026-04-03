@@ -1,0 +1,10 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`buildFxRateMap (via context) > snapshot: rates for all commodities 1`] = `
+{
+  "AAPL": 1,
+  "GBP": 1,
+  "USD": 0.79,
+  "VWRL": 1,
+}
+`;

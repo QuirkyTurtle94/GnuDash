@@ -1,0 +1,24 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`computeCashFlowSeries > snapshot 1`] = `
+[
+  {
+    "expenses": 330,
+    "income": 3000,
+    "month": "2025-01",
+    "net": 2670,
+  },
+  {
+    "expenses": 270,
+    "income": 3500,
+    "month": "2025-02",
+    "net": 3230,
+  },
+  {
+    "expenses": 40,
+    "income": 3000,
+    "month": "2025-03",
+    "net": 2960,
+  },
+]
+`;

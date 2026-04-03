@@ -1,4 +1,4 @@
-import type Database from "better-sqlite3";
+import type { DbAdapter } from "./db/adapter";
 import type {
   GnuCashAccount,
   GnuCashCommodity,
@@ -7,7 +7,7 @@ import type {
 import { buildFxRateMap, type FxRateMap } from "./domain/fx";
 
 export interface ParseContext {
-  db: Database.Database;
+  db: DbAdapter;
   accounts: GnuCashAccount[];
   accountMap: Map<string, GnuCashAccount>;
   commodities: GnuCashCommodity[];
@@ -25,7 +25,7 @@ export interface ParseContext {
   topIncomeGuids: Set<string>;
 }
 
-export function buildParseContext(db: Database.Database): ParseContext {
+export function buildParseContext(db: DbAdapter): ParseContext {
   const accounts = db
     .prepare(
       `SELECT guid, name, account_type, commodity_guid, parent_guid,

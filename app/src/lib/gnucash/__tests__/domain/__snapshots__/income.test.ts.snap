@@ -1,0 +1,93 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`computeIncomeBreakdown > snapshot 1`] = `
+{
+  "colors": {
+    "Freelance": "#4A7A9A",
+    "Salary": "#3B6B8A",
+  },
+  "monthly": [
+    {
+      "amount": 3000,
+      "category": "Salary",
+      "fullPath": "Salary",
+      "month": "2025-01",
+      "pathParts": [
+        "Salary",
+      ],
+    },
+    {
+      "amount": 3000,
+      "category": "Salary",
+      "fullPath": "Salary",
+      "month": "2025-02",
+      "pathParts": [
+        "Salary",
+      ],
+    },
+    {
+      "amount": 500,
+      "category": "Freelance",
+      "fullPath": "Freelance",
+      "month": "2025-02",
+      "pathParts": [
+        "Freelance",
+      ],
+    },
+    {
+      "amount": 3000,
+      "category": "Salary",
+      "fullPath": "Salary",
+      "month": "2025-03",
+      "pathParts": [
+        "Salary",
+      ],
+    },
+  ],
+}
+`;
+
+exports[`getIncomeTransactions > snapshot 1`] = `
+[
+  {
+    "accountName": "Salary",
+    "amount": 3000,
+    "date": "2025-03-28",
+    "description": "Salary March",
+    "fullPath": "Salary",
+    "pathParts": [
+      "Salary",
+    ],
+  },
+  {
+    "accountName": "Salary",
+    "amount": 3000,
+    "date": "2025-02-28",
+    "description": "Salary February",
+    "fullPath": "Salary",
+    "pathParts": [
+      "Salary",
+    ],
+  },
+  {
+    "accountName": "Freelance",
+    "amount": 500,
+    "date": "2025-02-15",
+    "description": "Freelance Project",
+    "fullPath": "Freelance",
+    "pathParts": [
+      "Freelance",
+    ],
+  },
+  {
+    "accountName": "Salary",
+    "amount": 3000,
+    "date": "2025-01-28",
+    "description": "Salary January",
+    "fullPath": "Salary",
+    "pathParts": [
+      "Salary",
+    ],
+  },
+]
+`;

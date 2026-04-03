@@ -1,0 +1,157 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`computeExpenseBreakdown > snapshot 1`] = `
+{
+  "categories": [
+    {
+      "amount": 425,
+      "color": "#4A7A6B",
+      "fullPath": "Food",
+      "name": "Food",
+    },
+    {
+      "amount": 215,
+      "color": "#5C8C7C",
+      "fullPath": "Utilities",
+      "name": "Utilities",
+    },
+  ],
+  "colors": {
+    "Food": "#4A7A6B",
+    "Utilities": "#5C8C7C",
+  },
+  "monthly": [
+    {
+      "amount": 200,
+      "category": "Groceries",
+      "fullPath": "Food:Groceries",
+      "month": "2025-01",
+      "pathParts": [
+        "Food",
+        "Groceries",
+      ],
+    },
+    {
+      "amount": 45,
+      "category": "Restaurants",
+      "fullPath": "Food:Restaurants",
+      "month": "2025-01",
+      "pathParts": [
+        "Food",
+        "Restaurants",
+      ],
+    },
+    {
+      "amount": 85,
+      "category": "Electric",
+      "fullPath": "Utilities:Electric",
+      "month": "2025-01",
+      "pathParts": [
+        "Utilities",
+        "Electric",
+      ],
+    },
+    {
+      "amount": 180,
+      "category": "Groceries",
+      "fullPath": "Food:Groceries",
+      "month": "2025-02",
+      "pathParts": [
+        "Food",
+        "Groceries",
+      ],
+    },
+    {
+      "amount": 90,
+      "category": "Electric",
+      "fullPath": "Utilities:Electric",
+      "month": "2025-02",
+      "pathParts": [
+        "Utilities",
+        "Electric",
+      ],
+    },
+    {
+      "amount": 40,
+      "category": "Water",
+      "fullPath": "Utilities:Water",
+      "month": "2025-03",
+      "pathParts": [
+        "Utilities",
+        "Water",
+      ],
+    },
+  ],
+}
+`;
+
+exports[`getExpenseTransactions > snapshot 1`] = `
+[
+  {
+    "accountName": "Water",
+    "amount": 40,
+    "date": "2025-03-10",
+    "description": "Thames Water",
+    "fullPath": "Utilities:Water",
+    "pathParts": [
+      "Utilities",
+      "Water",
+    ],
+  },
+  {
+    "accountName": "Groceries",
+    "amount": 180,
+    "date": "2025-02-10",
+    "description": "Sainsburys Groceries",
+    "fullPath": "Food:Groceries",
+    "pathParts": [
+      "Food",
+      "Groceries",
+    ],
+  },
+  {
+    "accountName": "Electric",
+    "amount": 90,
+    "date": "2025-02-05",
+    "description": "British Gas Electric",
+    "fullPath": "Utilities:Electric",
+    "pathParts": [
+      "Utilities",
+      "Electric",
+    ],
+  },
+  {
+    "accountName": "Restaurants",
+    "amount": 45,
+    "date": "2025-01-20",
+    "description": "Pizza Express",
+    "fullPath": "Food:Restaurants",
+    "pathParts": [
+      "Food",
+      "Restaurants",
+    ],
+  },
+  {
+    "accountName": "Groceries",
+    "amount": 200,
+    "date": "2025-01-15",
+    "description": "Tesco Groceries",
+    "fullPath": "Food:Groceries",
+    "pathParts": [
+      "Food",
+      "Groceries",
+    ],
+  },
+  {
+    "accountName": "Electric",
+    "amount": 85,
+    "date": "2025-01-05",
+    "description": "British Gas Electric",
+    "fullPath": "Utilities:Electric",
+    "pathParts": [
+      "Utilities",
+      "Electric",
+    ],
+  },
+]
+`;

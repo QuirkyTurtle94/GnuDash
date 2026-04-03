@@ -1,0 +1,306 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`computeBudgetData > snapshot 1`] = `
+{
+  "availableYears": [
+    2025,
+  ],
+  "budgets": [
+    {
+      "description": "Annual household budget",
+      "guid": "00000034000000340000003400000034",
+      "name": "2025 Budget",
+      "numPeriods": 12,
+    },
+  ],
+  "expenseCategories": [
+    {
+      "accountGuid": "00000012000000120000001200000012",
+      "accountName": "Groceries",
+      "actual": 0,
+      "budgeted": 750,
+      "fullPath": "Food:Groceries",
+      "periods": [
+        {
+          "actual": {
+            "2025": 200,
+          },
+          "budgeted": 250,
+          "period": 0,
+        },
+        {
+          "actual": {
+            "2025": 180,
+          },
+          "budgeted": 250,
+          "period": 1,
+        },
+        {
+          "actual": {
+            "2025": 0,
+          },
+          "budgeted": 250,
+          "period": 2,
+        },
+        {
+          "actual": {
+            "2025": 0,
+          },
+          "budgeted": 0,
+          "period": 3,
+        },
+        {
+          "actual": {
+            "2025": 0,
+          },
+          "budgeted": 0,
+          "period": 4,
+        },
+        {
+          "actual": {
+            "2025": 0,
+          },
+          "budgeted": 0,
+          "period": 5,
+        },
+        {
+          "actual": {
+            "2025": 0,
+          },
+          "budgeted": 0,
+          "period": 6,
+        },
+        {
+          "actual": {
+            "2025": 0,
+          },
+          "budgeted": 0,
+          "period": 7,
+        },
+        {
+          "actual": {
+            "2025": 0,
+          },
+          "budgeted": 0,
+          "period": 8,
+        },
+        {
+          "actual": {
+            "2025": 0,
+          },
+          "budgeted": 0,
+          "period": 9,
+        },
+        {
+          "actual": {
+            "2025": 0,
+          },
+          "budgeted": 0,
+          "period": 10,
+        },
+        {
+          "actual": {
+            "2025": 0,
+          },
+          "budgeted": 0,
+          "period": 11,
+        },
+      ],
+      "variance": 750,
+      "variancePct": 100,
+    },
+    {
+      "accountGuid": "00000015000000150000001500000015",
+      "accountName": "Electric",
+      "actual": 0,
+      "budgeted": 300,
+      "fullPath": "Utilities:Electric",
+      "periods": [
+        {
+          "actual": {
+            "2025": 85,
+          },
+          "budgeted": 100,
+          "period": 0,
+        },
+        {
+          "actual": {
+            "2025": 90,
+          },
+          "budgeted": 100,
+          "period": 1,
+        },
+        {
+          "actual": {
+            "2025": 0,
+          },
+          "budgeted": 100,
+          "period": 2,
+        },
+        {
+          "actual": {
+            "2025": 0,
+          },
+          "budgeted": 0,
+          "period": 3,
+        },
+        {
+          "actual": {
+            "2025": 0,
+          },
+          "budgeted": 0,
+          "period": 4,
+        },
+        {
+          "actual": {
+            "2025": 0,
+          },
+          "budgeted": 0,
+          "period": 5,
+        },
+        {
+          "actual": {
+            "2025": 0,
+          },
+          "budgeted": 0,
+          "period": 6,
+        },
+        {
+          "actual": {
+            "2025": 0,
+          },
+          "budgeted": 0,
+          "period": 7,
+        },
+        {
+          "actual": {
+            "2025": 0,
+          },
+          "budgeted": 0,
+          "period": 8,
+        },
+        {
+          "actual": {
+            "2025": 0,
+          },
+          "budgeted": 0,
+          "period": 9,
+        },
+        {
+          "actual": {
+            "2025": 0,
+          },
+          "budgeted": 0,
+          "period": 10,
+        },
+        {
+          "actual": {
+            "2025": 0,
+          },
+          "budgeted": 0,
+          "period": 11,
+        },
+      ],
+      "variance": 300,
+      "variancePct": 100,
+    },
+  ],
+  "incomeCategories": [
+    {
+      "accountGuid": "0000000e0000000e0000000e0000000e",
+      "accountName": "Salary",
+      "actual": 0,
+      "budgeted": 9000,
+      "fullPath": "Salary",
+      "periods": [
+        {
+          "actual": {
+            "2025": 3000,
+          },
+          "budgeted": 3000,
+          "period": 0,
+        },
+        {
+          "actual": {
+            "2025": 3000,
+          },
+          "budgeted": 3000,
+          "period": 1,
+        },
+        {
+          "actual": {
+            "2025": 3000,
+          },
+          "budgeted": 3000,
+          "period": 2,
+        },
+        {
+          "actual": {
+            "2025": 0,
+          },
+          "budgeted": 0,
+          "period": 3,
+        },
+        {
+          "actual": {
+            "2025": 0,
+          },
+          "budgeted": 0,
+          "period": 4,
+        },
+        {
+          "actual": {
+            "2025": 0,
+          },
+          "budgeted": 0,
+          "period": 5,
+        },
+        {
+          "actual": {
+            "2025": 0,
+          },
+          "budgeted": 0,
+          "period": 6,
+        },
+        {
+          "actual": {
+            "2025": 0,
+          },
+          "budgeted": 0,
+          "period": 7,
+        },
+        {
+          "actual": {
+            "2025": 0,
+          },
+          "budgeted": 0,
+          "period": 8,
+        },
+        {
+          "actual": {
+            "2025": 0,
+          },
+          "budgeted": 0,
+          "period": 9,
+        },
+        {
+          "actual": {
+            "2025": 0,
+          },
+          "budgeted": 0,
+          "period": 10,
+        },
+        {
+          "actual": {
+            "2025": 0,
+          },
+          "budgeted": 0,
+          "period": 11,
+        },
+      ],
+      "variance": 9000,
+      "variancePct": 100,
+    },
+  ],
+}
+`;

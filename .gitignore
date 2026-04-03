@@ -39,6 +39,9 @@ Thumbs.db
 *.gnucash.LNK
 *.gnucash.LCK
 
+# But keep test fixtures
+!**/fixtures/test.gnucash
+
 # Claude Code
 .claude/
 CLAUDE.md

@@ -1,46 +1,19 @@
 import Database from "better-sqlite3";
+import type { DbAdapter } from "./adapter";
+import { validateSchema } from "./validation";
 
-const REQUIRED_TABLES: Record<string, string[]> = {
-  accounts: ["guid", "name", "account_type", "commodity_guid", "parent_guid"],
-  transactions: ["guid", "currency_guid", "post_date", "description"],
-  splits: [
-    "guid",
-    "tx_guid",
-    "account_guid",
-    "value_num",
-    "value_denom",
-    "quantity_num",
-    "quantity_denom",
-  ],
-  commodities: ["guid", "namespace", "mnemonic"],
-  books: ["guid", "root_account_guid"],
-};
-
-export function openAndValidate(filePath: string): Database.Database {
+export function openAndValidate(filePath: string): DbAdapter {
   const db = new Database(filePath, { readonly: true });
 
-  for (const [table, columns] of Object.entries(REQUIRED_TABLES)) {
-    const exists = db
-      .prepare(`SELECT 1 FROM sqlite_master WHERE type='table' AND name=?`)
-      .get(table);
-    if (!exists) {
-      db.close();
-      throw new Error(`Not a valid GNUCash file: missing table "${table}"`);
-    }
+  // better-sqlite3's Database already satisfies DbAdapter
+  const adapter = db as unknown as DbAdapter;
 
-    const info = db.prepare(`PRAGMA table_info(${table})`).all() as {
-      name: string;
-    }[];
-    const columnNames = new Set(info.map((c) => c.name));
-    for (const col of columns) {
-      if (!columnNames.has(col)) {
-        db.close();
-        throw new Error(
-          `Not a valid GNUCash file: table "${table}" is missing column "${col}"`
-        );
-      }
-    }
+  try {
+    validateSchema(adapter);
+  } catch (e) {
+    db.close();
+    throw e;
   }
 
-  return db;
+  return adapter;
 }

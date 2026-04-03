@@ -1,0 +1,41 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`computeTopBalances > snapshot 1`] = `
+[
+  {
+    "accountName": "Savings",
+    "commodityMnemonic": "GBP",
+    "fullPath": "Assets:Savings",
+    "type": "BANK",
+    "value": 10000,
+  },
+  {
+    "accountName": "Current Account",
+    "commodityMnemonic": "GBP",
+    "fullPath": "Assets:Current Account",
+    "type": "BANK",
+    "value": 8260,
+  },
+  {
+    "accountName": "VWRL",
+    "commodityMnemonic": "VWRL",
+    "fullPath": "Assets:Investments:VWRL",
+    "type": "MUTUAL",
+    "value": 4250,
+  },
+  {
+    "accountName": "AAPL",
+    "commodityMnemonic": "AAPL",
+    "fullPath": "Assets:Investments:AAPL",
+    "type": "STOCK",
+    "value": 1350,
+  },
+  {
+    "accountName": "USD Account",
+    "commodityMnemonic": "USD",
+    "fullPath": "Assets:USD Account",
+    "type": "BANK",
+    "value": 395,
+  },
+]
+`;

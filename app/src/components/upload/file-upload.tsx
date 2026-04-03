@@ -82,7 +82,7 @@ export function FileUpload() {
             <div className="flex flex-col items-center gap-3">
               <Loader2 className="h-10 w-10 animate-spin text-[#6C9B8B]" />
               <p className="text-sm font-medium text-[#1A1D1F]">
-                Parsing your GNUCash file...
+                Analysing your GNUCash file...
               </p>
             </div>
           ) : (
@@ -122,7 +122,7 @@ export function FileUpload() {
         )}
 
         <p className="mt-6 text-center text-xs text-[#9A9FA5]">
-          Your financial data is processed in memory and never stored on our servers.
+          Your financial data never leaves your device. Everything runs locally in your browser.
         </p>
       </div>
     </div>
