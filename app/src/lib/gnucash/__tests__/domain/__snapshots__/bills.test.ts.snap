@@ -1,0 +1,18 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`getUpcomingBills > snapshot 1`] = `
+[
+  {
+    "amount": null,
+    "enabled": true,
+    "name": "Internet",
+    "nextDate": "2025-03-15",
+  },
+  {
+    "amount": null,
+    "enabled": true,
+    "name": "Rent",
+    "nextDate": "2025-03-31",
+  },
+]
+`;

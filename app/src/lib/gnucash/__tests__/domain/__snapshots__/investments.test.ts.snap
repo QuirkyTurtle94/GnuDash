@@ -1,0 +1,63 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`computeInvestmentValueSeries > snapshot 1`] = `
+[
+  {
+    "costBasis": 1200,
+    "month": "2025-01",
+    "ticker": "AAPL",
+    "value": 1250,
+  },
+  {
+    "costBasis": 1200,
+    "month": "2025-02",
+    "ticker": "AAPL",
+    "value": 1300,
+  },
+  {
+    "costBasis": 1200,
+    "month": "2025-03",
+    "ticker": "AAPL",
+    "value": 1350,
+  },
+  {
+    "costBasis": 4000,
+    "month": "2025-02",
+    "ticker": "VWRL",
+    "value": 4100,
+  },
+  {
+    "costBasis": 4000,
+    "month": "2025-03",
+    "ticker": "VWRL",
+    "value": 4250,
+  },
+]
+`;
+
+exports[`computeInvestments > snapshot 1`] = `
+[
+  {
+    "accountName": "AAPL",
+    "change12m": 0,
+    "change12mPct": 0,
+    "costBasis": 1200,
+    "gainLoss": 150,
+    "gainLossPct": 12.5,
+    "marketValue": 1350,
+    "sharesHeld": 10,
+    "ticker": "AAPL",
+  },
+  {
+    "accountName": "VWRL",
+    "change12m": 0,
+    "change12mPct": 0,
+    "costBasis": 4000,
+    "gainLoss": 250,
+    "gainLossPct": 6.25,
+    "marketValue": 4250,
+    "sharesHeld": 50,
+    "ticker": "VWRL",
+  },
+]
+`;
