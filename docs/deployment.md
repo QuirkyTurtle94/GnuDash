@@ -56,10 +56,12 @@ A `Dockerfile` is included in both the repo root (build context = repo) and `app
 # From the app/ directory
 cd app
 docker build -t gnudash .
-docker run -p 8080:80 gnudash
+docker run -p 8080:80 --restart unless-stopped gnudash
 ```
 
 Open [http://localhost:8080](http://localhost:8080).
+
+The `-p 8080:80` flag maps port 80 inside the container to port 8080 on your host. You can change `8080` to any port you like — for example, `-p 3000:80` to serve on port 3000, or `-p 80:80` if nothing else is using port 80. The container always listens on port 80 internally.
 
 ### Docker Compose
 
@@ -72,7 +74,7 @@ services:
       context: ./app
       dockerfile: Dockerfile
     ports:
-      - "8080:80"
+      - "8080:80"  # Change 8080 to any port you prefer
     restart: unless-stopped
 ```
 
