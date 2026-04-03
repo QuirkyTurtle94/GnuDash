@@ -52,6 +52,7 @@ coverage/
 
 # Internal docs
 ROADMAP.md
+ARCHITECTURE_REVIEW.md
 
 # GNUCash source reference
 gnucash-source/
