@@ -10,6 +10,7 @@ import {
 } from "recharts";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatCurrency } from "@/lib/format";
+import { assignShades } from "@/lib/color-utils";
 import { useSpendingFilter } from "@/lib/spending-filter-context";
 import { getMonthsForPeriod } from "@/lib/spending-utils";
 import type { MonthlyExpenseByCategory } from "@/lib/types/gnucash";
@@ -64,6 +65,9 @@ export function SpendingPieCard({ monthlyExpenses, categoryColors, currency, tit
         };
       })
       .sort((a, b) => b.amount - a.amount);
+
+    // When drilled into a category, generate different shades for subcategories
+    if (selectedCategory) assignShades(cats);
 
     const t = cats.reduce((sum, c) => sum + c.amount, 0);
     return { categories: cats, total: t };

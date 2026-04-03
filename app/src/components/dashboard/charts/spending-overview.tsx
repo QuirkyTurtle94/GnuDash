@@ -11,6 +11,7 @@ import {
 import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatCurrency } from "@/lib/format";
+import { assignShades } from "@/lib/color-utils";
 import type { MonthlyExpenseByCategory } from "@/lib/types/gnucash";
 
 type TimePeriod = "this-month" | "last-month" | "this-year" | "last-12m";
@@ -123,6 +124,8 @@ export function SpendingOverview({ monthlyExpenses, categoryColors, currency, li
         };
       })
       .sort((a, b) => b.amount - a.amount);
+
+    if (drillPath) assignShades(cats);
 
     const t = cats.reduce((sum, c) => sum + c.amount, 0);
     return { categories: cats, total: t };
