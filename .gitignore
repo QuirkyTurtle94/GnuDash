@@ -53,6 +53,12 @@ AGENTS.md
 # Test coverage
 coverage/
 
+# Playwright
+playwright.config.ts
+playwright-report/
+test-results/
+app/scripts/
+
 # Internal docs
 ROADMAP.md
 ARCHITECTURE_REVIEW.md

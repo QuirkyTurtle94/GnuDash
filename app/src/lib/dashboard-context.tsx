@@ -15,11 +15,13 @@ import { generateDemoData } from "@/lib/demo-data";
 const STORAGE_KEY = "gnucash-dashboard-data";
 const STORAGE_VERSION = "v14"; // bumped: WASM migration
 const VERSION_KEY = "gnucash-dashboard-version";
+const UPLOADED_AT_KEY = "gnucash-dashboard-uploaded-at";
 
 interface DashboardContextType {
   data: DashboardData | null;
   isLoading: boolean;
   error: string | null;
+  uploadedAt: Date | null;
   uploadFile: (file: File) => Promise<void>;
   loadDemo: () => Promise<void>;
   clearData: () => void;
@@ -31,6 +33,7 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
   const [data, setData] = useState<DashboardData | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [uploadedAt, setUploadedAt] = useState<Date | null>(null);
   const clientRef = useRef<GnuCashWorkerClient | null>(null);
 
   function getClient(): GnuCashWorkerClient {
@@ -54,6 +57,8 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
           const dashboardData = await client.getFullDashboardData();
           if (!cancelled) {
             setData(dashboardData);
+            const stored = sessionStorage.getItem(UPLOADED_AT_KEY);
+            if (stored) setUploadedAt(new Date(stored));
             return;
           }
         }
@@ -73,6 +78,8 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
         const stored = sessionStorage.getItem(STORAGE_KEY);
         if (stored) {
           setData(JSON.parse(stored));
+          const storedAt = sessionStorage.getItem(UPLOADED_AT_KEY);
+          if (storedAt) setUploadedAt(new Date(storedAt));
         }
       } catch {
         // ignore parse errors
@@ -104,7 +111,10 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
       await client.waitForReady();
       await client.openFile(file);
       const dashboardData = await client.getFullDashboardData();
+      const now = new Date();
       setData(dashboardData);
+      setUploadedAt(now);
+      sessionStorage.setItem(UPLOADED_AT_KEY, now.toISOString());
     } catch (err) {
       setError(err instanceof Error ? err.message : "Upload failed");
     } finally {
@@ -129,7 +139,9 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
   function clearData() {
     setData(null);
     setError(null);
+    setUploadedAt(null);
     sessionStorage.removeItem(STORAGE_KEY);
+    sessionStorage.removeItem(UPLOADED_AT_KEY);
     // Close the worker DB but keep the worker alive
     if (clientRef.current) {
       clientRef.current.close();
@@ -139,7 +151,7 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
 
   return (
     <DashboardContext.Provider
-      value={{ data, isLoading, error, uploadFile, loadDemo, clearData }}
+      value={{ data, isLoading, error, uploadedAt, uploadFile, loadDemo, clearData }}
     >
       {children}
     </DashboardContext.Provider>
