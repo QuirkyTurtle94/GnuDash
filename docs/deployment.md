@@ -170,6 +170,93 @@ The Dockerfile handles everything — the build, the nginx config, and the requi
 
 ---
 
+## Synology NAS
+
+You can run GnuDash on a Synology NAS using Container Manager (Docker). No command line needed.
+
+### Prerequisites
+
+- A Synology NAS running DSM 7.0 or later
+- **Container Manager** installed from Package Center (it's free — open Package Center, search "Container Manager", and click Install)
+
+### Step-by-step
+
+1. **Open Container Manager** from your Synology desktop
+
+2. **Go to the "Project" section** in the left sidebar
+
+3. **Click "Create"**
+   - Give the project a name: `gnudash`
+   - Set the path to any folder (e.g. create a new folder called `docker/gnudash` in File Station first)
+
+4. **Paste this Docker Compose config** in the editor:
+
+   ```yaml
+   services:
+     gnudash:
+       image: nginx:alpine
+       ports:
+         - "8080:80"  # Change 8080 to any free port on your NAS
+       restart: unless-stopped
+       volumes:
+         - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
+         - ./site:/usr/share/nginx/html:ro
+   ```
+
+5. **Click "Next"**, then **"Done"** to create the project (it will fail to start — that's expected, we need to add the files first)
+
+6. **Build the site on your computer** (you need Node.js installed):
+
+   ```bash
+   git clone https://github.com/QuirkyTurtle94/GnuDash.git
+   cd GnuDash/app
+   npm install
+   npm run build
+   ```
+
+7. **Copy files to your NAS** using File Station or a network share:
+   - Copy the entire contents of `GnuDash/app/out/` into the `site/` folder inside your project directory
+   - Copy `GnuDash/app/nginx.conf` into the project directory (next to `docker-compose.yml`)
+
+   Your project folder should look like:
+   ```
+   docker/gnudash/
+   ├── docker-compose.yml   (created by Container Manager)
+   ├── nginx.conf           (copied from the repo)
+   └── site/                (contents of app/out/)
+       ├── index.html
+       ├── _next/
+       ├── _headers
+       └── ...
+   ```
+
+8. **Go back to Container Manager** > **Project** > **gnudash** > click **"Start"**
+
+9. **Open GnuDash** at `http://YOUR-NAS-IP:8080`
+
+### Updating
+
+When a new version of GnuDash is released, repeat steps 6-7 (rebuild and copy the files), then restart the container in Container Manager.
+
+### Alternative: Build on the NAS
+
+If you'd prefer the NAS to build the Docker image itself (no need to copy files manually), your NAS needs enough RAM (2GB+ free) and you'll use SSH:
+
+1. SSH into your NAS: `ssh admin@YOUR-NAS-IP`
+2. Clone and build:
+   ```bash
+   cd /volume1/docker
+   git clone https://github.com/QuirkyTurtle94/GnuDash.git
+   cd GnuDash/app
+   docker build -t gnudash .
+   docker run -d -p 8080:80 --restart unless-stopped --name gnudash gnudash
+   ```
+3. Open `http://YOUR-NAS-IP:8080`
+
+To update: `cd /volume1/docker/GnuDash && git pull && cd app && docker build -t gnudash . && docker stop gnudash && docker rm gnudash && docker run -d -p 8080:80 --restart unless-stopped --name gnudash gnudash`
+
+---
+
 ## Any Static Host
 
 If your host isn't listed above, the process is the same:
