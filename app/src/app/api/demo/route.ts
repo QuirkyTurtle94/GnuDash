@@ -6,8 +6,9 @@ export async function GET() {
     const data = generateDemoData();
     return NextResponse.json(data);
   } catch (err) {
+    console.error("Demo data generation error:", err);
     return NextResponse.json(
-      { error: err instanceof Error ? err.message : "Failed to generate demo data" },
+      { error: "Failed to generate demo data" },
       { status: 500 }
     );
   }
