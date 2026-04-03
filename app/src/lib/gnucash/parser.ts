@@ -198,19 +198,77 @@ function buildAccountTree(
   db: Database.Database
 ): AccountNode[] {
   const commodityMap = new Map(commodities.map((c) => [c.guid, c]));
+  const accountMap = new Map(accounts.map((a) => [a.guid, a]));
 
-  // Get balances for all accounts
-  const balances = db
+  // Determine base currency
+  const book = db
+    .prepare(`SELECT root_account_guid FROM books LIMIT 1`)
+    .get() as { root_account_guid: string } | undefined;
+  const rootAcct = book ? accounts.find((a) => a.guid === book.root_account_guid) : null;
+  const baseCurrencyGuid = rootAcct?.commodity_guid ?? "";
+
+  // Build FX rate map: foreign_currency_guid -> rate_to_base
+  const allFxPrices = db
     .prepare(
-      `SELECT account_guid, SUM(CAST(value_num AS REAL) / value_denom) AS balance
-       FROM splits
-       GROUP BY account_guid`
+      `SELECT p.commodity_guid, p.currency_guid,
+              CAST(p.value_num AS REAL) / p.value_denom AS price
+       FROM prices p
+       JOIN commodities c1 ON p.commodity_guid = c1.guid
+       JOIN commodities c2 ON p.currency_guid = c2.guid
+       WHERE c1.namespace = 'CURRENCY' AND c2.namespace = 'CURRENCY'
+       ORDER BY p.date DESC`
+    )
+    .all() as { commodity_guid: string; currency_guid: string; price: number }[];
+
+  const fxToBase = new Map<string, number>();
+  fxToBase.set(baseCurrencyGuid, 1.0);
+  for (const fx of allFxPrices) {
+    if (fx.currency_guid === baseCurrencyGuid && !fxToBase.has(fx.commodity_guid)) {
+      fxToBase.set(fx.commodity_guid, fx.price);
+    } else if (fx.commodity_guid === baseCurrencyGuid && !fxToBase.has(fx.currency_guid)) {
+      fxToBase.set(fx.currency_guid, 1 / fx.price);
+    }
+  }
+
+  // Get per-account balances using quantity (native commodity)
+  const balanceRows = db
+    .prepare(
+      `SELECT s.account_guid, SUM(CAST(s.quantity_num AS REAL) / s.quantity_denom) AS balance
+       FROM splits s
+       GROUP BY s.account_guid`
     )
     .all() as { account_guid: string; balance: number }[];
-  const balanceMap = new Map(balances.map((b) => [b.account_guid, b.balance]));
+  const rawBalanceMap = new Map(balanceRows.map((b) => [b.account_guid, b.balance]));
 
-  // Build lookup
-  const accountMap = new Map(accounts.map((a) => [a.guid, a]));
+  // Get latest prices for investment commodities (STOCK/MUTUAL)
+  const latestPrices = db
+    .prepare(
+      `SELECT commodity_guid, CAST(value_num AS REAL) / value_denom AS price
+       FROM prices p1
+       WHERE date = (SELECT MAX(date) FROM prices p2 WHERE p2.commodity_guid = p1.commodity_guid)`
+    )
+    .all() as { commodity_guid: string; price: number }[];
+  const priceMap = new Map(latestPrices.map((p) => [p.commodity_guid, p.price]));
+
+  // Convert a raw quantity balance to base currency
+  function toBaseCurrency(account: GnuCashAccount, rawBalance: number): number {
+    const commodity = commodityMap.get(account.commodity_guid);
+    if (!commodity) return rawBalance;
+
+    // Investment accounts: shares × latest price
+    if (account.account_type === "STOCK" || account.account_type === "MUTUAL") {
+      return rawBalance * (priceMap.get(account.commodity_guid) ?? 0);
+    }
+
+    // Foreign currency accounts: balance × FX rate
+    if (commodity.namespace === "CURRENCY" && account.commodity_guid !== baseCurrencyGuid) {
+      return rawBalance * (fxToBase.get(account.commodity_guid) ?? 1);
+    }
+
+    return rawBalance;
+  }
+
+  // Build children lookup
   const childrenMap = new Map<string, GnuCashAccount[]>();
   for (const a of accounts) {
     const key = a.parent_guid ?? "ROOT";
@@ -236,6 +294,14 @@ function buildAccountTree(
       .filter((c) => c.account_type !== "ROOT")
       .map(buildNode);
 
+    // Own balance in base currency (leaf accounts only)
+    const rawBalance = rawBalanceMap.get(account.guid) ?? 0;
+    const ownBalance = toBaseCurrency(account, rawBalance);
+
+    // Roll up: own balance + sum of children's balances
+    const childrenTotal = children.reduce((sum, c) => sum + c.balance, 0);
+    const totalBalance = ownBalance + childrenTotal;
+
     return {
       guid: account.guid,
       name: account.name,
@@ -245,7 +311,7 @@ function buildAccountTree(
       parentGuid: account.parent_guid,
       hidden: account.hidden === 1,
       placeholder: account.placeholder === 1,
-      balance: balanceMap.get(account.guid) ?? 0,
+      balance: totalBalance,
       children,
     };
   }
