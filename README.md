@@ -60,10 +60,18 @@ Charts are fully interactive — click any bar or segment to drill down into bre
   </tr>
   <tr>
     <td><strong>Budget</strong></td>
-    <td><strong>Upload</strong></td>
+    <td><strong>Transactions</strong></td>
   </tr>
   <tr>
     <td><img src="app/screenshots/06-budget.png" width="450" /></td>
+    <td><img src="app/screenshots/07-transactions.png" width="450" /></td>
+  </tr>
+  <tr>
+    <td><strong>Accounts</strong></td>
+    <td><strong>Upload</strong></td>
+  </tr>
+  <tr>
+    <td><img src="app/screenshots/08-accounts.png" width="450" /></td>
     <td><img src="app/screenshots/01-upload.png" width="450" /></td>
   </tr>
 </table>
@@ -91,31 +99,9 @@ npm run dev
 
 Open [http://localhost:3000](http://localhost:3000) and drag-and-drop your `.gnucash` file to get started.
 
-## Production Build
+## Deployment
 
-GnuDash builds to a fully static site — no Node.js server required in production.
-
-```bash
-cd app
-npm run build
-```
-
-This produces a static export in `out/`. Serve it with any static file server:
-
-```bash
-npx serve out
-```
-
-### Required HTTP Headers
-
-Your hosting server must set these headers for SQLite WASM and OPFS to work:
-
-```
-Cross-Origin-Opener-Policy: same-origin
-Cross-Origin-Embedder-Policy: require-corp
-```
-
-These are required for `SharedArrayBuffer` support, which OPFS uses internally. Most static hosts (Vercel, Netlify, Cloudflare Pages) allow you to configure custom headers.
+GnuDash is a fully static site — no backend server required. See the **[Deployment Guide](docs/deployment.md)** for full instructions covering Docker, Cloudflare Pages, Vercel, Netlify, Coolify, and more.
 
 ## Tech Stack
 

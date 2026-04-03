@@ -31,7 +31,7 @@ interface SidebarProps {
 }
 
 export function Sidebar({ onNavigate }: SidebarProps) {
-  const { clearData } = useDashboard();
+  const { clearData, uploadedAt } = useDashboard();
   const pathname = usePathname();
 
   return (
@@ -92,6 +92,12 @@ export function Sidebar({ onNavigate }: SidebarProps) {
           <LogOut className="h-[18px] w-[18px] text-[#9A9FA5]" />
           Upload new file
         </button>
+        {uploadedAt && (
+          <p className="mt-1.5 px-3 text-xs text-[#9A9FA5]">
+            Loaded {uploadedAt.toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" })}{" "}
+            {uploadedAt.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })}
+          </p>
+        )}
       </div>
     </aside>
   );
