@@ -10,7 +10,7 @@ import {
 import type { DashboardData } from "@/lib/types/gnucash";
 
 const STORAGE_KEY = "gnucash-dashboard-data";
-const STORAGE_VERSION = "v11"; // bump this when DashboardData shape changes
+const STORAGE_VERSION = "v12"; // bump this when DashboardData shape changes
 const VERSION_KEY = "gnucash-dashboard-version";
 
 interface DashboardContextType {

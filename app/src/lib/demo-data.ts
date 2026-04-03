@@ -11,6 +11,8 @@ import type {
   RecentTransaction,
   UpcomingBill,
   ExpenseTransaction,
+  LedgerTransaction,
+  LedgerSplit,
   BudgetData,
   BudgetCategoryRow,
 } from "@/lib/types/gnucash";
@@ -319,6 +321,115 @@ export function generateDemoData(): DashboardData {
     ? Math.round(((currentMonthIncome - currentMonthExpenses) / currentMonthIncome) * 10000) / 100
     : 0;
 
+  // --- Ledger transactions (double-entry from expense + income transactions) ---
+  const ledgerTransactions: LedgerTransaction[] = [];
+
+  // Convert expense transactions into double-entry ledger entries (Current Account -> Expense)
+  for (const tx of expenseTransactions) {
+    ledgerTransactions.push({
+      guid: guid(),
+      date: tx.date,
+      description: tx.description,
+      num: "",
+      splits: [
+        {
+          accountGuid: "",
+          accountName: tx.accountName,
+          accountFullPath: `Expenses:${tx.fullPath}`,
+          accountType: "EXPENSE",
+          memo: "",
+          reconcileState: rand() > 0.3 ? "y" : "n",
+          amount: tx.amount,
+          quantity: tx.amount,
+          commodityMnemonic: currency,
+        },
+        {
+          accountGuid: "",
+          accountName: "Current Account",
+          accountFullPath: "Assets:Current Account",
+          accountType: "BANK",
+          memo: "",
+          reconcileState: rand() > 0.3 ? "y" : "n",
+          amount: -tx.amount,
+          quantity: -tx.amount,
+          commodityMnemonic: currency,
+        },
+      ],
+    });
+  }
+
+  // Convert income transactions into double-entry ledger entries (Income -> Current Account)
+  for (const tx of incomeTransactions) {
+    ledgerTransactions.push({
+      guid: guid(),
+      date: tx.date,
+      description: tx.description,
+      num: tx.accountName === "Salary" ? String(ri(1000, 9999)) : "",
+      splits: [
+        {
+          accountGuid: "",
+          accountName: "Current Account",
+          accountFullPath: "Assets:Current Account",
+          accountType: "BANK",
+          memo: "",
+          reconcileState: "y",
+          amount: tx.amount,
+          quantity: tx.amount,
+          commodityMnemonic: currency,
+        },
+        {
+          accountGuid: "",
+          accountName: tx.accountName,
+          accountFullPath: `Income:${tx.fullPath}`,
+          accountType: "INCOME",
+          memo: "",
+          reconcileState: "y",
+          amount: -tx.amount,
+          quantity: -tx.amount,
+          commodityMnemonic: currency,
+        },
+      ],
+    });
+  }
+
+  // Add a few transfer transactions (savings, mortgage payments)
+  for (const month of months) {
+    const savingsAmount = ri(200, 800);
+    ledgerTransactions.push({
+      guid: guid(),
+      date: `${month}-${String(ri(1, 5)).padStart(2, "0")}`,
+      description: "Transfer to savings",
+      num: "",
+      splits: [
+        {
+          accountGuid: "",
+          accountName: "Savings Account",
+          accountFullPath: "Assets:Savings Account",
+          accountType: "BANK",
+          memo: "Monthly savings",
+          reconcileState: "y",
+          amount: savingsAmount,
+          quantity: savingsAmount,
+          commodityMnemonic: currency,
+        },
+        {
+          accountGuid: "",
+          accountName: "Current Account",
+          accountFullPath: "Assets:Current Account",
+          accountType: "BANK",
+          memo: "Monthly savings",
+          reconcileState: "y",
+          amount: -savingsAmount,
+          quantity: -savingsAmount,
+          commodityMnemonic: currency,
+        },
+      ],
+    });
+  }
+
+  // Sort by date descending
+  ledgerTransactions.sort((a, b) => b.date.localeCompare(a.date));
+
   // --- Budget data ---
   const budgetData = generateBudgetData(
     expenseAccounts, incomeAccounts, expenseRanges, incomeRanges,
@@ -348,6 +459,7 @@ export function generateDemoData(): DashboardData {
     currentMonthExpenses,
     savingsRate,
     budgetData,
+    ledgerTransactions,
   };
 }
 

@@ -17,6 +17,8 @@ import type {
   BudgetData,
   BudgetInfo,
   BudgetCategoryRow,
+  LedgerTransaction,
+  LedgerSplit,
   DashboardData,
 } from "@/lib/types/gnucash";
 
@@ -75,6 +77,7 @@ export function parseGnuCashFile(filePath: string): DashboardData {
     const incomeTransactions = getIncomeTransactions(db, accounts);
     const recentTransactions = getRecentTransactions(db, accounts);
     const upcomingBills = getUpcomingBills(db);
+    const ledgerTransactions = getLedgerTransactions(db, accounts, commodities);
     const budgetData = computeBudgetData(db, accounts);
 
     // Current net worth: compute directly from account balances
@@ -114,6 +117,7 @@ export function parseGnuCashFile(filePath: string): DashboardData {
       currentMonthExpenses: currentExpenses,
       savingsRate,
       budgetData,
+      ledgerTransactions,
     };
   } finally {
     db.close();
@@ -1268,6 +1272,114 @@ function getRecentTransactions(
       reconciled: row.reconcile_state === "y",
     };
   });
+}
+
+function getLedgerTransactions(
+  db: Database.Database,
+  accounts: GnuCashAccount[],
+  commodities: GnuCashCommodity[]
+): LedgerTransaction[] {
+  const accountMap = new Map(accounts.map((a) => [a.guid, a]));
+  const commodityMap = new Map(commodities.map((c) => [c.guid, c]));
+  const rootAccount = accounts.find((a) => a.account_type === "ROOT");
+
+  // Build full account paths (e.g. "Assets:Bank:Checking")
+  function buildFullPath(account: GnuCashAccount): string {
+    const parts: string[] = [account.name];
+    let current = account;
+    while (current.parent_guid && current.parent_guid !== rootAccount?.guid) {
+      const parent = accountMap.get(current.parent_guid);
+      if (!parent) break;
+      parts.unshift(parent.name);
+      current = parent;
+    }
+    return parts.join(":");
+  }
+
+  const rows = db
+    .prepare(
+      `SELECT
+        t.guid AS tx_guid,
+        t.post_date,
+        t.description,
+        t.num,
+        s.account_guid,
+        s.memo,
+        s.reconcile_state,
+        s.value_num,
+        s.value_denom,
+        s.quantity_num,
+        s.quantity_denom
+      FROM transactions t
+      JOIN splits s ON s.tx_guid = t.guid
+      ORDER BY t.post_date DESC, t.guid, s.value_num DESC`
+    )
+    .all() as {
+    tx_guid: string;
+    post_date: string;
+    description: string;
+    num: string;
+    account_guid: string;
+    memo: string;
+    reconcile_state: string;
+    value_num: number;
+    value_denom: number;
+    quantity_num: number;
+    quantity_denom: number;
+  }[];
+
+  // Group rows by transaction
+  const txMap = new Map<
+    string,
+    { date: string; description: string; num: string; splits: LedgerSplit[] }
+  >();
+
+  for (const row of rows) {
+    const account = accountMap.get(row.account_guid);
+    const commodity = account
+      ? commodityMap.get(account.commodity_guid)
+      : undefined;
+
+    const split: LedgerSplit = {
+      accountGuid: row.account_guid,
+      accountName: account?.name ?? "Unknown",
+      accountFullPath: account ? buildFullPath(account) : "Unknown",
+      accountType: account?.account_type ?? "UNKNOWN",
+      memo: row.memo ?? "",
+      reconcileState: row.reconcile_state ?? "n",
+      amount: row.value_denom !== 0 ? row.value_num / row.value_denom : 0,
+      quantity:
+        row.quantity_denom !== 0 ? row.quantity_num / row.quantity_denom : 0,
+      commodityMnemonic: commodity?.mnemonic ?? "",
+    };
+
+    const existing = txMap.get(row.tx_guid);
+    if (existing) {
+      existing.splits.push(split);
+    } else {
+      const date = parseGnuCashDate(row.post_date);
+      const dateStr = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+      txMap.set(row.tx_guid, {
+        date: dateStr,
+        description: row.description,
+        num: row.num ?? "",
+        splits: [split],
+      });
+    }
+  }
+
+  const transactions: LedgerTransaction[] = [];
+  for (const [guid, tx] of txMap) {
+    transactions.push({
+      guid,
+      date: tx.date,
+      description: tx.description,
+      num: tx.num,
+      splits: tx.splits,
+    });
+  }
+
+  return transactions;
 }
 
 function computeBudgetData(

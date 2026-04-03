@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   Home,
+  BookOpen,
   Receipt,
   CreditCard,
   TrendingUp,
@@ -15,7 +16,8 @@ import { useDashboard } from "@/lib/dashboard-context";
 
 const mainNav = [
   { icon: Home, label: "Dashboard", href: "/" },
-  { icon: Receipt, label: "Income", href: "/transactions" },
+  { icon: BookOpen, label: "Transactions", href: "/transactions" },
+  { icon: Receipt, label: "Income", href: "/income" },
   { icon: CreditCard, label: "Spending", href: "/spending" },
   { icon: TrendingUp, label: "Investment", href: "/investment" },
   { icon: Target, label: "Budget", href: "/budget" },

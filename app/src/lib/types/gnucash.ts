@@ -180,6 +180,26 @@ export interface ExpenseTransaction {
   amount: number;
 }
 
+export interface LedgerSplit {
+  accountGuid: string;
+  accountName: string;
+  accountFullPath: string;
+  accountType: string;
+  memo: string;
+  reconcileState: string; // "y" = reconciled, "c" = cleared, "n" = unreconciled
+  amount: number; // value_num / value_denom (in transaction currency)
+  quantity: number; // quantity_num / quantity_denom (in account commodity)
+  commodityMnemonic: string;
+}
+
+export interface LedgerTransaction {
+  guid: string;
+  date: string; // YYYY-MM-DD
+  description: string;
+  num: string; // check number / reference
+  splits: LedgerSplit[];
+}
+
 export interface BudgetInfo {
   guid: string;
   name: string;
@@ -227,4 +247,5 @@ export interface DashboardData {
   currentMonthExpenses: number;
   savingsRate: number;
   budgetData: BudgetData | null;
+  ledgerTransactions: LedgerTransaction[];
 }
