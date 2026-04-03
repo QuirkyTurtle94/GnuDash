@@ -6,6 +6,8 @@ A personal finance dashboard **for** [GNUCash](https://gnucash.org) users. Uploa
 
 > GnuDash is an independent, community project and is not affiliated with or endorsed by the GNU Project or GNUCash.
 
+**[Try it live](https://gnudash.pages.dev/)** — the app is served as a fully static site. Once the page loads, no data crosses your network. Your `.gnucash` file is read and queried entirely within your browser.
+
 ![Next.js](https://img.shields.io/badge/Next.js-16-black)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
