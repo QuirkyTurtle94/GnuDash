@@ -225,10 +225,24 @@ export interface BudgetCategoryRow {
   variance: number; // budgeted - actual (positive = under budget)
   variancePct: number; // variance / budgeted * 100
   periods: { period: number; budgeted: number; actual: Record<string, number> }[]; // actual keyed by year
+  parentAccountGuid: string | null; // nearest ancestor in the budget hierarchy (null = top-level)
+  depth: number; // 0 = top-level budget category
+  hasChildren: boolean; // true if child accounts also appear in the budget hierarchy
+  hasExplicitBudget: boolean; // true if this account has its own budget_amounts entry
+  childBudgetTotal: number; // sum of direct children's budgeted amounts
+  imbalance: number; // this.budgeted - childBudgetTotal (only non-zero for explicit budgets with children)
+}
+
+export interface BudgetDataForBudget {
+  expenseCategories: BudgetCategoryRow[];
+  incomeCategories: BudgetCategoryRow[];
 }
 
 export interface BudgetData {
   budgets: BudgetInfo[];
+  /** Categories keyed by budget guid */
+  categoriesByBudget: Record<string, BudgetDataForBudget>;
+  /** @deprecated Use categoriesByBudget instead — kept for convenience as alias to first budget */
   expenseCategories: BudgetCategoryRow[];
   incomeCategories: BudgetCategoryRow[];
   availableYears: number[];

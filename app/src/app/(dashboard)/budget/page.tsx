@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useDashboard } from "@/lib/dashboard-context";
 import { formatCurrency } from "@/lib/format";
@@ -149,22 +149,106 @@ function YearMonthSelector({
   );
 }
 
+function Breadcrumb({
+  path,
+  allCategories,
+  onNavigate,
+}: {
+  path: string[];
+  allCategories: BudgetCategoryRow[];
+  onNavigate: (depth: number) => void;
+}) {
+  if (path.length === 0) return null;
+
+  const categoryMap = new Map(allCategories.map((c) => [c.accountGuid, c]));
+
+  return (
+    <nav className="flex items-center gap-1 text-sm">
+      <button
+        onClick={() => onNavigate(-1)}
+        className="font-medium text-[#6C9B8B] hover:underline"
+      >
+        All Categories
+      </button>
+      {path.map((guid, i) => {
+        const cat = categoryMap.get(guid);
+        const isLast = i === path.length - 1;
+        return (
+          <span key={guid} className="flex items-center gap-1">
+            <svg className="h-3 w-3 text-[#9A9FA5]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+            </svg>
+            {isLast ? (
+              <span className="font-medium text-[#1A1D1F]">{cat?.accountName ?? guid}</span>
+            ) : (
+              <button
+                onClick={() => onNavigate(i)}
+                className="font-medium text-[#6C9B8B] hover:underline"
+              >
+                {cat?.accountName ?? guid}
+              </button>
+            )}
+          </span>
+        );
+      })}
+    </nav>
+  );
+}
+
+function ImbalanceBanner({
+  parentCategory,
+  currency,
+  isIncome,
+}: {
+  parentCategory: BudgetCategoryRow;
+  currency: string;
+  isIncome: boolean;
+}) {
+  const { imbalance, budgeted, childBudgetTotal } = parentCategory;
+  if (imbalance === 0) return null;
+
+  const isUnderAllocated = imbalance > 0;
+  const color = isUnderAllocated ? "#E8B86B" : "#E87C6B";
+  const label = isUnderAllocated ? "Unallocated" : "Over-allocated";
+
+  return (
+    <div
+      className="flex items-center gap-2 rounded-lg border px-4 py-2.5 text-sm"
+      style={{ borderColor: color + "40", backgroundColor: color + "08" }}
+    >
+      <svg className="h-4 w-4 shrink-0" style={{ color }} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4.5c-.77-.833-2.694-.833-3.464 0L3.34 16.5c-.77.833.192 2.5 1.732 2.5z" />
+      </svg>
+      <span style={{ color }}>
+        <span className="font-medium">{label}:</span>{" "}
+        {parentCategory.accountName} is budgeted at{" "}
+        <span className="font-semibold" data-v>{formatCurrency(budgeted, currency)}</span>{" "}
+        but sub-budgets total{" "}
+        <span className="font-semibold" data-v>{formatCurrency(childBudgetTotal, currency)}</span>{" "}
+        ({formatCurrency(Math.abs(imbalance), currency)} {isUnderAllocated ? "unallocated" : "over-allocated"})
+      </span>
+    </div>
+  );
+}
+
 function SummaryCard({
   totalBudgeted,
   totalActual,
   currency,
   isIncome = false,
+  parentName,
+  childCount,
 }: {
   totalBudgeted: number;
   totalActual: number;
   currency: string;
   isIncome?: boolean;
+  parentName?: string;
+  childCount?: number;
 }) {
   const remaining = totalBudgeted - totalActual;
   const pct = totalBudgeted > 0 ? (totalActual / totalBudgeted) * 100 : 0;
   const isOver = totalActual > totalBudgeted;
-  // For income: over target is good (green), under target is bad (red)
-  // For expenses: over budget is bad (red), under budget is good (green)
   const overColor = isIncome ? "#6C9B8B" : "#E87C6B";
   const underColor = isIncome ? "#E87C6B" : "#6C9B8B";
   const ringColor = isOver ? overColor : underColor;
@@ -174,12 +258,15 @@ function SummaryCard({
     <Card>
       <CardHeader>
         <CardTitle className="text-sm font-medium text-[#6F767E]">
-          {isIncome ? "Income Summary" : "Budget Summary"}
+          {parentName ? (
+            <span>{parentName} <span className="text-[#9A9FA5]">— {childCount} sub-budget{childCount !== 1 ? "s" : ""}</span></span>
+          ) : (
+            isIncome ? "Income Summary" : "Budget Summary"
+          )}
         </CardTitle>
       </CardHeader>
       <CardContent>
         <div className="flex flex-col gap-4">
-          {/* Ring chart */}
           <div className="flex items-center gap-6">
             <div className="relative h-28 w-28 shrink-0">
               <svg viewBox="0 0 100 100" className="h-full w-full -rotate-90">
@@ -237,23 +324,35 @@ function ProgressBars({
   currency,
   isIncome = false,
   ytdVarianceMap,
+  onDrillDown,
+  drillPath,
+  allCategories,
+  onBreadcrumbNavigate,
 }: {
   categories: BudgetCategoryRow[];
   currency: string;
   isIncome?: boolean;
   ytdVarianceMap?: Map<string, number>;
+  onDrillDown: (accountGuid: string) => void;
+  drillPath: string[];
+  allCategories: BudgetCategoryRow[];
+  onBreadcrumbNavigate: (depth: number) => void;
 }) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-sm font-medium text-[#6F767E]">Category Progress</CardTitle>
+        <div className="flex flex-col gap-1.5">
+          <CardTitle className="text-sm font-medium text-[#6F767E]">Category Progress</CardTitle>
+          {drillPath.length > 0 && (
+            <Breadcrumb path={drillPath} allCategories={allCategories} onNavigate={onBreadcrumbNavigate} />
+          )}
+        </div>
       </CardHeader>
       <CardContent>
         <div className="flex flex-col gap-3">
           {categories.map((cat) => {
             const pct = cat.budgeted > 0 ? (cat.actual / cat.budgeted) * 100 : (cat.actual > 0 ? 100 : 0);
             const isOver = cat.actual > cat.budgeted;
-            // Income: exceeding target is good, falling short is bad
             const barColor = isIncome
               ? (pct >= 100 ? "#6C9B8B" : pct >= 80 ? "#E8B86B" : "#E87C6B")
               : (pct > 100 ? "#E87C6B" : pct > 80 ? "#E8B86B" : "#6C9B8B");
@@ -271,10 +370,34 @@ function ProgressBars({
               ? (ytdIsOver ? "#6C9B8B" : "#E87C6B")
               : (ytdIsOver ? "#E87C6B" : "#6C9B8B");
 
+            const hasImbalance = cat.hasChildren && cat.imbalance !== 0;
+
             return (
-              <div key={cat.accountGuid} className="flex flex-col gap-1">
+              <div
+                key={cat.accountGuid}
+                className={`flex flex-col gap-1 ${cat.hasChildren ? "cursor-pointer rounded-lg px-2 py-1.5 -mx-2 transition-colors hover:bg-[#F4F5F7]" : ""}`}
+                onClick={cat.hasChildren ? () => onDrillDown(cat.accountGuid) : undefined}
+              >
                 <div className="flex items-center justify-between text-xs">
-                  <span className="font-medium text-[#1A1D1F]" data-l>{cat.fullPath || cat.accountName}</span>
+                  <span className="flex items-center gap-1.5 font-medium text-[#1A1D1F]" data-l>
+                    {cat.accountName}
+                    {cat.hasChildren && (
+                      <svg className="h-3 w-3 text-[#9A9FA5]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                      </svg>
+                    )}
+                    {hasImbalance && (
+                      <span
+                        className="inline-flex items-center rounded px-1 py-0.5 text-[10px] font-medium"
+                        style={{
+                          backgroundColor: cat.imbalance > 0 ? "#E8B86B20" : "#E87C6B20",
+                          color: cat.imbalance > 0 ? "#E8B86B" : "#E87C6B",
+                        }}
+                      >
+                        {cat.imbalance > 0 ? "unallocated" : "over-allocated"}
+                      </span>
+                    )}
+                  </span>
                   <span className="text-[#9A9FA5]" data-v>
                     {formatCurrency(cat.actual, currency)} / {formatCurrency(cat.budgeted, currency)}
                   </span>
@@ -318,10 +441,12 @@ function VarianceTable({
   categories,
   currency,
   isIncome = false,
+  onDrillDown,
 }: {
   categories: BudgetCategoryRow[];
   currency: string;
   isIncome?: boolean;
+  onDrillDown: (accountGuid: string) => void;
 }) {
   const [sortKey, setSortKey] = useState<"name" | "budgeted" | "actual" | "variance">("actual");
   const [sortAsc, setSortAsc] = useState(false);
@@ -391,13 +516,37 @@ function VarianceTable({
           <tbody>
             {sorted.map((cat) => {
               const exceeded = cat.variance < 0;
-              // For expenses: exceeded = red. For income: exceeded = green (beat target)
               const varColor = isIncome
                 ? (exceeded ? "#6C9B8B" : "#E87C6B")
                 : (exceeded ? "#E87C6B" : "#6C9B8B");
+              const hasImbalance = cat.hasChildren && cat.imbalance !== 0;
               return (
-                <tr key={cat.accountGuid} className="border-b border-[#EFEFEF]/50 last:border-0">
-                  <td className="py-2.5 pr-4 font-medium text-[#1A1D1F]" data-l>{cat.fullPath || cat.accountName}</td>
+                <tr
+                  key={cat.accountGuid}
+                  className={`border-b border-[#EFEFEF]/50 last:border-0 ${cat.hasChildren ? "cursor-pointer transition-colors hover:bg-[#F4F5F7]" : ""}`}
+                  onClick={cat.hasChildren ? () => onDrillDown(cat.accountGuid) : undefined}
+                >
+                  <td className="py-2.5 pr-4 font-medium text-[#1A1D1F]" data-l>
+                    <span className="flex items-center gap-1.5">
+                      {cat.accountName}
+                      {cat.hasChildren && (
+                        <svg className="h-3 w-3 text-[#9A9FA5]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                        </svg>
+                      )}
+                      {hasImbalance && (
+                        <span
+                          className="inline-flex items-center rounded px-1 py-0.5 text-[10px] font-medium"
+                          style={{
+                            backgroundColor: cat.imbalance > 0 ? "#E8B86B20" : "#E87C6B20",
+                            color: cat.imbalance > 0 ? "#E8B86B" : "#E87C6B",
+                          }}
+                        >
+                          {cat.imbalance > 0 ? "unallocated" : "over-allocated"}
+                        </span>
+                      )}
+                    </span>
+                  </td>
                   <td className="py-2.5 pr-4 text-right text-[#6F767E]" data-v>{formatCurrency(cat.budgeted, currency)}</td>
                   <td className="py-2.5 pr-4 text-right text-[#1A1D1F]" data-v>{formatCurrency(cat.actual, currency)}</td>
                   <td className="py-2.5 pr-4 text-right font-medium" style={{ color: varColor }} data-v>
@@ -472,6 +621,7 @@ function computeFilteredCategories(
   selectedMonth: number,
   selectedYear: number,
   yearStr: string,
+  numPeriods: number,
 ): BudgetCategoryRow[] {
   if (!sourceCategories) return [];
   if (viewMode === "monthly") {
@@ -480,19 +630,34 @@ function computeFilteredCategories(
       const budgeted = periodData?.budgeted ?? 0;
       const actual = periodData?.actual[yearStr] ?? 0;
       const variance = budgeted - actual;
+
+      // Recompute childBudgetTotal for this period
+      let childBudgetTotal = cat.childBudgetTotal;
+      let imbalance = cat.imbalance;
+      if (cat.hasChildren && sourceCategories) {
+        const children = sourceCategories.filter((c) => c.parentAccountGuid === cat.accountGuid);
+        childBudgetTotal = children.reduce((sum, c) => {
+          const cp = c.periods.find((p) => p.period === selectedMonth);
+          return sum + (cp?.budgeted ?? 0);
+        }, 0);
+        imbalance = cat.hasExplicitBudget ? budgeted - childBudgetTotal : 0;
+      }
+
       return {
         ...cat,
         budgeted,
         actual,
         variance,
         variancePct: budgeted > 0 ? (variance / budgeted) * 100 : 0,
+        childBudgetTotal,
+        imbalance,
       };
     }).filter((cat) => cat.budgeted > 0 || cat.actual > 0);
   }
 
   const now = new Date();
   const isCurrentYear = selectedYear === now.getFullYear();
-  const maxPeriod = viewMode === "year" ? 11 : (isCurrentYear ? now.getMonth() : 11);
+  const maxPeriod = viewMode === "year" ? (numPeriods - 1) : (isCurrentYear ? now.getMonth() : 11);
   return sourceCategories.map((cat) => {
     let budgeted = 0;
     let actual = 0;
@@ -503,12 +668,30 @@ function computeFilteredCategories(
       }
     }
     const variance = budgeted - actual;
+
+    // Recompute childBudgetTotal for this period range
+    let childBudgetTotal = cat.childBudgetTotal;
+    let imbalance = cat.imbalance;
+    if (cat.hasChildren && sourceCategories) {
+      const children = sourceCategories.filter((c) => c.parentAccountGuid === cat.accountGuid);
+      childBudgetTotal = children.reduce((sum, c) => {
+        let cb = 0;
+        for (const p of c.periods) {
+          if (p.period <= maxPeriod) cb += p.budgeted;
+        }
+        return sum + cb;
+      }, 0);
+      imbalance = cat.hasExplicitBudget ? budgeted - childBudgetTotal : 0;
+    }
+
     return {
       ...cat,
       budgeted,
       actual,
       variance,
       variancePct: budgeted > 0 ? (variance / budgeted) * 100 : 0,
+      childBudgetTotal,
+      imbalance,
     };
   }).filter((cat) => cat.budgeted > 0 || cat.actual > 0);
 }
@@ -521,20 +704,71 @@ function BudgetContent({ data }: { data: NonNullable<ReturnType<typeof useDashbo
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [selectedBudget, setSelectedBudget] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<BudgetTab>("expense");
+  const [drillPath, setDrillPath] = useState<string[]>([]);
 
   const budgetData = data.budgetData;
   const yearStr = selectedYear.toString();
   const isIncome = activeTab === "income";
 
-  const expenseCategories = useMemo(
-    () => budgetData ? computeFilteredCategories(budgetData.expenseCategories, viewMode, selectedMonth, selectedYear, yearStr) : [],
-    [budgetData, viewMode, selectedMonth, selectedYear, yearStr],
+  const activeBudgetGuid = selectedBudget ?? budgetData?.budgets[0]?.guid ?? "";
+
+  // Get categories for the selected budget
+  const activeBudgetData = budgetData?.categoriesByBudget[activeBudgetGuid];
+
+  const allExpenseCategories = useMemo(
+    () => activeBudgetData
+      ? computeFilteredCategories(activeBudgetData.expenseCategories, viewMode, selectedMonth, selectedYear, yearStr, budgetData?.budgets[0]?.numPeriods ?? 12)
+      : [],
+    [activeBudgetData, viewMode, selectedMonth, selectedYear, yearStr, budgetData],
   );
 
-  const incomeCategories = useMemo(
-    () => budgetData ? computeFilteredCategories(budgetData.incomeCategories, viewMode, selectedMonth, selectedYear, yearStr) : [],
-    [budgetData, viewMode, selectedMonth, selectedYear, yearStr],
+  const allIncomeCategories = useMemo(
+    () => activeBudgetData
+      ? computeFilteredCategories(activeBudgetData.incomeCategories, viewMode, selectedMonth, selectedYear, yearStr, budgetData?.budgets[0]?.numPeriods ?? 12)
+      : [],
+    [activeBudgetData, viewMode, selectedMonth, selectedYear, yearStr, budgetData],
   );
+
+  // Reset drill path when switching budget or tab
+  const handleBudgetSelect = useCallback((guid: string) => {
+    setSelectedBudget(guid);
+    setDrillPath([]);
+  }, []);
+
+  const handleTabChange = useCallback((tab: BudgetTab) => {
+    setActiveTab(tab);
+    setDrillPath([]);
+  }, []);
+
+  // All categories for the active tab (used for breadcrumb lookups)
+  const allCategories = isIncome ? allIncomeCategories : allExpenseCategories;
+
+  // Filter categories based on drill path
+  const visibleCategories = useMemo(() => {
+    if (drillPath.length === 0) {
+      // Top level: show categories with no budgeted parent
+      return allCategories.filter((c) => c.parentAccountGuid === null);
+    }
+    const currentParent = drillPath[drillPath.length - 1];
+    return allCategories.filter((c) => c.parentAccountGuid === currentParent);
+  }, [allCategories, drillPath]);
+
+  // Get the parent category when drilled in (for imbalance banner and summary)
+  const parentCategory = drillPath.length > 0
+    ? allCategories.find((c) => c.accountGuid === drillPath[drillPath.length - 1])
+    : undefined;
+
+  const handleDrillDown = useCallback((accountGuid: string) => {
+    setDrillPath((prev) => [...prev, accountGuid]);
+  }, []);
+
+  const handleBreadcrumbNavigate = useCallback((depth: number) => {
+    if (depth < 0) {
+      setDrillPath([]);
+    } else {
+      setDrillPath((prev) => prev.slice(0, depth + 1));
+    }
+  }, []);
 
   if (!budgetData || budgetData.budgets.length === 0) {
     return (
@@ -545,10 +779,10 @@ function BudgetContent({ data }: { data: NonNullable<ReturnType<typeof useDashbo
     );
   }
 
-  // Compute YTD variance per category (used in monthly view to show running total)
+  // Compute YTD variance per category (used in monthly view)
   const ytdVarianceMap = useMemo(() => {
-    if (!budgetData || viewMode !== "monthly") return new Map<string, number>();
-    const source = isIncome ? budgetData.incomeCategories : budgetData.expenseCategories;
+    if (!activeBudgetData || viewMode !== "monthly") return new Map<string, number>();
+    const source = isIncome ? activeBudgetData.incomeCategories : activeBudgetData.expenseCategories;
     const map = new Map<string, number>();
     for (const cat of source) {
       let ytdBudgeted = 0;
@@ -562,14 +796,14 @@ function BudgetContent({ data }: { data: NonNullable<ReturnType<typeof useDashbo
       map.set(cat.accountGuid, ytdBudgeted - ytdActual);
     }
     return map;
-  }, [budgetData, viewMode, selectedMonth, yearStr, isIncome]);
+  }, [activeBudgetData, viewMode, selectedMonth, yearStr, isIncome]);
 
-  const activeBudgetGuid = selectedBudget ?? budgetData.budgets[0].guid;
   const c = data.currency;
-  const categories = isIncome ? incomeCategories : expenseCategories;
-  const hasIncome = budgetData.incomeCategories.length > 0;
-  const totalBudgeted = categories.reduce((s, c) => s + c.budgeted, 0);
-  const totalActual = categories.reduce((s, c) => s + c.actual, 0);
+  const hasIncome = (activeBudgetData?.incomeCategories.length ?? 0) > 0;
+
+  // Use parent's budget/actual when drilled in, otherwise sum visible categories
+  const totalBudgeted = parentCategory ? parentCategory.budgeted : visibleCategories.reduce((s, c) => s + c.budgeted, 0);
+  const totalActual = parentCategory ? parentCategory.actual : visibleCategories.reduce((s, c) => s + c.actual, 0);
 
   return (
     <div className="flex flex-col gap-4 sm:gap-6">
@@ -581,7 +815,7 @@ function BudgetContent({ data }: { data: NonNullable<ReturnType<typeof useDashbo
           <BudgetSelector
             budgets={budgetData.budgets}
             selected={activeBudgetGuid}
-            onSelect={setSelectedBudget}
+            onSelect={handleBudgetSelect}
           />
         </div>
       </div>
@@ -590,7 +824,7 @@ function BudgetContent({ data }: { data: NonNullable<ReturnType<typeof useDashbo
       {hasIncome && (
         <div className="flex gap-1 rounded-lg border border-[#EFEFEF] bg-white self-start">
           <button
-            onClick={() => setActiveTab("expense")}
+            onClick={() => handleTabChange("expense")}
             className={`px-4 py-1.5 text-sm font-medium transition-colors rounded-lg ${
               activeTab === "expense"
                 ? "bg-[#6C9B8B]/10 text-[#6C9B8B]"
@@ -600,7 +834,7 @@ function BudgetContent({ data }: { data: NonNullable<ReturnType<typeof useDashbo
             Expenses
           </button>
           <button
-            onClick={() => setActiveTab("income")}
+            onClick={() => handleTabChange("income")}
             className={`px-4 py-1.5 text-sm font-medium transition-colors rounded-lg ${
               activeTab === "income"
                 ? "bg-[#6C9B8B]/10 text-[#6C9B8B]"
@@ -623,6 +857,11 @@ function BudgetContent({ data }: { data: NonNullable<ReturnType<typeof useDashbo
         showMonths={viewMode === "monthly"}
       />
 
+      {/* Imbalance banner when drilled in */}
+      {parentCategory && parentCategory.imbalance !== 0 && (
+        <ImbalanceBanner parentCategory={parentCategory} currency={c} isIncome={isIncome} />
+      )}
+
       {/* Row 1: Summary + Progress bars */}
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-5">
         <SummaryCard
@@ -630,20 +869,27 @@ function BudgetContent({ data }: { data: NonNullable<ReturnType<typeof useDashbo
           totalActual={totalActual}
           currency={c}
           isIncome={isIncome}
+          parentName={parentCategory?.accountName}
+          childCount={visibleCategories.length}
         />
         <ProgressBars
-          categories={categories}
+          categories={visibleCategories}
           currency={c}
           isIncome={isIncome}
           ytdVarianceMap={viewMode === "monthly" ? ytdVarianceMap : undefined}
+          onDrillDown={handleDrillDown}
+          drillPath={drillPath}
+          allCategories={allCategories}
+          onBreadcrumbNavigate={handleBreadcrumbNavigate}
         />
       </div>
 
       {/* Row 2: Variance table */}
       <VarianceTable
-        categories={categories}
+        categories={visibleCategories}
         currency={c}
         isIncome={isIncome}
+        onDrillDown={handleDrillDown}
       />
     </div>
   );

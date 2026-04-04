@@ -1,9 +1,9 @@
-import type { BudgetData, BudgetInfo, BudgetCategoryRow } from "@/lib/types/gnucash";
+import type { BudgetData, BudgetDataForBudget, BudgetInfo, BudgetCategoryRow } from "@/lib/types/gnucash";
 import type { ParseContext } from "../context";
 import { sqlYear, sqlMonthNum } from "../shared/dates";
 
 export function computeBudgetData(ctx: ParseContext): BudgetData | null {
-  const { db, accounts, accountMap, rootAccount } = ctx;
+  const { db, accounts, accountMap, rootAccount, topExpenseGuids, topIncomeGuids } = ctx;
 
   // Check if budgets table exists
   const tableCheck = db
@@ -33,32 +33,7 @@ export function computeBudgetData(ctx: ParseContext): BudgetData | null {
     )
     .all() as { budget_guid: string; account_guid: string; period_num: number; amount: number }[];
 
-  const topContainerGuids = new Set(
-    accounts
-      .filter(
-        (a) =>
-          (a.account_type === "EXPENSE" || a.account_type === "INCOME") &&
-          a.parent_guid === rootAccount.guid
-      )
-      .map((a) => a.guid)
-  );
-
-  function getAccountPath(accountGuid: string): string {
-    const parts: string[] = [];
-    let current = accountMap.get(accountGuid);
-    while (
-      current &&
-      !topContainerGuids.has(current.guid) &&
-      current.account_type !== "ROOT"
-    ) {
-      parts.unshift(current.name);
-      current = current.parent_guid
-        ? accountMap.get(current.parent_guid)
-        : undefined;
-    }
-    return parts.join(":");
-  }
-
+  // Fetch actuals for all expense/income leaf accounts
   const actualRows = db
     .prepare(
       `SELECT
@@ -86,6 +61,7 @@ export function computeBudgetData(ctx: ParseContext): BudgetData | null {
   }
   const availableYears = [...allYears].sort((a, b) => b - a);
 
+  // Build account children map (full account tree)
   const childrenMap = new Map<string, string[]>();
   for (const a of accounts) {
     if (a.parent_guid) {
@@ -103,6 +79,7 @@ export function computeBudgetData(ctx: ParseContext): BudgetData | null {
     return result;
   }
 
+  // Build budget amounts map: budgetGuid -> accountGuid -> periodNum -> amount
   const budgetAmountsMap = new Map<string, Map<string, Map<number, number>>>();
   for (const row of amountRows) {
     if (!budgetAmountsMap.has(row.budget_guid)) budgetAmountsMap.set(row.budget_guid, new Map());
@@ -111,42 +88,173 @@ export function computeBudgetData(ctx: ParseContext): BudgetData | null {
     accountAmounts.get(row.account_guid)!.set(row.period_num, row.amount);
   }
 
-  const defaultBudget = budgets[0];
-  const defaultAmounts = budgetAmountsMap.get(defaultBudget.guid);
-  const expenseCategories: BudgetCategoryRow[] = [];
-  const incomeCategories: BudgetCategoryRow[] = [];
+  /**
+   * Walk from an account up to its top-level container (direct child of
+   * Expenses or Income root), returning the path of account GUIDs from
+   * top-level down to (but not including) the account itself.
+   * Returns null if the account is already a top-level container or root.
+   */
+  function getAncestorPath(accountGuid: string): string[] | null {
+    const path: string[] = [];
+    let current = accountMap.get(accountGuid);
+    if (!current) return null;
 
-  if (defaultAmounts) {
-    for (const [accountGuid, periodAmounts] of defaultAmounts) {
+    // Walk up, collecting ancestors until we hit a top-level container
+    while (current) {
+      if (topExpenseGuids.has(current.guid) || topIncomeGuids.has(current.guid)) {
+        // current is the top-level category — it's the root of our hierarchy
+        path.unshift(current.guid);
+        return path;
+      }
+      if (current.account_type === "ROOT" || current.guid === rootAccount.guid) return null;
+      path.unshift(current.guid);
+      current = current.parent_guid ? accountMap.get(current.parent_guid) : undefined;
+    }
+    return null;
+  }
+
+  function getAccountPath(accountGuid: string): string {
+    const parts: string[] = [];
+    let current = accountMap.get(accountGuid);
+    const topGuids = new Set([...topExpenseGuids, ...topIncomeGuids]);
+    while (
+      current &&
+      !topGuids.has(current.guid) &&
+      current.account_type !== "ROOT"
+    ) {
+      parts.unshift(current.name);
+      current = current.parent_guid
+        ? accountMap.get(current.parent_guid)
+        : undefined;
+    }
+    return parts.join(":");
+  }
+
+  // Compute rolled-up actuals for a given account (including all descendants)
+  function getRolledUpActuals(accountGuid: string): Map<string, Map<number, number>> {
+    const descendantGuids = getDescendants(accountGuid);
+    const rolledUp = new Map<string, Map<number, number>>();
+    for (const dGuid of descendantGuids) {
+      const dYearMap = actualsMap.get(dGuid);
+      if (dYearMap) {
+        for (const [year, periodMap] of dYearMap) {
+          if (!rolledUp.has(year)) rolledUp.set(year, new Map());
+          const target = rolledUp.get(year)!;
+          for (const [period, amount] of periodMap) {
+            target.set(period, (target.get(period) ?? 0) + amount);
+          }
+        }
+      }
+    }
+    return rolledUp;
+  }
+
+  // Build categories for each budget
+  const categoriesByBudget: Record<string, BudgetDataForBudget> = {};
+
+  for (const budget of budgets) {
+    const budgetAmounts = budgetAmountsMap.get(budget.guid);
+    if (!budgetAmounts) {
+      categoriesByBudget[budget.guid] = { expenseCategories: [], incomeCategories: [] };
+      continue;
+    }
+
+    const budgetedAccountGuids = new Set(budgetAmounts.keys());
+    const currentYear = new Date().getFullYear().toString();
+
+    // Collect all account GUIDs that need rows: budgeted accounts + all
+    // ancestors up to the top-level container. This ensures we always
+    // present a hierarchy starting at the top level.
+    const allNeededGuids = new Set<string>();
+    for (const accGuid of budgetedAccountGuids) {
+      const path = getAncestorPath(accGuid);
+      if (path) {
+        for (const guid of path) allNeededGuids.add(guid);
+      }
+    }
+
+    // For each needed account, determine its direct parent in the hierarchy
+    // (the nearest ancestor that is also in allNeededGuids).
+    function findHierarchyParent(accountGuid: string): string | null {
+      const account = accountMap.get(accountGuid);
+      if (!account || !account.parent_guid) return null;
+      let current = accountMap.get(account.parent_guid);
+      while (current) {
+        if (current.account_type === "ROOT" || current.guid === rootAccount.guid) return null;
+        if (topExpenseGuids.has(current.guid) || topIncomeGuids.has(current.guid)) {
+          // If the account itself IS a top-level guid, its parent is null
+          if (accountGuid === current.guid) return null;
+          // Otherwise, the top-level guid is the parent if it's in allNeededGuids
+          return allNeededGuids.has(current.guid) ? current.guid : null;
+        }
+        if (allNeededGuids.has(current.guid)) return current.guid;
+        current = current.parent_guid ? accountMap.get(current.parent_guid) : undefined;
+      }
+      return null;
+    }
+
+    // Build a map of direct hierarchy children for each node
+    const hierarchyChildrenMap = new Map<string, string[]>();
+    for (const guid of allNeededGuids) {
+      const parent = findHierarchyParent(guid);
+      if (parent) {
+        if (!hierarchyChildrenMap.has(parent)) hierarchyChildrenMap.set(parent, []);
+        hierarchyChildrenMap.get(parent)!.push(guid);
+      }
+    }
+
+    // Compute depth in the hierarchy
+    function computeDepth(accountGuid: string): number {
+      let depth = 0;
+      let parent = findHierarchyParent(accountGuid);
+      while (parent) {
+        depth++;
+        parent = findHierarchyParent(parent);
+      }
+      return depth;
+    }
+
+    // Build rows for all needed accounts
+    const expenseCategories: BudgetCategoryRow[] = [];
+    const incomeCategories: BudgetCategoryRow[] = [];
+
+    for (const accountGuid of allNeededGuids) {
       const account = accountMap.get(accountGuid);
       if (!account) continue;
       if (account.account_type !== "EXPENSE" && account.account_type !== "INCOME") continue;
 
-      const descendantGuids = getDescendants(accountGuid);
-      const rolledUpActuals = new Map<string, Map<number, number>>();
-      for (const dGuid of descendantGuids) {
-        const dYearMap = actualsMap.get(dGuid);
-        if (dYearMap) {
-          for (const [year, periodMap] of dYearMap) {
-            if (!rolledUpActuals.has(year)) rolledUpActuals.set(year, new Map());
-            const target = rolledUpActuals.get(year)!;
-            for (const [period, amount] of periodMap) {
-              target.set(period, (target.get(period) ?? 0) + amount);
+      const isIncome = account.account_type === "INCOME";
+      const rolledUpActuals = getRolledUpActuals(accountGuid);
+      const ownBudgetAmounts = budgetAmounts.get(accountGuid);
+
+      // If this account has an explicit budget, use it.
+      // Otherwise, sum up all budgeted descendants' amounts (rollup).
+      let periodBudgets: Map<number, number>;
+      if (ownBudgetAmounts) {
+        periodBudgets = ownBudgetAmounts;
+      } else {
+        // Synthesise budget by summing all budgeted descendants
+        periodBudgets = new Map<number, number>();
+        const descendants = getDescendants(accountGuid);
+        for (const dGuid of descendants) {
+          if (dGuid === accountGuid) continue;
+          const dBudget = budgetAmounts.get(dGuid);
+          if (dBudget) {
+            for (const [p, amt] of dBudget) {
+              periodBudgets.set(p, (periodBudgets.get(p) ?? 0) + amt);
             }
           }
         }
       }
 
       const fullPath = getAccountPath(accountGuid);
-      const currentYear = new Date().getFullYear().toString();
-      const isIncome = account.account_type === "INCOME";
 
       let totalBudgeted = 0;
       let totalActual = 0;
       const periods: { period: number; budgeted: number; actual: Record<string, number> }[] = [];
 
-      for (let p = 0; p < defaultBudget.numPeriods; p++) {
-        const rawBudgeted = periodAmounts.get(p) ?? 0;
+      for (let p = 0; p < budget.numPeriods; p++) {
+        const rawBudgeted = periodBudgets.get(p) ?? 0;
         const budgeted = isIncome ? Math.abs(rawBudgeted) : rawBudgeted;
         const actualByYear: Record<string, number> = {};
         for (const year of allYears) {
@@ -161,6 +269,44 @@ export function computeBudgetData(ctx: ParseContext): BudgetData | null {
 
       if (totalBudgeted === 0 && totalActual === 0) continue;
 
+      // Compute child budget totals for imbalance detection
+      const directChildren = hierarchyChildrenMap.get(accountGuid) ?? [];
+      // Only count children that will actually appear as rows (non-zero budget or actual)
+      const hasChildren = directChildren.length > 0;
+      let childBudgetTotal = 0;
+      if (hasChildren) {
+        for (const childGuid of directChildren) {
+          const childAccount = accountMap.get(childGuid);
+          const childIsIncome = childAccount?.account_type === "INCOME";
+          // Child budget: explicit or rolled-up
+          const childOwnBudget = budgetAmounts.get(childGuid);
+          if (childOwnBudget) {
+            for (let p = 0; p < budget.numPeriods; p++) {
+              const raw = childOwnBudget.get(p) ?? 0;
+              childBudgetTotal += childIsIncome ? Math.abs(raw) : raw;
+            }
+          } else {
+            // Child is a synthesised parent — sum its budgeted descendants
+            const childDescendants = getDescendants(childGuid);
+            for (const dGuid of childDescendants) {
+              if (dGuid === childGuid) continue;
+              const dBudget = budgetAmounts.get(dGuid);
+              if (dBudget) {
+                for (let p = 0; p < budget.numPeriods; p++) {
+                  const raw = dBudget.get(p) ?? 0;
+                  childBudgetTotal += childIsIncome ? Math.abs(raw) : raw;
+                }
+              }
+            }
+          }
+        }
+      }
+
+      // Only show imbalance when the account has its own explicit budget
+      // AND children with budgets. Synthesised parents always balance by definition.
+      const hasExplicitBudget = budgetedAccountGuids.has(accountGuid);
+      const imbalance = hasExplicitBudget && hasChildren ? totalBudgeted - childBudgetTotal : 0;
+
       const row: BudgetCategoryRow = {
         accountGuid,
         accountName: account.name,
@@ -170,6 +316,12 @@ export function computeBudgetData(ctx: ParseContext): BudgetData | null {
         variance: totalBudgeted - totalActual,
         variancePct: totalBudgeted > 0 ? ((totalBudgeted - totalActual) / totalBudgeted) * 100 : 0,
         periods,
+        parentAccountGuid: findHierarchyParent(accountGuid),
+        depth: computeDepth(accountGuid),
+        hasChildren,
+        hasExplicitBudget,
+        childBudgetTotal,
+        imbalance,
       };
 
       if (isIncome) incomeCategories.push(row);
@@ -178,7 +330,18 @@ export function computeBudgetData(ctx: ParseContext): BudgetData | null {
 
     expenseCategories.sort((a, b) => b.actual - a.actual);
     incomeCategories.sort((a, b) => b.actual - a.actual);
+
+    categoriesByBudget[budget.guid] = { expenseCategories, incomeCategories };
   }
 
-  return { budgets, expenseCategories, incomeCategories, availableYears };
+  // Default to first budget for backward compat
+  const defaultData = categoriesByBudget[budgets[0].guid] ?? { expenseCategories: [], incomeCategories: [] };
+
+  return {
+    budgets,
+    categoriesByBudget,
+    expenseCategories: defaultData.expenseCategories,
+    incomeCategories: defaultData.incomeCategories,
+    availableYears,
+  };
 }
