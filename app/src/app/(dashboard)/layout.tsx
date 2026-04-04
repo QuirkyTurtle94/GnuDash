@@ -1,14 +1,14 @@
 "use client";
 
 import { useState } from "react";
-import { Menu, Eye, EyeOff } from "lucide-react";
+import { Menu, Eye, EyeOff, Pencil, Lock } from "lucide-react";
 import { useDashboard } from "@/lib/dashboard-context";
 import { PrivacyProvider, usePrivacy } from "@/lib/privacy-context";
 import { FileUpload } from "@/components/upload/file-upload";
 import { Sidebar } from "@/components/dashboard/sidebar";
 
 function DashboardInner({ children }: { children: React.ReactNode }) {
-  const { data } = useDashboard();
+  const { data, isWritable, toggleWritable } = useDashboard();
   const { hideValues, toggleHideValues } = usePrivacy();
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
@@ -48,6 +48,26 @@ function DashboardInner({ children }: { children: React.ReactNode }) {
             <h1 className="text-sm font-medium text-[#1A1D1F] sm:text-[15px]">Home page</h1>
           </div>
           <div className="flex items-center gap-2 sm:gap-3">
+            {isWritable && (
+              <button
+                onClick={toggleWritable}
+                className="flex items-center gap-1.5 rounded-lg border border-[#3B6B8A] bg-[#3B6B8A]/10 px-3 py-1.5 text-xs font-medium text-[#3B6B8A] transition-colors hover:bg-[#3B6B8A]/20"
+                title="Click to switch to read-only mode"
+              >
+                <Pencil className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline">Editing</span>
+              </button>
+            )}
+            {!isWritable && data && (
+              <button
+                onClick={toggleWritable}
+                className="flex items-center gap-1.5 rounded-lg border border-[#EFEFEF] px-3 py-1.5 text-xs font-medium text-[#9A9FA5] transition-colors hover:bg-[#F4F5F7] hover:text-[#6F767E]"
+                title="Click to enable editing"
+              >
+                <Lock className="h-3 w-3" />
+                <span className="hidden sm:inline">Read-only</span>
+              </button>
+            )}
             <button
               onClick={toggleHideValues}
               className={`flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors ${

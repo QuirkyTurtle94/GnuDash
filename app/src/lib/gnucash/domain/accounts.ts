@@ -57,6 +57,7 @@ export function buildAccountTree(ctx: ParseContext): AccountNode[] {
       name: account.name,
       fullPath: buildFullPath(account, accountMap),
       type: account.account_type,
+      commodityGuid: account.commodity_guid,
       commodityMnemonic: commodity?.mnemonic ?? "???",
       parentGuid: account.parent_guid,
       hidden: account.hidden === 1,

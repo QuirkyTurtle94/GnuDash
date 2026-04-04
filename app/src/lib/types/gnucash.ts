@@ -90,12 +90,21 @@ export interface AccountNode {
   name: string;
   fullPath: string;
   type: string;
+  commodityGuid: string;
   commodityMnemonic: string;
   parentGuid: string | null;
   hidden: boolean;
   placeholder: boolean;
   balance: number;
   children: AccountNode[];
+}
+
+export interface CommodityInfo {
+  guid: string;
+  namespace: string;
+  mnemonic: string;
+  fullname: string;
+  fraction: number;
 }
 
 export interface MonthlyNetWorth {
@@ -227,6 +236,8 @@ export interface BudgetData {
 
 export interface DashboardData {
   currency: string; // ISO 4217 code detected from GNUCash (e.g. "GBP", "USD")
+  currencyGuid: string; // GUID of the base currency commodity
+  currencyFraction: number; // Smallest unit for the base currency (e.g., 100 for USD/GBP)
   accounts: AccountNode[];
   netWorthSeries: MonthlyNetWorth[];
   cashFlowSeries: MonthlyCashFlow[];
@@ -248,4 +259,5 @@ export interface DashboardData {
   savingsRate: number;
   budgetData: BudgetData | null;
   ledgerTransactions: LedgerTransaction[];
+  commodities: CommodityInfo[];
 }

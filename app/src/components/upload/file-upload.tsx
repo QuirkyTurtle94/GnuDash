@@ -8,15 +8,16 @@ import { useDashboard } from "@/lib/dashboard-context";
 export function FileUpload() {
   const { uploadFile, loadDemo, isLoading, error } = useDashboard();
   const [isDragging, setIsDragging] = useState(false);
+  const [writable, setWritable] = useState(false);
 
   const handleFile = useCallback(
     (file: File) => {
       if (!file.name.endsWith(".gnucash")) {
         return;
       }
-      uploadFile(file);
+      uploadFile(file, writable);
     },
-    [uploadFile]
+    [uploadFile, writable]
   );
 
   const handleDrop = useCallback(
@@ -99,6 +100,22 @@ export function FileUpload() {
             </div>
           )}
         </div>
+
+        {/* Read-write toggle */}
+        <label className="mt-4 flex items-start gap-3 rounded-xl border border-[#D4DAE0] bg-white p-3 cursor-pointer transition-all hover:border-[#6C9B8B]/50">
+          <input
+            type="checkbox"
+            checked={writable}
+            onChange={(e) => setWritable(e.target.checked)}
+            className="mt-0.5 h-4 w-4 rounded border-[#D4DAE0] text-[#6C9B8B] accent-[#6C9B8B]"
+          />
+          <div>
+            <span className="text-sm font-medium text-[#1A1D1F]">Enable editing</span>
+            <p className="mt-0.5 text-xs text-[#9A9FA5]">
+              Allows adding transactions. Changes are saved to the browser copy of your file.
+            </p>
+          </div>
+        </label>
 
         <div className="mt-4 flex items-center gap-3">
           <div className="h-px flex-1 bg-[#D4DAE0]" />

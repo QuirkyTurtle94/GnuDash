@@ -99,11 +99,15 @@ export function SpendingOverview({ monthlyExpenses, categoryColors, currency, li
         // When drilled in, only include rows whose path starts with the drill prefix
         const rowPrefix = row.pathParts.slice(0, drillDepth).join(":");
         if (rowPrefix !== drillPath) continue;
-        // Must have at least one more level to show as a sub-category
-        if (row.pathParts.length <= drillDepth) continue;
-        // Group by the next level below the drill path
-        const groupKey = row.pathParts.slice(0, drillDepth + 1).join(":");
-        totals.set(groupKey, (totals.get(groupKey) ?? 0) + row.amount);
+        if (row.pathParts.length <= drillDepth) {
+          // Direct transactions on the parent account itself
+          const directKey = drillPath + ":(Direct)";
+          totals.set(directKey, (totals.get(directKey) ?? 0) + row.amount);
+        } else {
+          // Group by the next level below the drill path
+          const groupKey = row.pathParts.slice(0, drillDepth + 1).join(":");
+          totals.set(groupKey, (totals.get(groupKey) ?? 0) + row.amount);
+        }
       } else {
         // Top-level view: group by the path truncated to selected depth
         const groupKey = row.pathParts.slice(0, depth).join(":");

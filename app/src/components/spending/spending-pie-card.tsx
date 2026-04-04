@@ -44,9 +44,14 @@ export function SpendingPieCard({ monthlyExpenses, categoryColors, currency, tit
       if (selectedCategory) {
         const rowPrefix = row.pathParts.slice(0, drillDepth).join(":");
         if (rowPrefix !== selectedCategory) continue;
-        if (row.pathParts.length <= drillDepth) continue;
-        const groupKey = row.pathParts.slice(0, drillDepth + 1).join(":");
-        totals.set(groupKey, (totals.get(groupKey) ?? 0) + row.amount);
+        if (row.pathParts.length <= drillDepth) {
+          // Direct transactions on the parent account itself
+          const directKey = selectedCategory + ":(Direct)";
+          totals.set(directKey, (totals.get(directKey) ?? 0) + row.amount);
+        } else {
+          const groupKey = row.pathParts.slice(0, drillDepth + 1).join(":");
+          totals.set(groupKey, (totals.get(groupKey) ?? 0) + row.amount);
+        }
       } else {
         const groupKey = row.pathParts[0];
         totals.set(groupKey, (totals.get(groupKey) ?? 0) + row.amount);

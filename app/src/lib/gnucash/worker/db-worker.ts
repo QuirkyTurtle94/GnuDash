@@ -17,12 +17,23 @@ import { getLedgerTransactions, getRecentTransactions } from "../domain/ledger";
 import { computeBudgetData } from "../domain/budgets";
 import { getUpcomingBills } from "../domain/bills";
 import { formatMonth } from "../shared/dates";
+import { createWritableWasmAdapter } from "../engine/db/writable-wasm-adapter";
+import { TransactionBuilder } from "../engine/builders/transaction-builder";
+import { GncNumeric } from "../engine/gnc-numeric";
+import type { WritableDbAdapter } from "../engine/db/writable-adapter";
 import type { DashboardData } from "@/lib/types/gnucash";
-import type { WorkerRequest, WorkerResponse, DomainFunction } from "./messages";
+import { deleteTransaction } from "../engine/operations/transaction-ops";
+import { AccountBuilder } from "../engine/builders/account-builder";
+import { updateAccount, deleteAccountWithReallocation } from "../engine/operations/account-ops";
+import { createCommodity } from "../engine/operations/commodity-ops";
+import type { AccountType } from "../engine/types";
+import type { WorkerRequest, WorkerResponse, DomainFunction, CreateTransactionPayload, DeleteTransactionPayload, EditTransactionPayload, CreateAccountPayload, UpdateAccountPayload, DeleteAccountPayload, CreateCommodityPayload } from "./messages";
 
 let sqlite3: Sqlite3Static;
 let db: WasmDatabase | null = null;
 let ctx: ParseContext | null = null;
+let isWritable = false;
+let writableAdapter: WritableDbAdapter | null = null;
 
 const OPFS_DB_NAME = "/gnucash-dashboard.db";
 
@@ -34,15 +45,16 @@ function post(msg: WorkerResponse) {
  * Opens a database from an ArrayBuffer (uploaded file).
  * Writes to OPFS for persistence, then opens from there.
  */
-async function initFromBuffer(buffer: ArrayBuffer): Promise<void> {
+async function initFromBuffer(buffer: ArrayBuffer, writable: boolean): Promise<void> {
   closeDb();
+  isWritable = writable;
 
   const hasOpfs = !!sqlite3.oo1.OpfsDb;
 
   if (hasOpfs) {
     // Write to OPFS for persistence, then open from there
     await sqlite3.oo1.OpfsDb.importDb(OPFS_DB_NAME, buffer);
-    db = new sqlite3.oo1.OpfsDb(OPFS_DB_NAME, "r");
+    db = new sqlite3.oo1.OpfsDb(OPFS_DB_NAME, writable ? "rw" : "r");
   } else {
     // Fallback: in-memory DB from the buffer
     const bytes = new Uint8Array(buffer);
@@ -62,26 +74,44 @@ async function initFromBuffer(buffer: ArrayBuffer): Promise<void> {
     }
   }
 
-  const adapter = createWasmAdapter(db);
-  validateSchema(adapter);
-  ctx = buildParseContext(adapter);
+  if (writable) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    writableAdapter = createWritableWasmAdapter(db as any);
+    validateSchema(writableAdapter);
+    ctx = buildParseContext(writableAdapter);
+  } else {
+    writableAdapter = null;
+    const adapter = createWasmAdapter(db);
+    validateSchema(adapter);
+    ctx = buildParseContext(adapter);
+  }
 }
 
 /**
  * Opens an existing database from OPFS (session restore).
  */
-function initFromOpfs(): void {
+function initFromOpfs(writable: boolean): void {
   closeDb();
+  isWritable = writable;
 
   if (!sqlite3.oo1.OpfsDb) {
     throw new Error("OPFS not available");
   }
 
   // This will throw if the file doesn't exist
-  db = new sqlite3.oo1.OpfsDb(OPFS_DB_NAME, "r");
-  const adapter = createWasmAdapter(db);
-  validateSchema(adapter);
-  ctx = buildParseContext(adapter);
+  db = new sqlite3.oo1.OpfsDb(OPFS_DB_NAME, writable ? "rw" : "r");
+
+  if (writable) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    writableAdapter = createWritableWasmAdapter(db as any);
+    validateSchema(writableAdapter);
+    ctx = buildParseContext(writableAdapter);
+  } else {
+    writableAdapter = null;
+    const adapter = createWasmAdapter(db);
+    validateSchema(adapter);
+    ctx = buildParseContext(adapter);
+  }
 }
 
 function closeDb(): void {
@@ -89,6 +119,8 @@ function closeDb(): void {
     db.close();
     db = null;
     ctx = null;
+    writableAdapter = null;
+    isWritable = false;
   }
 }
 
@@ -121,8 +153,12 @@ function getFullDashboardData(): DashboardData {
       ? ((currentIncome - currentExpenses) / currentIncome) * 100
       : 0;
 
+  const baseCommodity = ctx.commodityMap.get(ctx.baseCurrencyGuid);
+
   return {
     currency: ctx.baseCurrencyMnemonic,
+    currencyGuid: ctx.baseCurrencyGuid,
+    currencyFraction: baseCommodity?.fraction ?? 100,
     accounts: accountTree,
     netWorthSeries,
     cashFlowSeries,
@@ -144,7 +180,163 @@ function getFullDashboardData(): DashboardData {
     savingsRate,
     budgetData,
     ledgerTransactions,
+    commodities: ctx.commodities.map((c) => ({
+      guid: c.guid,
+      namespace: c.namespace,
+      mnemonic: c.mnemonic,
+      fullname: c.fullname,
+      fraction: c.fraction,
+    })),
   };
+}
+
+/**
+ * Handle a createTransaction mutation.
+ * Uses the accounting engine to validate and commit, then returns fresh dashboard data.
+ */
+function handleCreateTransaction(payload: CreateTransactionPayload): DashboardData {
+  if (!ctx) throw new Error("No database loaded");
+  if (!writableAdapter) throw new Error("Database is not open in read-write mode");
+
+  const builder = new TransactionBuilder(writableAdapter, ctx)
+    .currency(payload.currencyGuid)
+    .postDate(new Date(payload.postDate + "T00:00:00"))
+    .description(payload.description);
+
+  if (payload.num) {
+    builder.num(payload.num);
+  }
+
+  for (const split of payload.splits) {
+    builder.addSplit({
+      accountGuid: split.accountGuid,
+      value: new GncNumeric(split.valueNum, split.valueDenom),
+      quantity: new GncNumeric(split.quantityNum, split.quantityDenom),
+      memo: split.memo,
+    });
+  }
+
+  builder.commit();
+
+  // Rebuild context to pick up the new transaction
+  ctx = buildParseContext(writableAdapter);
+
+  // Return fully refreshed dashboard data
+  return getFullDashboardData();
+}
+
+/**
+ * Handle a deleteTransaction mutation.
+ */
+function handleDeleteTransaction(payload: DeleteTransactionPayload): DashboardData {
+  if (!ctx) throw new Error("No database loaded");
+  if (!writableAdapter) throw new Error("Database is not open in read-write mode");
+
+  deleteTransaction(writableAdapter, payload.transactionGuid);
+  ctx = buildParseContext(writableAdapter);
+  return getFullDashboardData();
+}
+
+/**
+ * Handle an editTransaction mutation.
+ * Deletes the old transaction and creates a new one with updated data.
+ * This matches GNUCash's behavior where split changes require delete + recreate.
+ */
+function handleEditTransaction(payload: EditTransactionPayload): DashboardData {
+  if (!ctx) throw new Error("No database loaded");
+  if (!writableAdapter) throw new Error("Database is not open in read-write mode");
+
+  // Delete the original transaction first
+  deleteTransaction(writableAdapter, payload.originalGuid);
+
+  // Rebuild context after delete so the builder sees current state
+  ctx = buildParseContext(writableAdapter);
+
+  // Create the replacement transaction
+  const builder = new TransactionBuilder(writableAdapter, ctx)
+    .currency(payload.currencyGuid)
+    .postDate(new Date(payload.postDate + "T00:00:00"))
+    .description(payload.description);
+
+  if (payload.num) {
+    builder.num(payload.num);
+  }
+
+  for (const split of payload.splits) {
+    builder.addSplit({
+      accountGuid: split.accountGuid,
+      value: new GncNumeric(split.valueNum, split.valueDenom),
+      quantity: new GncNumeric(split.quantityNum, split.quantityDenom),
+      memo: split.memo,
+    });
+  }
+
+  builder.commit();
+  ctx = buildParseContext(writableAdapter);
+  return getFullDashboardData();
+}
+
+function handleCreateAccount(payload: CreateAccountPayload): DashboardData {
+  if (!ctx) throw new Error("No database loaded");
+  if (!writableAdapter) throw new Error("Database is not open in read-write mode");
+
+  new AccountBuilder(writableAdapter, ctx)
+    .name(payload.name)
+    .type(payload.accountType as AccountType)
+    .commodity(payload.commodityGuid)
+    .parent(payload.parentGuid)
+    .code(payload.code ?? "")
+    .description(payload.description ?? "")
+    .hidden(payload.hidden ?? false)
+    .placeholder(payload.placeholder ?? false)
+    .commit();
+
+  ctx = buildParseContext(writableAdapter);
+  return getFullDashboardData();
+}
+
+function handleUpdateAccount(payload: UpdateAccountPayload): DashboardData {
+  if (!ctx) throw new Error("No database loaded");
+  if (!writableAdapter) throw new Error("Database is not open in read-write mode");
+
+  updateAccount(writableAdapter, payload.accountGuid, {
+    name: payload.name,
+    accountType: payload.accountType,
+    commodityGuid: payload.commodityGuid,
+    parentGuid: payload.parentGuid,
+    code: payload.code,
+    description: payload.description,
+    hidden: payload.hidden,
+    placeholder: payload.placeholder,
+  });
+
+  ctx = buildParseContext(writableAdapter);
+  return getFullDashboardData();
+}
+
+function handleDeleteAccount(payload: DeleteAccountPayload): DashboardData {
+  if (!ctx) throw new Error("No database loaded");
+  if (!writableAdapter) throw new Error("Database is not open in read-write mode");
+
+  deleteAccountWithReallocation(writableAdapter, payload.accountGuid, payload.targetAccountGuid);
+  ctx = buildParseContext(writableAdapter);
+  return getFullDashboardData();
+}
+
+function handleCreateCommodity(payload: CreateCommodityPayload): DashboardData {
+  if (!ctx) throw new Error("No database loaded");
+  if (!writableAdapter) throw new Error("Database is not open in read-write mode");
+
+  createCommodity(writableAdapter, {
+    namespace: payload.namespace,
+    mnemonic: payload.mnemonic,
+    fullname: payload.fullname,
+    fraction: payload.fraction,
+    cusip: payload.cusip,
+  });
+
+  ctx = buildParseContext(writableAdapter);
+  return getFullDashboardData();
 }
 
 const domainFunctions: Record<DomainFunction, () => unknown> = {
@@ -172,8 +364,8 @@ self.onmessage = async (e: MessageEvent<WorkerRequest>) => {
   switch (msg.type) {
     case "init": {
       try {
-        await initFromBuffer(msg.fileBuffer);
-        console.log("[db-worker] DB opened from uploaded file via SQLite WASM");
+        await initFromBuffer(msg.fileBuffer, msg.writable ?? false);
+        console.log("[db-worker] DB opened from uploaded file via SQLite WASM", isWritable ? "(read-write)" : "(read-only)");
         post({ type: "ready" });
       } catch (err) {
         post({ type: "init-error", message: (err as Error).message });
@@ -183,8 +375,8 @@ self.onmessage = async (e: MessageEvent<WorkerRequest>) => {
 
     case "init-opfs": {
       try {
-        initFromOpfs();
-        console.log("[db-worker] DB restored from OPFS");
+        initFromOpfs(msg.writable ?? false);
+        console.log("[db-worker] DB restored from OPFS", isWritable ? "(read-write)" : "(read-only)");
         post({ type: "ready" });
       } catch (err) {
         post({ type: "init-error", message: (err as Error).message });
@@ -199,6 +391,56 @@ self.onmessage = async (e: MessageEvent<WorkerRequest>) => {
         if (!fn) throw new Error(`Unknown domain function: ${msg.fn}`);
         const data = fn();
         post({ type: "result", id: msg.id, data });
+      } catch (err) {
+        post({ type: "error", id: msg.id, message: (err as Error).message });
+      }
+      break;
+    }
+
+    case "mutation": {
+      try {
+        if (!ctx) throw new Error("No database loaded");
+        let data: unknown;
+        switch (msg.action) {
+          case "createTransaction":
+            data = handleCreateTransaction(msg.payload as CreateTransactionPayload);
+            break;
+          case "deleteTransaction":
+            data = handleDeleteTransaction(msg.payload as DeleteTransactionPayload);
+            break;
+          case "editTransaction":
+            data = handleEditTransaction(msg.payload as EditTransactionPayload);
+            break;
+          case "createAccount":
+            data = handleCreateAccount(msg.payload as CreateAccountPayload);
+            break;
+          case "updateAccount":
+            data = handleUpdateAccount(msg.payload as UpdateAccountPayload);
+            break;
+          case "deleteAccount":
+            data = handleDeleteAccount(msg.payload as DeleteAccountPayload);
+            break;
+          case "createCommodity":
+            data = handleCreateCommodity(msg.payload as CreateCommodityPayload);
+            break;
+          default:
+            throw new Error(`Unknown mutation action: ${msg.action}`);
+        }
+        post({ type: "result", id: msg.id, data });
+      } catch (err) {
+        post({ type: "error", id: msg.id, message: (err as Error).message });
+      }
+      break;
+    }
+
+    case "export": {
+      try {
+        if (!db) throw new Error("No database loaded");
+        const bytes = sqlite3.capi.sqlite3_js_db_export(db.pointer!);
+        const buffer = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
+        // Use the DedicatedWorkerGlobalScope overload with transfer list
+        (self as unknown as { postMessage(msg: unknown, transfer: Transferable[]): void })
+          .postMessage({ type: "export-result", id: msg.id, buffer }, [buffer]);
       } catch (err) {
         post({ type: "error", id: msg.id, message: (err as Error).message });
       }
