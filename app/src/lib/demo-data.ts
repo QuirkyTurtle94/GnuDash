@@ -439,6 +439,9 @@ export function generateDemoData(): DashboardData {
 
   return {
     currency,
+    currencyGuid: "",
+    currencyFraction: 100,
+    commodities: [],
     accounts,
     netWorthSeries,
     cashFlowSeries,
@@ -622,23 +625,23 @@ function buildAccountTree(
   // Assets
   const assetsNode: AccountNode = {
     guid: guidFn(), name: "Assets", fullPath: "Assets", type: "ASSET",
-    commodityMnemonic: currency, parentGuid: rootGuid, hidden: false, placeholder: true, balance: 0, children: [],
+    commodityGuid: "", commodityMnemonic: currency, parentGuid: rootGuid, hidden: false, placeholder: true, balance: 0, children: [],
   };
   for (const a of assetAccounts) {
     assetsNode.children.push({
       guid: guidFn(), name: a.name, fullPath: `Assets:${a.name}`, type: a.type,
-      commodityMnemonic: currency, parentGuid: assetsNode.guid, hidden: false, placeholder: false,
+      commodityGuid: "", commodityMnemonic: currency, parentGuid: assetsNode.guid, hidden: false, placeholder: false,
       balance: a.balance, children: [],
     });
   }
   const investmentsNode: AccountNode = {
     guid: guidFn(), name: "Investments", fullPath: "Assets:Investments", type: "ASSET",
-    commodityMnemonic: currency, parentGuid: assetsNode.guid, hidden: false, placeholder: true, balance: 0, children: [],
+    commodityGuid: "", commodityMnemonic: currency, parentGuid: assetsNode.guid, hidden: false, placeholder: true, balance: 0, children: [],
   };
   for (const inv of investmentAccounts) {
     investmentsNode.children.push({
       guid: guidFn(), name: inv.name, fullPath: `Assets:Investments:${inv.name}`, type: "STOCK",
-      commodityMnemonic: inv.ticker, parentGuid: investmentsNode.guid, hidden: false, placeholder: false,
+      commodityGuid: "", commodityMnemonic: inv.ticker, parentGuid: investmentsNode.guid, hidden: false, placeholder: false,
       balance: Math.round(inv.shares * inv.currentPrice * 100) / 100, children: [],
     });
   }
@@ -649,12 +652,12 @@ function buildAccountTree(
   // Liabilities
   const liabNode: AccountNode = {
     guid: guidFn(), name: "Liabilities", fullPath: "Liabilities", type: "LIABILITY",
-    commodityMnemonic: currency, parentGuid: rootGuid, hidden: false, placeholder: true, balance: 0, children: [],
+    commodityGuid: "", commodityMnemonic: currency, parentGuid: rootGuid, hidden: false, placeholder: true, balance: 0, children: [],
   };
   for (const l of liabilityAccounts) {
     liabNode.children.push({
       guid: guidFn(), name: l.name, fullPath: `Liabilities:${l.name}`, type: l.type,
-      commodityMnemonic: currency, parentGuid: liabNode.guid, hidden: false, placeholder: false,
+      commodityGuid: "", commodityMnemonic: currency, parentGuid: liabNode.guid, hidden: false, placeholder: false,
       balance: l.balance, children: [],
     });
   }
@@ -664,17 +667,17 @@ function buildAccountTree(
   // Expenses
   const expNode: AccountNode = {
     guid: guidFn(), name: "Expenses", fullPath: "Expenses", type: "EXPENSE",
-    commodityMnemonic: currency, parentGuid: rootGuid, hidden: false, placeholder: true, balance: 0, children: [],
+    commodityGuid: "", commodityMnemonic: currency, parentGuid: rootGuid, hidden: false, placeholder: true, balance: 0, children: [],
   };
   for (const cat of expenseAccounts) {
     const catNode: AccountNode = {
       guid: guidFn(), name: cat.name, fullPath: `Expenses:${cat.name}`, type: "EXPENSE",
-      commodityMnemonic: currency, parentGuid: expNode.guid, hidden: false, placeholder: true, balance: 0, children: [],
+      commodityGuid: "", commodityMnemonic: currency, parentGuid: expNode.guid, hidden: false, placeholder: true, balance: 0, children: [],
     };
     for (const child of cat.children) {
       catNode.children.push({
         guid: guidFn(), name: child, fullPath: `Expenses:${cat.name}:${child}`, type: "EXPENSE",
-        commodityMnemonic: currency, parentGuid: catNode.guid, hidden: false, placeholder: false, balance: 0, children: [],
+        commodityGuid: "", commodityMnemonic: currency, parentGuid: catNode.guid, hidden: false, placeholder: false, balance: 0, children: [],
       });
     }
     expNode.children.push(catNode);
@@ -684,12 +687,12 @@ function buildAccountTree(
   // Income
   const incNode: AccountNode = {
     guid: guidFn(), name: "Income", fullPath: "Income", type: "INCOME",
-    commodityMnemonic: currency, parentGuid: rootGuid, hidden: false, placeholder: true, balance: 0, children: [],
+    commodityGuid: "", commodityMnemonic: currency, parentGuid: rootGuid, hidden: false, placeholder: true, balance: 0, children: [],
   };
   for (const acc of incomeAccounts) {
     incNode.children.push({
       guid: guidFn(), name: acc.name, fullPath: `Income:${acc.name}`, type: "INCOME",
-      commodityMnemonic: currency, parentGuid: incNode.guid, hidden: false, placeholder: false, balance: 0, children: [],
+      commodityGuid: "", commodityMnemonic: currency, parentGuid: incNode.guid, hidden: false, placeholder: false, balance: 0, children: [],
     });
   }
   tree.push(incNode);

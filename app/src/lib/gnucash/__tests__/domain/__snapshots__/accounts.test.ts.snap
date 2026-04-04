@@ -8,6 +8,7 @@ exports[`buildAccountTree > snapshot 1`] = `
       {
         "balance": 8260,
         "children": [],
+        "commodityGuid": "00000001000000010000000100000001",
         "commodityMnemonic": "GBP",
         "fullPath": "Assets:Current Account",
         "guid": "00000008000000080000000800000008",
@@ -20,6 +21,7 @@ exports[`buildAccountTree > snapshot 1`] = `
       {
         "balance": 10000,
         "children": [],
+        "commodityGuid": "00000001000000010000000100000001",
         "commodityMnemonic": "GBP",
         "fullPath": "Assets:Savings",
         "guid": "00000009000000090000000900000009",
@@ -32,6 +34,7 @@ exports[`buildAccountTree > snapshot 1`] = `
       {
         "balance": 395,
         "children": [],
+        "commodityGuid": "00000002000000020000000200000002",
         "commodityMnemonic": "USD",
         "fullPath": "Assets:USD Account",
         "guid": "0000000a0000000a0000000a0000000a",
@@ -47,6 +50,7 @@ exports[`buildAccountTree > snapshot 1`] = `
           {
             "balance": 1350,
             "children": [],
+            "commodityGuid": "00000003000000030000000300000003",
             "commodityMnemonic": "AAPL",
             "fullPath": "Assets:Investments:AAPL",
             "guid": "0000001a0000001a0000001a0000001a",
@@ -59,6 +63,7 @@ exports[`buildAccountTree > snapshot 1`] = `
           {
             "balance": 4250,
             "children": [],
+            "commodityGuid": "00000004000000040000000400000004",
             "commodityMnemonic": "VWRL",
             "fullPath": "Assets:Investments:VWRL",
             "guid": "0000001b0000001b0000001b0000001b",
@@ -69,6 +74,7 @@ exports[`buildAccountTree > snapshot 1`] = `
             "type": "MUTUAL",
           },
         ],
+        "commodityGuid": "00000001000000010000000100000001",
         "commodityMnemonic": "GBP",
         "fullPath": "Assets:Investments",
         "guid": "00000019000000190000001900000019",
@@ -79,6 +85,7 @@ exports[`buildAccountTree > snapshot 1`] = `
         "type": "ASSET",
       },
     ],
+    "commodityGuid": "00000001000000010000000100000001",
     "commodityMnemonic": "GBP",
     "fullPath": "Assets",
     "guid": "00000007000000070000000700000007",
@@ -94,6 +101,7 @@ exports[`buildAccountTree > snapshot 1`] = `
       {
         "balance": 0,
         "children": [],
+        "commodityGuid": "00000001000000010000000100000001",
         "commodityMnemonic": "GBP",
         "fullPath": "Liabilities:Credit Card",
         "guid": "0000000c0000000c0000000c0000000c",
@@ -104,6 +112,7 @@ exports[`buildAccountTree > snapshot 1`] = `
         "type": "CREDIT",
       },
     ],
+    "commodityGuid": "00000001000000010000000100000001",
     "commodityMnemonic": "GBP",
     "fullPath": "Liabilities",
     "guid": "0000000b0000000b0000000b0000000b",
@@ -119,6 +128,7 @@ exports[`buildAccountTree > snapshot 1`] = `
       {
         "balance": -9000,
         "children": [],
+        "commodityGuid": "00000001000000010000000100000001",
         "commodityMnemonic": "GBP",
         "fullPath": "Income:Salary",
         "guid": "0000000e0000000e0000000e0000000e",
@@ -131,6 +141,7 @@ exports[`buildAccountTree > snapshot 1`] = `
       {
         "balance": -500,
         "children": [],
+        "commodityGuid": "00000001000000010000000100000001",
         "commodityMnemonic": "GBP",
         "fullPath": "Income:Freelance",
         "guid": "0000000f0000000f0000000f0000000f",
@@ -141,6 +152,7 @@ exports[`buildAccountTree > snapshot 1`] = `
         "type": "INCOME",
       },
     ],
+    "commodityGuid": "00000001000000010000000100000001",
     "commodityMnemonic": "GBP",
     "fullPath": "Income",
     "guid": "0000000d0000000d0000000d0000000d",
@@ -159,6 +171,7 @@ exports[`buildAccountTree > snapshot 1`] = `
           {
             "balance": 380,
             "children": [],
+            "commodityGuid": "00000001000000010000000100000001",
             "commodityMnemonic": "GBP",
             "fullPath": "Expenses:Food:Groceries",
             "guid": "00000012000000120000001200000012",
@@ -171,6 +184,7 @@ exports[`buildAccountTree > snapshot 1`] = `
           {
             "balance": 45,
             "children": [],
+            "commodityGuid": "00000001000000010000000100000001",
             "commodityMnemonic": "GBP",
             "fullPath": "Expenses:Food:Restaurants",
             "guid": "00000013000000130000001300000013",
@@ -181,6 +195,7 @@ exports[`buildAccountTree > snapshot 1`] = `
             "type": "EXPENSE",
           },
         ],
+        "commodityGuid": "00000001000000010000000100000001",
         "commodityMnemonic": "GBP",
         "fullPath": "Expenses:Food",
         "guid": "00000011000000110000001100000011",
@@ -196,6 +211,7 @@ exports[`buildAccountTree > snapshot 1`] = `
           {
             "balance": 175,
             "children": [],
+            "commodityGuid": "00000001000000010000000100000001",
             "commodityMnemonic": "GBP",
             "fullPath": "Expenses:Utilities:Electric",
             "guid": "00000015000000150000001500000015",
@@ -208,6 +224,7 @@ exports[`buildAccountTree > snapshot 1`] = `
           {
             "balance": 40,
             "children": [],
+            "commodityGuid": "00000001000000010000000100000001",
             "commodityMnemonic": "GBP",
             "fullPath": "Expenses:Utilities:Water",
             "guid": "00000016000000160000001600000016",
@@ -218,6 +235,7 @@ exports[`buildAccountTree > snapshot 1`] = `
             "type": "EXPENSE",
           },
         ],
+        "commodityGuid": "00000001000000010000000100000001",
         "commodityMnemonic": "GBP",
         "fullPath": "Expenses:Utilities",
         "guid": "00000014000000140000001400000014",
@@ -228,6 +246,7 @@ exports[`buildAccountTree > snapshot 1`] = `
         "type": "EXPENSE",
       },
     ],
+    "commodityGuid": "00000001000000010000000100000001",
     "commodityMnemonic": "GBP",
     "fullPath": "Expenses",
     "guid": "00000010000000100000001000000010",
@@ -243,6 +262,7 @@ exports[`buildAccountTree > snapshot 1`] = `
       {
         "balance": -15000,
         "children": [],
+        "commodityGuid": "00000001000000010000000100000001",
         "commodityMnemonic": "GBP",
         "fullPath": "Equity:Opening Balances",
         "guid": "00000018000000180000001800000018",
@@ -253,6 +273,7 @@ exports[`buildAccountTree > snapshot 1`] = `
         "type": "EQUITY",
       },
     ],
+    "commodityGuid": "00000001000000010000000100000001",
     "commodityMnemonic": "GBP",
     "fullPath": "Equity",
     "guid": "00000017000000170000001700000017",
@@ -265,6 +286,7 @@ exports[`buildAccountTree > snapshot 1`] = `
   {
     "balance": 0,
     "children": [],
+    "commodityGuid": "00000001000000010000000100000001",
     "commodityMnemonic": "GBP",
     "fullPath": "Trading",
     "guid": "0000001c0000001c0000001c0000001c",

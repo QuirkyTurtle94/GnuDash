@@ -12,6 +12,7 @@ import {
   TrendingUp,
   Target,
   LogOut,
+  Download,
 } from "lucide-react";
 import { useDashboard } from "@/lib/dashboard-context";
 
@@ -31,7 +32,7 @@ interface SidebarProps {
 }
 
 export function Sidebar({ onNavigate }: SidebarProps) {
-  const { clearData, uploadedAt } = useDashboard();
+  const { clearData, uploadedAt, exportFile } = useDashboard();
   const pathname = usePathname();
 
   return (
@@ -83,8 +84,15 @@ export function Sidebar({ onNavigate }: SidebarProps) {
 
       </div>
 
-      {/* Bottom: Upload new file */}
+      {/* Bottom: Export + Upload new file */}
       <div className="mt-auto border-t border-[#EFEFEF] p-5">
+        <button
+          onClick={exportFile}
+          className="flex w-full items-center gap-2.5 rounded-[10px] px-3 py-2 text-sm text-[#6F767E] transition-colors hover:bg-[#F4F5F7]"
+        >
+          <Download className="h-[18px] w-[18px] text-[#9A9FA5]" />
+          Export .gnucash file
+        </button>
         <button
           onClick={clearData}
           className="flex w-full items-center gap-2.5 rounded-[10px] px-3 py-2 text-sm text-[#6F767E] transition-colors hover:bg-[#F4F5F7]"

@@ -30,14 +30,19 @@ To clear your data, use the dashboard's clear/reset option or clear your browser
 - **Net Worth** — Track assets minus liabilities over time
 - **Cash Flow** — Monthly income/expense bars with net income trend line
 - **Spending Breakdown** — Category-level expense analysis with interactive drill-down
+- **Income Analysis** — Income sources with drill-down and monthly trends
 - **Account Balances** — Current balances across all accounts
 - **Investment Portfolio** — Holdings, allocation, performance, and value over time
 - **Budget Tracking** — Budget vs actual with expense/income tabs, YTD variance
-- **Recent Transactions** — Searchable transaction history
+- **Transaction Ledger** — Searchable, sortable transaction history with split details
+- **Transaction Editing** — Add, edit, and delete transactions with full double-entry enforcement
+- **Investment Transactions** — Buy/sell stocks with shares, price, and total (auto-calculates any 2 of 3)
+- **Accounting Engine** — Rational arithmetic (no floating point), multi-currency, GNUCash-compatible writes
+- **Export** — Download your modified `.gnucash` file for use in GNUCash desktop
 - **Privacy Mode** — Toggle to blur sensitive numbers on screen
 - **Demo Mode** — Try the dashboard instantly with realistic sample data
 
-Charts are fully interactive — click any bar or segment to drill down into breakdowns and individual transactions.
+Charts are fully interactive — click any bar or segment to drill down into breakdowns and individual transactions. Transaction editing uses the same GNUCash SQLite schema, so exported files open seamlessly in GNUCash desktop.
 
 ## Screenshots
 
@@ -131,7 +136,12 @@ app/
 │   └── lib/
 │       ├── gnucash/      # GNUCash SQLite parser and domain logic
 │       │   ├── db/       # Database adapters (WASM + better-sqlite3 for tests)
-│       │   ├── domain/   # Business logic modules (accounts, net-worth, etc.)
+│       │   ├── domain/   # Read-only business logic modules (accounts, net-worth, etc.)
+│       │   ├── engine/   # Accounting engine (write operations)
+│       │   │   ├── builders/    # TransactionBuilder, AccountBuilder
+│       │   │   ├── db/          # WritableDbAdapter (WASM + better-sqlite3)
+│       │   │   ├── operations/  # CRUD operations (transactions, accounts, prices, lots)
+│       │   │   └── validation/  # Double-entry invariants and account rules
 │       │   ├── worker/   # Web Worker for client-side SQLite execution
 │       │   └── shared/   # Shared utilities (dates, account paths)
 │       └── types/        # TypeScript type definitions

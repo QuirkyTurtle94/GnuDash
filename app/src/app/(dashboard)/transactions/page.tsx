@@ -5,7 +5,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatCurrency } from "@/lib/format";
 import { useDashboard } from "@/lib/dashboard-context";
 import type { LedgerTransaction } from "@/lib/types/gnucash";
-import { Search, ChevronDown, ChevronRight, X } from "lucide-react";
+import { Search, ChevronDown, ChevronRight, X, Plus, Pencil, Trash2 } from "lucide-react";
+import { AddTransactionSheet } from "@/components/add-transaction-sheet";
 
 const PAGE_SIZE = 50;
 
@@ -58,7 +59,11 @@ function reconcileLabel(state: string): { text: string; className: string } {
 }
 
 export default function TransactionsPage() {
-  const { data } = useDashboard();
+  const { data, isWritable, deleteTransaction } = useDashboard();
+  const [showAddSheet, setShowAddSheet] = useState(false);
+  const [editingTx, setEditingTx] = useState<LedgerTransaction | null>(null);
+  const [deletingGuid, setDeletingGuid] = useState<string | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [accountTypeFilter, setAccountTypeFilter] = useState("All");
   const [accountFilter, setAccountFilter] = useState("");
@@ -161,10 +166,72 @@ export default function TransactionsPage() {
     <div className="flex flex-col gap-4 sm:gap-6">
       <div className="flex items-center justify-between gap-3">
         <h2 className="text-lg font-semibold text-[#1A1D1F] sm:text-xl">Transactions</h2>
-        <span className="text-sm text-[#9A9FA5]">
-          {filtered.length.toLocaleString()} transaction{filtered.length !== 1 ? "s" : ""}
-        </span>
+        <div className="flex items-center gap-3">
+          <span className="text-sm text-[#9A9FA5]">
+            {filtered.length.toLocaleString()} transaction{filtered.length !== 1 ? "s" : ""}
+          </span>
+          {isWritable && (
+            <button
+              onClick={() => setShowAddSheet(true)}
+              className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#3B6B8A] text-white transition-colors hover:bg-[#2D5570]"
+              title="Add transaction"
+            >
+              <Plus className="h-4 w-4" />
+            </button>
+          )}
+        </div>
       </div>
+
+      {isWritable && (
+        <>
+          <AddTransactionSheet
+            open={showAddSheet}
+            onOpenChange={(open) => {
+              setShowAddSheet(open);
+              if (!open) setEditingTx(null);
+            }}
+            editingTransaction={editingTx}
+          />
+
+          {/* Delete confirmation */}
+          {deletingGuid && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/20" onClick={() => { setDeletingGuid(null); setDeleteError(null); }}>
+              <div className="w-full max-w-sm rounded-xl bg-white p-5 shadow-lg" onClick={(e) => e.stopPropagation()}>
+                <h3 className="text-sm font-semibold text-[#1A1D1F]">Delete Transaction</h3>
+                <p className="mt-2 text-xs text-[#6F767E]">
+                  Are you sure you want to delete this transaction? This cannot be undone.
+                </p>
+                {deleteError && (
+                  <p className="mt-2 text-xs text-red-600">{deleteError}</p>
+                )}
+                <div className="mt-4 flex gap-2">
+                  <button
+                    onClick={() => { setDeletingGuid(null); setDeleteError(null); }}
+                    className="flex-1 rounded-lg border border-[#EFEFEF] px-3 py-2 text-xs font-medium text-[#6F767E] transition-colors hover:bg-[#F4F5F7]"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={async () => {
+                      try {
+                        setDeleteError(null);
+                        await deleteTransaction({ transactionGuid: deletingGuid });
+                        setDeletingGuid(null);
+                        setExpandedTx(new Set());
+                      } catch (err) {
+                        setDeleteError(err instanceof Error ? err.message : "Delete failed");
+                      }
+                    }}
+                    className="flex-1 rounded-lg bg-red-600 px-3 py-2 text-xs font-medium text-white transition-colors hover:bg-red-700"
+                  >
+                    Delete
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+        </>
+      )}
 
       {/* Filters */}
       <Card className="shadow-sm border-[#EFEFEF]">
@@ -277,6 +344,8 @@ export default function TransactionsPage() {
                           isExpanded={isExpanded}
                           currency={currency}
                           onToggle={toggleExpand}
+                          onEdit={isWritable ? (tx) => { setEditingTx(tx); setShowAddSheet(true); } : undefined}
+                          onDelete={isWritable ? (guid) => setDeletingGuid(guid) : undefined}
                         />
                       );
                     })}
@@ -325,6 +394,8 @@ function TransactionRow({
   isExpanded,
   currency,
   onToggle,
+  onEdit,
+  onDelete,
 }: {
   tx: LedgerTransaction;
   primarySplit: LedgerTransaction["splits"][0];
@@ -333,6 +404,8 @@ function TransactionRow({
   isExpanded: boolean;
   currency: string;
   onToggle: (guid: string) => void;
+  onEdit?: (tx: LedgerTransaction) => void;
+  onDelete?: (guid: string) => void;
 }) {
   return (
     <>
@@ -429,6 +502,30 @@ function TransactionRow({
                   })}
                 </tbody>
               </table>
+
+              {/* Edit / Delete buttons */}
+              {(onEdit || onDelete) && (
+                <div className="flex items-center justify-end gap-1.5 border-t border-[#EFEFEF] px-3 py-2">
+                  {onEdit && (
+                    <button
+                      onClick={(e) => { e.stopPropagation(); onEdit(tx); }}
+                      className="flex items-center gap-1 rounded-md px-2 py-1 text-xs text-[#3B6B8A] transition-colors hover:bg-[#3B6B8A]/10"
+                    >
+                      <Pencil className="h-3 w-3" />
+                      Edit
+                    </button>
+                  )}
+                  {onDelete && (
+                    <button
+                      onClick={(e) => { e.stopPropagation(); onDelete(tx.guid); }}
+                      className="flex items-center gap-1 rounded-md px-2 py-1 text-xs text-[#E87C6B] transition-colors hover:bg-red-50"
+                    >
+                      <Trash2 className="h-3 w-3" />
+                      Delete
+                    </button>
+                  )}
+                </div>
+              )}
             </div>
           </td>
         </tr>

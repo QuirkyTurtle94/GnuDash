@@ -64,9 +64,12 @@ export function MonthlyExpenseBarCard({
       if (selectedCategory) {
         const rowPrefix = row.pathParts.slice(0, drillDepth).join(":");
         if (rowPrefix !== selectedCategory) continue;
-        if (row.pathParts.length <= drillDepth) continue;
-        // Check excluded at the sub-category level
-        const subKey = row.pathParts.slice(0, drillDepth + 1).join(":");
+        let subKey: string;
+        if (row.pathParts.length <= drillDepth) {
+          subKey = selectedCategory + ":(Direct)";
+        } else {
+          subKey = row.pathParts.slice(0, drillDepth + 1).join(":");
+        }
         if (excluded.has(subKey)) continue;
       } else {
         // Top-level: check excluded at top level

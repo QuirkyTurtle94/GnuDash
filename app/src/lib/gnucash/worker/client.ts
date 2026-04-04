@@ -17,7 +17,7 @@ import type {
   BudgetData,
   DashboardData,
 } from "@/lib/types/gnucash";
-import type { WorkerRequest, WorkerResponse, DomainFunction } from "./messages";
+import type { WorkerRequest, WorkerResponse, DomainFunction, MutationAction, CreateTransactionPayload, DeleteTransactionPayload, EditTransactionPayload, CreateAccountPayload, UpdateAccountPayload, DeleteAccountPayload, CreateCommodityPayload } from "./messages";
 
 type PendingRequest = {
   resolve: (data: unknown) => void;
@@ -72,6 +72,15 @@ export class GnuCashWorkerClient {
         break;
       }
 
+      case "export-result": {
+        const req = this.pending.get(msg.id);
+        if (req) {
+          this.pending.delete(msg.id);
+          req.resolve(msg.buffer);
+        }
+        break;
+      }
+
       case "error": {
         const req = this.pending.get(msg.id);
         if (req) {
@@ -102,6 +111,17 @@ export class GnuCashWorkerClient {
     });
   }
 
+  private mutate<T>(action: MutationAction, payload: unknown): Promise<T> {
+    const id = String(++this.idCounter);
+    return new Promise<T>((resolve, reject) => {
+      this.pending.set(id, {
+        resolve: resolve as (data: unknown) => void,
+        reject,
+      });
+      this.send({ type: "mutation", id, action, payload });
+    });
+  }
+
   /**
    * Wait for SQLite WASM to finish initializing.
    */
@@ -113,7 +133,7 @@ export class GnuCashWorkerClient {
    * Open a .gnucash file by reading it into an ArrayBuffer and sending to the Worker.
    * The Worker persists it to OPFS if available.
    */
-  async openFile(file: File): Promise<void> {
+  async openFile(file: File, writable: boolean = false): Promise<void> {
     await this.wasmReady;
 
     const buffer = await file.arrayBuffer();
@@ -135,7 +155,7 @@ export class GnuCashWorkerClient {
         }
       };
 
-      this.send({ type: "init", fileBuffer: buffer }, [buffer]);
+      this.send({ type: "init", fileBuffer: buffer, writable }, [buffer]);
     });
   }
 
@@ -143,7 +163,7 @@ export class GnuCashWorkerClient {
    * Try to open a previously persisted DB from OPFS.
    * Returns true if successful, false if no file found.
    */
-  async openFromOPFS(): Promise<boolean> {
+  async openFromOPFS(writable: boolean = false): Promise<boolean> {
     await this.wasmReady;
 
     return new Promise<boolean>((resolve) => {
@@ -161,11 +181,70 @@ export class GnuCashWorkerClient {
         }
       };
 
-      this.send({ type: "init-opfs", fileName: "gnucash-dashboard.db" });
+      this.send({ type: "init-opfs", fileName: "gnucash-dashboard.db", writable });
     });
   }
 
-  // Domain-specific methods
+  // ── Mutations ──────────────────────────────────────────────────
+
+  /**
+   * Create a transaction and return fully refreshed dashboard data.
+   * The accounting engine validates all invariants (balance, denoms, etc.)
+   * before committing atomically.
+   */
+  /**
+   * Export the current database as a raw SQLite ArrayBuffer.
+   * The result is a valid .gnucash file that opens in GNUCash desktop.
+   */
+  async exportDatabase(): Promise<ArrayBuffer> {
+    const id = String(++this.idCounter);
+    return new Promise<ArrayBuffer>((resolve, reject) => {
+      this.pending.set(id, {
+        resolve: resolve as (data: unknown) => void,
+        reject,
+      });
+      this.send({ type: "export", id });
+    });
+  }
+
+  async createTransaction(payload: CreateTransactionPayload): Promise<DashboardData> {
+    return this.mutate("createTransaction", payload);
+  }
+
+  /**
+   * Delete a transaction and return fully refreshed dashboard data.
+   * Throws if any split is reconciled.
+   */
+  async deleteTransaction(payload: DeleteTransactionPayload): Promise<DashboardData> {
+    return this.mutate("deleteTransaction", payload);
+  }
+
+  /**
+   * Edit a transaction by deleting the original and creating a replacement.
+   * Returns fully refreshed dashboard data.
+   */
+  async editTransaction(payload: EditTransactionPayload): Promise<DashboardData> {
+    return this.mutate("editTransaction", payload);
+  }
+
+  async createAccount(payload: CreateAccountPayload): Promise<DashboardData> {
+    return this.mutate("createAccount", payload);
+  }
+
+  async updateAccount(payload: UpdateAccountPayload): Promise<DashboardData> {
+    return this.mutate("updateAccount", payload);
+  }
+
+  async deleteAccount(payload: DeleteAccountPayload): Promise<DashboardData> {
+    return this.mutate("deleteAccount", payload);
+  }
+
+  async createCommodity(payload: CreateCommodityPayload): Promise<DashboardData> {
+    return this.mutate("createCommodity", payload);
+  }
+
+  // ── Domain queries ─────────────────────────────────────────────
+
   async getAccountTree(): Promise<AccountNode[]> {
     return this.query("buildAccountTree");
   }

@@ -46,8 +46,12 @@ export function parseGnuCashFile(filePath: string): DashboardData {
         ? ((currentIncome - currentExpenses) / currentIncome) * 100
         : 0;
 
+    const baseCommodity = ctx.commodityMap.get(ctx.baseCurrencyGuid);
+
     return {
       currency: ctx.baseCurrencyMnemonic,
+      currencyGuid: ctx.baseCurrencyGuid,
+      currencyFraction: baseCommodity?.fraction ?? 100,
       accounts: accountTree,
       netWorthSeries,
       cashFlowSeries,
@@ -69,6 +73,13 @@ export function parseGnuCashFile(filePath: string): DashboardData {
       savingsRate,
       budgetData,
       ledgerTransactions,
+      commodities: ctx.commodities.map((c) => ({
+        guid: c.guid,
+        namespace: c.namespace,
+        mnemonic: c.mnemonic,
+        fullname: c.fullname,
+        fraction: c.fraction,
+      })),
     };
   } finally {
     db.close();

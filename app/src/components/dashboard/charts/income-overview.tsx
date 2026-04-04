@@ -75,9 +75,13 @@ export function IncomeOverview({ monthlyIncome, categoryColors, currency, linkTo
       if (drillPath) {
         const rowPrefix = row.pathParts.slice(0, drillDepth).join(":");
         if (rowPrefix !== drillPath) continue;
-        if (row.pathParts.length <= drillDepth) continue;
-        const groupKey = row.pathParts.slice(0, drillDepth + 1).join(":");
-        totals.set(groupKey, (totals.get(groupKey) ?? 0) + row.amount);
+        if (row.pathParts.length <= drillDepth) {
+          const directKey = drillPath + ":(Direct)";
+          totals.set(directKey, (totals.get(directKey) ?? 0) + row.amount);
+        } else {
+          const groupKey = row.pathParts.slice(0, drillDepth + 1).join(":");
+          totals.set(groupKey, (totals.get(groupKey) ?? 0) + row.amount);
+        }
       } else {
         const groupKey = row.pathParts[0];
         totals.set(groupKey, (totals.get(groupKey) ?? 0) + row.amount);
