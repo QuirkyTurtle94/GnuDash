@@ -62,6 +62,7 @@ app/scripts/
 # Internal docs
 ROADMAP.md
 ARCHITECTURE_REVIEW.md
+reddit-post*.md
 
 # GNUCash source reference
 gnucash-source/

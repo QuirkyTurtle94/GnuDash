@@ -523,14 +523,60 @@ function generateBudgetData(
   const yearStr = currentYear.toString();
   const prevYearStr = (currentYear - 1).toString();
 
-  // Build expense budget categories (budget set on parent categories)
-  const expenseCategories: BudgetCategoryRow[] = expenseAccounts.map((cat) => {
-    const accountGuid = guidFn();
-    // Budget = slightly above average of children's ranges
+  // Build expense budget categories with sub-budgets
+  const expenseCategories: BudgetCategoryRow[] = [];
+  for (const cat of expenseAccounts) {
+    const parentGuid = guidFn();
     const childRanges = cat.children.map((c) => expenseRanges[c] ?? [10, 50]);
-    const monthlyBudget = Math.round(childRanges.reduce((s, [min, max]) => s + (min + max) / 2, 0) * 1.05);
+    // Parent budget = slightly above sum of children (creates a small imbalance to demo the feature)
+    const childMonthlyBudgets = childRanges.map(([min, max]) => Math.round((min + max) / 2));
+    const parentMonthlyBudget = Math.round(childMonthlyBudgets.reduce((s, b) => s + b, 0) * 1.05);
 
-    const periods = Array.from({ length: 12 }, (_, p) => {
+    // Build child rows first
+    const childRows: BudgetCategoryRow[] = cat.children.map((childName, ci) => {
+      const childGuid = guidFn();
+      const childMonthly = childMonthlyBudgets[ci];
+
+      const periods = Array.from({ length: 12 }, (_, p) => {
+        const monthStr = `${currentYear}-${String(p + 1).padStart(2, "0")}`;
+        const prevMonthStr = `${currentYear - 1}-${String(p + 1).padStart(2, "0")}`;
+        const actual: Record<string, number> = {};
+        actual[yearStr] = Math.round(
+          monthlyExpenses
+            .filter((e) => e.month === monthStr && e.category === childName)
+            .reduce((s, e) => s + e.amount, 0) * 100
+        ) / 100;
+        actual[prevYearStr] = Math.round(
+          monthlyExpenses
+            .filter((e) => e.month === prevMonthStr && e.category === childName)
+            .reduce((s, e) => s + e.amount, 0) * 100
+        ) / 100;
+        return { period: p, budgeted: childMonthly, actual };
+      });
+
+      const totalBudgeted = childMonthly * 12;
+      const totalActual = periods.reduce((s, p) => s + (p.actual[yearStr] ?? 0), 0);
+
+      return {
+        accountGuid: childGuid,
+        accountName: childName,
+        fullPath: `${cat.name}:${childName}`,
+        budgeted: totalBudgeted,
+        actual: Math.round(totalActual * 100) / 100,
+        variance: Math.round((totalBudgeted - totalActual) * 100) / 100,
+        variancePct: totalBudgeted > 0 ? Math.round(((totalBudgeted - totalActual) / totalBudgeted) * 10000) / 100 : 0,
+        periods,
+        parentAccountGuid: parentGuid,
+        depth: 1,
+        hasChildren: false,
+        hasExplicitBudget: true,
+        childBudgetTotal: 0,
+        imbalance: 0,
+      };
+    });
+
+    // Build parent row
+    const parentPeriods = Array.from({ length: 12 }, (_, p) => {
       const monthStr = `${currentYear}-${String(p + 1).padStart(2, "0")}`;
       const prevMonthStr = `${currentYear - 1}-${String(p + 1).padStart(2, "0")}`;
       const actual: Record<string, number> = {};
@@ -544,23 +590,31 @@ function generateBudgetData(
           .filter((e) => e.month === prevMonthStr && cat.children.includes(e.category))
           .reduce((s, e) => s + e.amount, 0) * 100
       ) / 100;
-      return { period: p, budgeted: monthlyBudget, actual };
+      return { period: p, budgeted: parentMonthlyBudget, actual };
     });
 
-    const totalBudgeted = monthlyBudget * 12;
-    const totalActual = periods.reduce((s, p) => s + (p.actual[yearStr] ?? 0), 0);
+    const totalBudgeted = parentMonthlyBudget * 12;
+    const totalActual = parentPeriods.reduce((s, p) => s + (p.actual[yearStr] ?? 0), 0);
+    const childBudgetTotal = childRows.reduce((s, c) => s + c.budgeted, 0);
 
-    return {
-      accountGuid,
+    expenseCategories.push({
+      accountGuid: parentGuid,
       accountName: cat.name,
       fullPath: cat.name,
       budgeted: totalBudgeted,
       actual: Math.round(totalActual * 100) / 100,
       variance: Math.round((totalBudgeted - totalActual) * 100) / 100,
       variancePct: totalBudgeted > 0 ? Math.round(((totalBudgeted - totalActual) / totalBudgeted) * 10000) / 100 : 0,
-      periods,
-    };
-  });
+      periods: parentPeriods,
+      parentAccountGuid: null,
+      depth: 0,
+      hasChildren: true,
+      hasExplicitBudget: true,
+      childBudgetTotal,
+      imbalance: totalBudgeted - childBudgetTotal,
+    });
+    expenseCategories.push(...childRows);
+  }
 
   // Build income budget categories
   const incomeCategories: BudgetCategoryRow[] = incomeAccounts
@@ -599,11 +653,19 @@ function generateBudgetData(
         variance: Math.round((totalBudgeted - totalActual) * 100) / 100,
         variancePct: totalBudgeted > 0 ? Math.round(((totalBudgeted - totalActual) / totalBudgeted) * 10000) / 100 : 0,
         periods,
+        parentAccountGuid: null,
+        depth: 0,
+        hasChildren: false,
+        hasExplicitBudget: true,
+        childBudgetTotal: 0,
+        imbalance: 0,
       };
     });
 
+  const budgetEntry = { expenseCategories, incomeCategories };
   return {
     budgets: [{ guid: budgetGuid, name: "2026 Budget", description: "Annual household budget", numPeriods: 12 }],
+    categoriesByBudget: { [budgetGuid]: budgetEntry },
     expenseCategories,
     incomeCategories,
     availableYears: [currentYear, currentYear - 1],
