@@ -328,6 +328,9 @@ export function computeBudgetData(ctx: ParseContext): BudgetData | null {
       else expenseCategories.push(row);
     }
 
+    addUnbudgetedRows(expenseCategories, currentYear);
+    addUnbudgetedRows(incomeCategories, currentYear);
+
     expenseCategories.sort((a, b) => b.actual - a.actual);
     incomeCategories.sort((a, b) => b.actual - a.actual);
 
@@ -344,4 +347,78 @@ export function computeBudgetData(ctx: ParseContext): BudgetData | null {
     incomeCategories: defaultData.incomeCategories,
     availableYears,
   };
+}
+
+/**
+ * Add synthetic "Unbudgeted" rows for parents whose children don't fully
+ * account for all actuals or budget. Mutates the array in place.
+ */
+export function addUnbudgetedRows(categories: BudgetCategoryRow[], currentYear: string) {
+  const childrenOf = new Map<string, BudgetCategoryRow[]>();
+  for (const cat of categories) {
+    if (cat.parentAccountGuid) {
+      if (!childrenOf.has(cat.parentAccountGuid)) childrenOf.set(cat.parentAccountGuid, []);
+      childrenOf.get(cat.parentAccountGuid)!.push(cat);
+    }
+  }
+
+  const toAdd: BudgetCategoryRow[] = [];
+  for (const parent of categories) {
+    if (!parent.hasChildren) continue;
+    const children = childrenOf.get(parent.accountGuid) ?? [];
+    if (children.length === 0) continue;
+
+    const periods: { period: number; budgeted: number; actual: Record<string, number> }[] = [];
+    let totalBudgeted = 0;
+    let totalActual = 0;
+
+    for (let p = 0; p < parent.periods.length; p++) {
+      const parentPeriod = parent.periods[p];
+      let childBudgetSum = 0;
+      const childActualByYear: Record<string, number> = {};
+
+      for (const child of children) {
+        const cp = child.periods[p];
+        if (cp) {
+          childBudgetSum += cp.budgeted;
+          for (const [yr, amt] of Object.entries(cp.actual)) {
+            childActualByYear[yr] = (childActualByYear[yr] ?? 0) + amt;
+          }
+        }
+      }
+
+      const unbudgetedBudget = parentPeriod.budgeted - childBudgetSum;
+      const unbudgetedActual: Record<string, number> = {};
+      for (const [yr, parentAmt] of Object.entries(parentPeriod.actual)) {
+        unbudgetedActual[yr] = parentAmt - (childActualByYear[yr] ?? 0);
+      }
+
+      totalBudgeted += unbudgetedBudget;
+      totalActual += unbudgetedActual[currentYear] ?? 0;
+      periods.push({ period: parentPeriod.period, budgeted: unbudgetedBudget, actual: unbudgetedActual });
+    }
+
+    if (totalBudgeted === 0 && totalActual === 0) continue;
+
+    toAdd.push({
+      accountGuid: `__unbudgeted__${parent.accountGuid}`,
+      accountName: "Unbudgeted",
+      fullPath: parent.fullPath ? `${parent.fullPath}:Unbudgeted` : "Unbudgeted",
+      budgeted: totalBudgeted,
+      actual: totalActual,
+      variance: totalBudgeted - totalActual,
+      variancePct: totalBudgeted > 0 ? ((totalBudgeted - totalActual) / totalBudgeted) * 100 : 0,
+      periods,
+      parentAccountGuid: parent.accountGuid,
+      depth: parent.depth + 1,
+      hasChildren: false,
+      hasExplicitBudget: false,
+      childBudgetTotal: 0,
+      imbalance: 0,
+      isUnbudgeted: true,
+    });
+
+  }
+
+  categories.push(...toAdd);
 }

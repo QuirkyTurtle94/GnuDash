@@ -16,6 +16,7 @@ import type {
   BudgetData,
   BudgetCategoryRow,
 } from "@/lib/types/gnucash";
+import { addUnbudgetedRows } from "@/lib/gnucash/domain/budgets";
 
 // Seeded PRNG for reproducible "random" data
 function seededRandom(seed: number) {
@@ -524,16 +525,27 @@ function generateBudgetData(
   const prevYearStr = (currentYear - 1).toString();
 
   // Build expense budget categories with sub-budgets
+  // For "Food", only budget "Groceries" to demo unbudgeted spending rows
+  const partialBudgetCategory = "Food";
+  const partialBudgetChildren = new Set(["Groceries"]);
+
   const expenseCategories: BudgetCategoryRow[] = [];
   for (const cat of expenseAccounts) {
     const parentGuid = guidFn();
-    const childRanges = cat.children.map((c) => expenseRanges[c] ?? [10, 50]);
-    // Parent budget = slightly above sum of children (creates a small imbalance to demo the feature)
+    const isPartial = cat.name === partialBudgetCategory;
+
+    // Determine which children get budgets
+    const budgetedChildren = isPartial
+      ? cat.children.filter((c) => partialBudgetChildren.has(c))
+      : cat.children;
+
+    const childRanges = budgetedChildren.map((c) => expenseRanges[c] ?? [10, 50]);
     const childMonthlyBudgets = childRanges.map(([min, max]) => Math.round((min + max) / 2));
+    // Parent budget = slightly above sum of budgeted children
     const parentMonthlyBudget = Math.round(childMonthlyBudgets.reduce((s, b) => s + b, 0) * 1.05);
 
-    // Build child rows first
-    const childRows: BudgetCategoryRow[] = cat.children.map((childName, ci) => {
+    // Build child rows only for budgeted children
+    const childRows: BudgetCategoryRow[] = budgetedChildren.map((childName, ci) => {
       const childGuid = guidFn();
       const childMonthly = childMonthlyBudgets[ci];
 
@@ -575,7 +587,7 @@ function generateBudgetData(
       };
     });
 
-    // Build parent row
+    // Build parent row — actual always rolls up ALL children (including unbudgeted ones)
     const parentPeriods = Array.from({ length: 12 }, (_, p) => {
       const monthStr = `${currentYear}-${String(p + 1).padStart(2, "0")}`;
       const prevMonthStr = `${currentYear - 1}-${String(p + 1).padStart(2, "0")}`;
@@ -615,6 +627,9 @@ function generateBudgetData(
     });
     expenseCategories.push(...childRows);
   }
+
+  // Add unbudgeted rows for parents with unaccounted spending
+  addUnbudgetedRows(expenseCategories, yearStr);
 
   // Build income budget categories
   const incomeCategories: BudgetCategoryRow[] = incomeAccounts

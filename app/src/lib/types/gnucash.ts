@@ -231,6 +231,7 @@ export interface BudgetCategoryRow {
   hasExplicitBudget: boolean; // true if this account has its own budget_amounts entry
   childBudgetTotal: number; // sum of direct children's budgeted amounts
   imbalance: number; // this.budgeted - childBudgetTotal (only non-zero for explicit budgets with children)
+  isUnbudgeted?: boolean; // true for synthetic "Unbudgeted" rows
 }
 
 export interface BudgetDataForBudget {

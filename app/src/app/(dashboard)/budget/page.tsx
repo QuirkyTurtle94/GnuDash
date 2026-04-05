@@ -379,7 +379,7 @@ function ProgressBars({
                 onClick={cat.hasChildren ? () => onDrillDown(cat.accountGuid) : undefined}
               >
                 <div className="flex items-center justify-between text-xs">
-                  <span className="flex items-center gap-1.5 font-medium text-[#1A1D1F]" data-l>
+                  <span className={`flex items-center gap-1.5 font-medium ${cat.isUnbudgeted ? "italic text-[#9A9FA5]" : "text-[#1A1D1F]"}`} data-l>
                     {cat.accountName}
                     {cat.hasChildren && (
                       <svg className="h-3 w-3 text-[#9A9FA5]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -526,7 +526,7 @@ function VarianceTable({
                   className={`border-b border-[#EFEFEF]/50 last:border-0 ${cat.hasChildren ? "cursor-pointer transition-colors hover:bg-[#F4F5F7]" : ""}`}
                   onClick={cat.hasChildren ? () => onDrillDown(cat.accountGuid) : undefined}
                 >
-                  <td className="py-2.5 pr-4 font-medium text-[#1A1D1F]" data-l>
+                  <td className={`py-2.5 pr-4 font-medium ${cat.isUnbudgeted ? "italic text-[#9A9FA5]" : "text-[#1A1D1F]"}`} data-l>
                     <span className="flex items-center gap-1.5">
                       {cat.accountName}
                       {cat.hasChildren && (
@@ -635,7 +635,7 @@ function computeFilteredCategories(
       let childBudgetTotal = cat.childBudgetTotal;
       let imbalance = cat.imbalance;
       if (cat.hasChildren && sourceCategories) {
-        const children = sourceCategories.filter((c) => c.parentAccountGuid === cat.accountGuid);
+        const children = sourceCategories.filter((c) => c.parentAccountGuid === cat.accountGuid && !c.isUnbudgeted);
         childBudgetTotal = children.reduce((sum, c) => {
           const cp = c.periods.find((p) => p.period === selectedMonth);
           return sum + (cp?.budgeted ?? 0);
@@ -673,7 +673,7 @@ function computeFilteredCategories(
     let childBudgetTotal = cat.childBudgetTotal;
     let imbalance = cat.imbalance;
     if (cat.hasChildren && sourceCategories) {
-      const children = sourceCategories.filter((c) => c.parentAccountGuid === cat.accountGuid);
+      const children = sourceCategories.filter((c) => c.parentAccountGuid === cat.accountGuid && !c.isUnbudgeted);
       childBudgetTotal = children.reduce((sum, c) => {
         let cb = 0;
         for (const p of c.periods) {
