@@ -3,12 +3,15 @@
 import { useState, useMemo, useEffect } from "react";
 import dynamic from "next/dynamic";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { PeriodSelector, DepthSlider, CategoryFilter, LinkColorControl } from "@/components/sankey/sankey-controls";
+import { PeriodSelector } from "@/components/ui/period-selector";
+import { DepthSlider, CategoryFilter, LinkColorControl } from "@/components/sankey/sankey-controls";
 import { useDashboard } from "@/lib/dashboard-context";
+import { type CustomRange, getDataRange } from "@/lib/period-utils";
 import {
   buildSankeyData,
   toEChartsFormat,
   getTopLevelCategories,
+  SANKEY_PERIOD_LABELS,
   type SankeyPeriod,
   type LinkColorMode,
 } from "@/lib/sankey-utils";
@@ -30,6 +33,7 @@ export default function SankeyPage() {
   const { data } = useDashboard();
 
   const [period, setPeriod] = useState<SankeyPeriod>("last-6m");
+  const [customRange, setCustomRange] = useState<CustomRange | null>(null);
   const [depth, setDepth] = useState(1);
   const [linkColorMode, setLinkColorMode] = useState<LinkColorMode>("source");
   const [greyColor, setGreyColor] = useState("#9A9FA5");
@@ -58,6 +62,11 @@ export default function SankeyPage() {
   const incomeKey = Array.from(selectedIncome).sort().join(",");
   const expenseKey = Array.from(selectedExpense).sort().join(",");
 
+  const dataRange = useMemo(
+    () => getDataRange(data?.cashFlowSeries ?? []) ?? { min: "2020-01", max: "2026-01" },
+    [data],
+  );
+
   const sankeyData = useMemo(() => {
     if (!data || !initialized) return null;
     return buildSankeyData({
@@ -70,9 +79,10 @@ export default function SankeyPage() {
       depth,
       selectedIncomeCategories: selectedIncome,
       selectedExpenseCategories: selectedExpense,
+      customRange: customRange ?? undefined,
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [data, period, depth, incomeKey, expenseKey, initialized]);
+  }, [data, period, customRange, depth, incomeKey, expenseKey, initialized]);
 
   const echartsData = useMemo(
     () => (sankeyData ? toEChartsFormat(sankeyData, linkColorMode, greyColor) : null),
@@ -99,7 +109,14 @@ export default function SankeyPage() {
               onModeChange={setLinkColorMode}
               onGreyColorChange={setGreyColor}
             />
-            <PeriodSelector period={period} onChange={setPeriod} />
+            <PeriodSelector
+              period={period}
+              labels={SANKEY_PERIOD_LABELS}
+              onChange={setPeriod}
+              customRange={customRange}
+              onCustomRangeChange={setCustomRange}
+              dataRange={dataRange}
+            />
           </div>
         </CardHeader>
 

@@ -38,7 +38,7 @@ export function computeIncomeBreakdown(
   const monthly: MonthlyExpenseByCategory[] = [];
   for (const row of rows) {
     const amount = -row.total; // Income splits are negative in GNUCash
-    if (amount <= 0) continue;
+    if (amount === 0) continue;
     const account = accountMap.get(row.account_guid);
     if (!account || topIncomeGuids.has(account.guid)) continue;
 
@@ -72,7 +72,7 @@ export function getIncomeTransactions(ctx: ParseContext): ExpenseTransaction[] {
   const transactions: ExpenseTransaction[] = [];
   for (const row of rows) {
     const amount = -row.amount; // Income splits are negative
-    if (amount <= 0) continue;
+    if (amount === 0) continue;
     const account = accountMap.get(row.account_guid);
     if (!account || topIncomeGuids.has(account.guid)) continue;
 

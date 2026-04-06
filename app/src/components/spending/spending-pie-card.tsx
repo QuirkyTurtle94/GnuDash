@@ -24,17 +24,17 @@ interface SpendingPieCardProps {
 }
 
 export function SpendingPieCard({ monthlyExpenses, categoryColors, currency, title = "Spending Breakdown", accentColor = "#6C9B8B" }: SpendingPieCardProps) {
-  const { period, selectedCategory, setSelectedCategory, selectedMonth, selectedAccount, setSelectedAccount, excluded, toggleExcluded } = useSpendingFilter();
+  const { period, customRange, selectedCategory, setSelectedCategory, selectedMonth, selectedAccount, setSelectedAccount, excluded, toggleExcluded } = useSpendingFilter();
   const [showAverage, setShowAverage] = useState(false);
 
   const drillParts = selectedCategory ? selectedCategory.split(":") : null;
   const drillDepth = drillParts ? drillParts.length : 0;
-  const monthCount = selectedMonth ? 1 : getMonthsForPeriod(period).length;
+  const monthCount = selectedMonth ? 1 : getMonthsForPeriod(period, customRange ?? undefined).length;
 
   const { categories, total } = useMemo(() => {
     if (!monthlyExpenses) return { categories: [], total: 0 };
 
-    const validMonths = new Set(selectedMonth ? [selectedMonth] : getMonthsForPeriod(period));
+    const validMonths = new Set(selectedMonth ? [selectedMonth] : getMonthsForPeriod(period, customRange ?? undefined));
     const totals = new Map<string, number>();
 
     for (const row of monthlyExpenses) {
@@ -103,7 +103,7 @@ export function SpendingPieCard({ monthlyExpenses, categoryColors, currency, tit
 
   const canDrill = useCallback((fullPath: string) => {
     if (!monthlyExpenses || !fullPath) return false;
-    const validMonths = new Set(selectedMonth ? [selectedMonth] : getMonthsForPeriod(period));
+    const validMonths = new Set(selectedMonth ? [selectedMonth] : getMonthsForPeriod(period, customRange ?? undefined));
     const parts = fullPath.split(":");
     return monthlyExpenses.some(
       (row) => row.pathParts && row.pathParts.length > parts.length &&

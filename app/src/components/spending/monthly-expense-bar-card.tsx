@@ -35,7 +35,7 @@ export function MonthlyExpenseBarCard({
   selectedBarColor = "#4A7A6B",
   fadedBarColor = "#D5F0E4",
 }: MonthlyExpenseBarCardProps) {
-  const { period, selectedCategory, excluded, selectedMonth, setSelectedMonth } = useSpendingFilter();
+  const { period, customRange, selectedCategory, excluded, selectedMonth, setSelectedMonth } = useSpendingFilter();
 
   const handleBarClick = useCallback((data: { month: string }) => {
     // Toggle: click same month again to deselect
@@ -45,7 +45,7 @@ export function MonthlyExpenseBarCard({
   const barData = useMemo(() => {
     if (!monthlyExpenses) return [];
 
-    const validMonths = getMonthsForPeriod(period);
+    const validMonths = getMonthsForPeriod(period, customRange ?? undefined);
     const validSet = new Set(validMonths);
     const drillParts = selectedCategory ? selectedCategory.split(":") : null;
     const drillDepth = drillParts ? drillParts.length : 0;

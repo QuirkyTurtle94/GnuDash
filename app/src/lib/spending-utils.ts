@@ -1,4 +1,6 @@
-export type TimePeriod = "this-month" | "last-month" | "last-6m" | "this-year" | "last-12m";
+import { type CustomRange, getMonthsBetween } from "@/lib/period-utils";
+
+export type TimePeriod = "this-month" | "last-month" | "last-6m" | "this-year" | "last-12m" | "custom";
 
 export const PERIOD_LABELS: Record<TimePeriod, string> = {
   "this-month": "This Month",
@@ -6,9 +8,10 @@ export const PERIOD_LABELS: Record<TimePeriod, string> = {
   "last-6m": "Last 6 Months",
   "this-year": "This Year",
   "last-12m": "Last 12 Months",
+  "custom": "Custom",
 };
 
-export function getMonthsForPeriod(period: TimePeriod): string[] {
+export function getMonthsForPeriod(period: TimePeriod, customRange?: CustomRange): string[] {
   const now = new Date();
   const y = now.getFullYear();
   const m = now.getMonth();
@@ -43,5 +46,7 @@ export function getMonthsForPeriod(period: TimePeriod): string[] {
       }
       return months;
     }
+    case "custom":
+      return customRange ? getMonthsBetween(customRange.start, customRange.end) : [];
   }
 }
