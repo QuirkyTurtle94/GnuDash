@@ -2,52 +2,8 @@
 
 import { useState } from "react";
 import {
-  type SankeyPeriod,
   type LinkColorMode,
-  SANKEY_PERIOD_LABELS,
 } from "@/lib/sankey-utils";
-
-// ── Period selector ───────────────────────────────────────────────────
-
-interface PeriodSelectorProps {
-  period: SankeyPeriod;
-  onChange: (p: SankeyPeriod) => void;
-}
-
-export function PeriodSelector({ period, onChange }: PeriodSelectorProps) {
-  const [open, setOpen] = useState(false);
-
-  return (
-    <div className="relative">
-      <button
-        onClick={() => setOpen(!open)}
-        className="flex items-center gap-1.5 rounded-lg border border-[#EFEFEF] px-3 py-1.5 transition-colors hover:bg-[#F4F5F7]"
-      >
-        <span className="text-xs font-medium text-[#6F767E]">
-          {SANKEY_PERIOD_LABELS[period]}
-        </span>
-        <svg className="h-3.5 w-3.5 text-[#9A9FA5]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-        </svg>
-      </button>
-      {open && (
-        <div className="absolute right-0 top-full z-10 mt-1 w-40 rounded-lg border border-[#EFEFEF] bg-white py-1 shadow-lg">
-          {(Object.keys(SANKEY_PERIOD_LABELS) as SankeyPeriod[]).map((p) => (
-            <button
-              key={p}
-              onClick={() => { onChange(p); setOpen(false); }}
-              className={`w-full px-3 py-2 text-left text-xs transition-colors hover:bg-[#F4F5F7] ${
-                period === p ? "font-medium text-[#6C9B8B]" : "text-[#6F767E]"
-              }`}
-            >
-              {SANKEY_PERIOD_LABELS[p]}
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
 
 // ── Depth slider ──────────────────────────────────────────────────────
 

@@ -40,7 +40,7 @@ export function computeExpenseBreakdown(
   const allTimeTotals = new Map<string, number>();
 
   for (const row of rows) {
-    if (row.total <= 0) continue;
+    if (row.total === 0) continue;
     const account = accountMap.get(row.account_guid);
     if (!account || topExpenseGuids.has(account.guid)) continue;
 
@@ -80,7 +80,7 @@ export function getExpenseTransactions(ctx: ParseContext): ExpenseTransaction[] 
 
   const transactions: ExpenseTransaction[] = [];
   for (const row of rows) {
-    if (row.amount <= 0) continue;
+    if (row.amount === 0) continue;
     const account = accountMap.get(row.account_guid);
     if (!account || topExpenseGuids.has(account.guid)) continue;
 

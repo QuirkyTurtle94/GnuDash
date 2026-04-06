@@ -38,7 +38,7 @@ function compareTx(a: ExpenseTransaction, b: ExpenseTransaction, field: SortFiel
 }
 
 export function ExpenseTableCard({ transactions, currency, title = "Expenses" }: ExpenseTableCardProps) {
-  const { period, selectedCategory, selectedMonth, selectedAccount, excluded } = useSpendingFilter();
+  const { period, customRange, selectedCategory, selectedMonth, selectedAccount, excluded } = useSpendingFilter();
   const [page, setPage] = useState(0);
   const [sortField, setSortField] = useState<SortField>("amount");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
@@ -57,7 +57,7 @@ export function ExpenseTableCard({ transactions, currency, title = "Expenses" }:
   const filterKey = `${period}-${selectedCategory}-${selectedMonth}-${selectedAccount}-${[...excluded].join(",")}`;
 
   const filtered = useMemo(() => {
-    const validMonths = new Set(selectedMonth ? [selectedMonth] : getMonthsForPeriod(period));
+    const validMonths = new Set(selectedMonth ? [selectedMonth] : getMonthsForPeriod(period, customRange ?? undefined));
     const drillParts = selectedCategory ? selectedCategory.split(":") : null;
     const drillDepth = drillParts ? drillParts.length : 0;
 

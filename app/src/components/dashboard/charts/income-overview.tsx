@@ -10,20 +10,26 @@ import {
 } from "recharts";
 import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { PeriodSelector } from "@/components/ui/period-selector";
 import { formatCurrency } from "@/lib/format";
 import { assignShades } from "@/lib/color-utils";
+import { type CustomRange, getDataRange, getMonthsBetween } from "@/lib/period-utils";
 import type { MonthlyExpenseByCategory } from "@/lib/types/gnucash";
 
-type TimePeriod = "this-month" | "last-month" | "this-year" | "last-12m";
+type TimePeriod = "this-month" | "last-month" | "this-year" | "last-12m" | "custom";
 
 const PERIOD_LABELS: Record<TimePeriod, string> = {
   "this-month": "This Month",
   "last-month": "Last Month",
   "this-year": "This Year",
   "last-12m": "Last 12 Months",
+  "custom": "Custom",
 };
 
-function getMonthsForPeriod(period: TimePeriod): string[] {
+function getMonthsForPeriod(period: TimePeriod, customRange?: CustomRange | null): string[] {
+  if (period === "custom") {
+    return customRange ? getMonthsBetween(customRange.start, customRange.end) : [];
+  }
   const now = new Date();
   const y = now.getFullYear();
   const m = now.getMonth();
@@ -59,13 +65,13 @@ interface IncomeOverviewProps {
 
 export function IncomeOverview({ monthlyIncome, categoryColors, currency, linkTo }: IncomeOverviewProps) {
   const [period, setPeriod] = useState<TimePeriod>("this-month");
-  const [showPeriodDropdown, setShowPeriodDropdown] = useState(false);
+  const [customRange, setCustomRange] = useState<CustomRange | null>(null);
   const [drillPath, setDrillPath] = useState<string | null>(null);
   const [excluded, setExcluded] = useState<Set<string>>(new Set());
 
   const { categories, total } = useMemo(() => {
     if (!monthlyIncome) return { categories: [], total: 0 };
-    const validMonths = new Set(getMonthsForPeriod(period));
+    const validMonths = new Set(getMonthsForPeriod(period, customRange));
     const drillParts = drillPath ? drillPath.split(":") : null;
     const drillDepth = drillParts ? drillParts.length : 0;
     const totals = new Map<string, number>();
@@ -100,7 +106,7 @@ export function IncomeOverview({ monthlyIncome, categoryColors, currency, linkTo
     if (drillPath) assignShades(cats);
 
     return { categories: cats, total: cats.reduce((s, c) => s + c.amount, 0) };
-  }, [monthlyIncome, categoryColors, period, drillPath]);
+  }, [monthlyIncome, categoryColors, period, customRange, drillPath]);
 
   const { activeCategories, activeTotal } = useMemo(() => {
     const active = categories.filter((c) => !excluded.has(c.fullPath));
@@ -118,6 +124,8 @@ export function IncomeOverview({ monthlyIncome, categoryColors, currency, linkTo
     if (othersTotal > 0) significant.push({ name: "Others", fullPath: "", amount: othersTotal, color: "#D4DAE0" });
     return significant;
   }, [activeCategories, activeTotal]);
+
+  const dataRange = useMemo(() => getDataRange(monthlyIncome) ?? { min: "2020-01", max: "2026-01" }, [monthlyIncome]);
 
   const canDrill = useCallback((fullPath: string) => {
     if (!monthlyIncome || !fullPath) return false;
@@ -144,32 +152,14 @@ export function IncomeOverview({ monthlyIncome, categoryColors, currency, linkTo
             <Link href={linkTo} className="hover:text-[#3B6B8A] transition-colors">Income Overview</Link>
           ) : "Income Overview"}
         </CardTitle>
-        <div className="relative">
-          <button
-            onClick={() => setShowPeriodDropdown(!showPeriodDropdown)}
-            className="flex items-center gap-1.5 rounded-lg border border-[#EFEFEF] px-3 py-1.5 transition-colors hover:bg-[#F4F5F7]"
-          >
-            <span className="text-xs font-medium text-[#6F767E]">{PERIOD_LABELS[period]}</span>
-            <svg className="h-3.5 w-3.5 text-[#9A9FA5]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-            </svg>
-          </button>
-          {showPeriodDropdown && (
-            <div className="absolute right-0 top-full z-10 mt-1 w-40 rounded-lg border border-[#EFEFEF] bg-white py-1 shadow-lg">
-              {(Object.keys(PERIOD_LABELS) as TimePeriod[]).map((p) => (
-                <button
-                  key={p}
-                  onClick={() => { setPeriod(p); setShowPeriodDropdown(false); }}
-                  className={`w-full px-3 py-2 text-left text-xs transition-colors hover:bg-[#F4F5F7] ${
-                    period === p ? "font-medium text-[#3B6B8A]" : "text-[#6F767E]"
-                  }`}
-                >
-                  {PERIOD_LABELS[p]}
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
+        <PeriodSelector
+          period={period}
+          labels={PERIOD_LABELS}
+          onChange={setPeriod}
+          customRange={customRange}
+          onCustomRangeChange={setCustomRange}
+          dataRange={dataRange}
+        />
       </CardHeader>
       <CardContent>
         {categories.length === 0 ? (

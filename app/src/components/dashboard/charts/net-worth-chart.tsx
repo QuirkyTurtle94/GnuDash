@@ -12,15 +12,18 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { PeriodSelector } from "@/components/ui/period-selector";
 import { formatCurrency, formatCurrencyShort } from "@/lib/format";
+import { type CustomRange, getDataRange } from "@/lib/period-utils";
 import type { MonthlyNetWorth } from "@/lib/types/gnucash";
 
-type TimePeriod = "last-6m" | "last-12m" | "all-time";
+type TimePeriod = "last-6m" | "last-12m" | "all-time" | "custom";
 
 const PERIOD_LABELS: Record<TimePeriod, string> = {
   "last-6m": "Last 6 Months",
   "last-12m": "Last 12 Months",
   "all-time": "All Time",
+  "custom": "Custom",
 };
 
 function formatAxisMonth(month: string): string {
@@ -57,16 +60,20 @@ interface NetWorthChartProps {
 
 export function NetWorthChart({ series, currentNetWorth, currency }: NetWorthChartProps) {
   const [period, setPeriod] = useState<TimePeriod>("all-time");
-  const [showDropdown, setShowDropdown] = useState(false);
+  const [customRange, setCustomRange] = useState<CustomRange | null>(null);
   const [showBreakdown, setShowBreakdown] = useState(false);
 
+  const dataRange = useMemo(() => getDataRange(series) ?? { min: "2020-01", max: "2026-01" }, [series]);
   const filtered = useMemo(() => {
     switch (period) {
       case "last-6m": return series.slice(-6);
       case "last-12m": return series.slice(-12);
       case "all-time": return series;
+      case "custom":
+        if (!customRange) return series;
+        return series.filter((s) => s.month >= customRange.start && s.month <= customRange.end);
     }
-  }, [series, period]);
+  }, [series, period, customRange]);
 
   // Compute nice Y-axis ticks at multiples of 1, 2, 5 × 10^n
   const { yDomain, yTicks } = useMemo(() => {
@@ -122,32 +129,14 @@ export function NetWorthChart({ series, currentNetWorth, currency }: NetWorthCha
           >
             Assets / Liabilities
           </button>
-          <div className="relative">
-          <button
-            onClick={() => setShowDropdown(!showDropdown)}
-            className="flex items-center gap-1.5 rounded-lg border border-[#EFEFEF] px-3 py-1.5 transition-colors hover:bg-[#F4F5F7]"
-          >
-            <span className="text-xs font-medium text-[#6F767E]">{PERIOD_LABELS[period]}</span>
-            <svg className="h-3.5 w-3.5 text-[#9A9FA5]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-            </svg>
-          </button>
-          {showDropdown && (
-            <div className="absolute right-0 top-full z-10 mt-1 w-40 rounded-lg border border-[#EFEFEF] bg-white py-1 shadow-lg">
-              {(Object.keys(PERIOD_LABELS) as TimePeriod[]).map((p) => (
-                <button
-                  key={p}
-                  onClick={() => { setPeriod(p); setShowDropdown(false); }}
-                  className={`w-full px-3 py-2 text-left text-xs transition-colors hover:bg-[#F4F5F7] ${
-                    period === p ? "font-medium text-[#6C9B8B]" : "text-[#6F767E]"
-                  }`}
-                >
-                  {PERIOD_LABELS[p]}
-                </button>
-              ))}
-            </div>
-          )}
-          </div>
+          <PeriodSelector
+            period={period}
+            labels={PERIOD_LABELS}
+            onChange={setPeriod}
+            customRange={customRange}
+            onCustomRangeChange={setCustomRange}
+            dataRange={dataRange}
+          />
         </div>
       </CardHeader>
       <CardContent>

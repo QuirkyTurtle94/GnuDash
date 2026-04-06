@@ -1,5 +1,6 @@
 import type { MonthlyExpenseByCategory, MonthlyCashFlow } from "@/lib/types/gnucash";
 import { formatCurrencyShort } from "@/lib/format";
+import type { CustomRange } from "@/lib/period-utils";
 
 // ── Library-agnostic intermediate format ──────────────────────────────
 
@@ -24,7 +25,7 @@ export interface SankeyData {
 
 // ── Time period helpers ───────────────────────────────────────────────
 
-export type SankeyPeriod = "this-month" | "last-month" | "last-3m" | "last-6m" | "last-12m" | "all-time";
+export type SankeyPeriod = "this-month" | "last-month" | "last-3m" | "last-6m" | "last-12m" | "all-time" | "custom";
 
 export const SANKEY_PERIOD_LABELS: Record<SankeyPeriod, string> = {
   "this-month": "This Month",
@@ -33,6 +34,7 @@ export const SANKEY_PERIOD_LABELS: Record<SankeyPeriod, string> = {
   "last-6m": "Last 6 Months",
   "last-12m": "Last 12 Months",
   "all-time": "All Time",
+  "custom": "Custom",
 };
 
 /**
@@ -43,6 +45,7 @@ export const SANKEY_PERIOD_LABELS: Record<SankeyPeriod, string> = {
 function getMonthsForPeriod(
   cashFlowSeries: MonthlyCashFlow[],
   period: SankeyPeriod,
+  customRange?: CustomRange,
 ): Set<string> {
   if (cashFlowSeries.length === 0) return new Set();
 
@@ -65,6 +68,12 @@ function getMonthsForPeriod(
       break;
     case "all-time":
       slice = cashFlowSeries;
+      break;
+    case "custom":
+      if (!customRange) return new Set();
+      slice = cashFlowSeries.filter(
+        (s) => s.month >= customRange.start && s.month <= customRange.end,
+      );
       break;
   }
 
@@ -115,6 +124,7 @@ interface BuildOptions {
   depth: number; // 1–6
   selectedIncomeCategories: Set<string> | null; // null = all
   selectedExpenseCategories: Set<string> | null; // null = all
+  customRange?: CustomRange;
 }
 
 interface AggResult {
@@ -151,21 +161,22 @@ function aggregateByDepth(
 
 export function buildSankeyData(opts: BuildOptions): SankeyData {
   const { period, depth, incomeCategoryColors, expenseCategoryColors } = opts;
-  const months = getMonthsForPeriod(opts.cashFlowSeries, period);
+  const months = getMonthsForPeriod(opts.cashFlowSeries, period, opts.customRange);
 
+  // Aggregate ALL categories (ignoring selection filter) to get true totals
+  const incomeAll = aggregateByDepth(opts.incomeByCategory, months, depth, null);
+  const expenseAll = aggregateByDepth(opts.expenseByCategory, months, depth, null);
+
+  // Totals derived from the category data itself — this ensures the Sankey
+  // always balances (inflows = outflows at every node).
+  const totalIncome = Array.from(incomeAll.selected.values()).reduce((a, b) => a + b, 0);
+  const totalExpenses = Array.from(expenseAll.selected.values()).reduce((a, b) => a + b, 0);
+  const netCashFlow = totalIncome - totalExpenses;
+
+  // Now aggregate with the user's category selection applied
   const incomeResult = aggregateByDepth(opts.incomeByCategory, months, depth, opts.selectedIncomeCategories);
   const expenseResult = aggregateByDepth(opts.expenseByCategory, months, depth, opts.selectedExpenseCategories);
 
-  // Use cashFlowSeries as the single source of truth for totals —
-  // this is the same data the dashboard Cash Flow card uses, so values always match.
-  const matchingMonths = opts.cashFlowSeries.filter((s) => months.has(s.month));
-  const totalIncome = matchingMonths.reduce((sum, s) => sum + s.income, 0);
-  const totalExpenses = matchingMonths.reduce((sum, s) => sum + s.expenses, 0);
-  const netCashFlow = matchingMonths.reduce((sum, s) => sum + s.net, 0);
-
-  // The category breakdowns may not sum exactly to the cashFlowSeries totals
-  // (different SQL queries). Attribute any difference to the "Other" bucket
-  // alongside user-filtered categories.
   const categoryIncomeTotal = Array.from(incomeResult.selected.values()).reduce((a, b) => a + b, 0);
   const categoryExpenseTotal = Array.from(expenseResult.selected.values()).reduce((a, b) => a + b, 0);
   const incomeRemainder = totalIncome - categoryIncomeTotal;

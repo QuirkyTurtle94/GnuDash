@@ -1,44 +1,33 @@
 "use client";
 
+import { useMemo } from "react";
 import { useDashboard } from "@/lib/dashboard-context";
 import { SpendingFilterProvider, useSpendingFilter } from "@/lib/spending-filter-context";
-import { PERIOD_LABELS, type TimePeriod } from "@/lib/spending-utils";
+import { PERIOD_LABELS } from "@/lib/spending-utils";
+import { PeriodSelector } from "@/components/ui/period-selector";
+import { getDataRange } from "@/lib/period-utils";
 import { SpendingPieCard } from "@/components/spending/spending-pie-card";
 import { MonthlyExpenseBarCard } from "@/components/spending/monthly-expense-bar-card";
 import { ExpenseTableCard } from "@/components/spending/expense-table-card";
-import { useState } from "react";
 
-function PeriodSelector() {
-  const { period, setPeriod, setSelectedMonth } = useSpendingFilter();
-  const [open, setOpen] = useState(false);
+function IncomePeriodSelector() {
+  const { period, setPeriod, customRange, setCustomRange, setSelectedMonth } = useSpendingFilter();
+  const { data } = useDashboard();
+  const dataRange = useMemo(
+    () => getDataRange(data?.cashFlowSeries ?? []) ?? { min: "2020-01", max: "2026-01" },
+    [data],
+  );
 
   return (
-    <div className="relative">
-      <button
-        onClick={() => setOpen(!open)}
-        className="flex items-center gap-1.5 rounded-lg border border-[#EFEFEF] bg-white px-4 py-2 transition-colors hover:bg-[#F4F5F7]"
-      >
-        <span className="text-sm font-medium text-[#6F767E]">{PERIOD_LABELS[period]}</span>
-        <svg className="h-4 w-4 text-[#9A9FA5]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-        </svg>
-      </button>
-      {open && (
-        <div className="absolute right-0 top-full z-10 mt-1 w-44 rounded-lg border border-[#EFEFEF] bg-white py-1 shadow-lg">
-          {(Object.keys(PERIOD_LABELS) as TimePeriod[]).map((p) => (
-            <button
-              key={p}
-              onClick={() => { setPeriod(p); setSelectedMonth(null); setOpen(false); }}
-              className={`w-full px-4 py-2 text-left text-sm transition-colors hover:bg-[#F4F5F7] ${
-                period === p ? "font-medium text-[#3B6B8A]" : "text-[#6F767E]"
-              }`}
-            >
-              {PERIOD_LABELS[p]}
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
+    <PeriodSelector
+      period={period}
+      labels={PERIOD_LABELS}
+      onChange={setPeriod}
+      customRange={customRange}
+      onCustomRangeChange={setCustomRange}
+      dataRange={dataRange}
+      onPeriodSideEffect={() => setSelectedMonth(null)}
+    />
   );
 }
 
@@ -119,7 +108,7 @@ function IncomeContent() {
           <h2 className="text-lg font-semibold text-[#1A1D1F] sm:text-xl">Income</h2>
           <ActiveFilters />
         </div>
-        <PeriodSelector />
+        <IncomePeriodSelector />
       </div>
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-5">

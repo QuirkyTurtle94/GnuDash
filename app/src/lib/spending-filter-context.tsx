@@ -2,10 +2,13 @@
 
 import { createContext, useContext, useState, useCallback, type ReactNode } from "react";
 import type { TimePeriod } from "@/lib/spending-utils";
+import type { CustomRange } from "@/lib/period-utils";
 
 interface SpendingFilterState {
   period: TimePeriod;
   setPeriod: (p: TimePeriod) => void;
+  customRange: CustomRange | null;
+  setCustomRange: (r: CustomRange) => void;
   /** Currently selected category path (e.g. "Food" or "Food:Groceries"), null = all */
   selectedCategory: string | null;
   setSelectedCategory: (path: string | null) => void;
@@ -25,6 +28,7 @@ const SpendingFilterContext = createContext<SpendingFilterState | null>(null);
 
 export function SpendingFilterProvider({ children }: { children: ReactNode }) {
   const [period, setPeriod] = useState<TimePeriod>("last-12m");
+  const [customRange, setCustomRange] = useState<CustomRange | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [selectedMonth, setSelectedMonth] = useState<string | null>(null);
   const [selectedAccount, setSelectedAccount] = useState<string | null>(null);
@@ -49,6 +53,8 @@ export function SpendingFilterProvider({ children }: { children: ReactNode }) {
       value={{
         period,
         setPeriod,
+        customRange,
+        setCustomRange,
         selectedCategory,
         setSelectedCategory,
         selectedMonth,

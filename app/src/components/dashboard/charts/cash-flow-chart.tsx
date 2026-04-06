@@ -12,33 +12,31 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { PeriodSelector } from "@/components/ui/period-selector";
 import { formatCurrency, formatCurrencyShort } from "@/lib/format";
+import { type CustomRange, getDataRange } from "@/lib/period-utils";
 import type { MonthlyCashFlow } from "@/lib/types/gnucash";
 
-type TimePeriod = "this-month" | "last-month" | "last-6m" | "last-12m";
+type TimePeriod = "this-month" | "last-month" | "last-6m" | "last-12m" | "custom";
 
 const PERIOD_LABELS: Record<TimePeriod, string> = {
   "this-month": "This Month",
   "last-month": "Last Month",
   "last-6m": "Last 6 Months",
   "last-12m": "Last 12 Months",
+  "custom": "Custom",
 };
 
-function getMonthsForPeriod(period: TimePeriod): number {
+function getSlice(series: MonthlyCashFlow[], period: TimePeriod, customRange?: CustomRange | null): MonthlyCashFlow[] {
   switch (period) {
-    case "this-month": return 1;
-    case "last-month": return 1;
-    case "last-6m": return 6;
-    case "last-12m": return 12;
+    case "this-month": return series.slice(-1);
+    case "last-month": return series.slice(-2, -1);
+    case "last-6m": return series.slice(-6);
+    case "last-12m": return series.slice(-12);
+    case "custom":
+      if (!customRange) return series;
+      return series.filter((s) => s.month >= customRange.start && s.month <= customRange.end);
   }
-}
-
-function getSlice(series: MonthlyCashFlow[], period: TimePeriod): MonthlyCashFlow[] {
-  if (period === "last-month") {
-    return series.slice(-2, -1);
-  }
-  const n = getMonthsForPeriod(period);
-  return series.slice(-n);
 }
 
 function formatMonthLabel(month: string): string {
@@ -57,9 +55,10 @@ interface CashFlowChartProps {
 
 export function CashFlowChart({ series, currency }: CashFlowChartProps) {
   const [period, setPeriod] = useState<TimePeriod>("last-6m");
-  const [showDropdown, setShowDropdown] = useState(false);
+  const [customRange, setCustomRange] = useState<CustomRange | null>(null);
 
-  const filtered = useMemo(() => getSlice(series, period), [series, period]);
+  const dataRange = useMemo(() => getDataRange(series) ?? { min: "2020-01", max: "2026-01" }, [series]);
+  const filtered = useMemo(() => getSlice(series, period, customRange), [series, period, customRange]);
   const totalNet = filtered.reduce((sum, s) => sum + s.net, 0);
   const showChart = filtered.length > 1;
 
@@ -69,32 +68,14 @@ export function CashFlowChart({ series, currency }: CashFlowChartProps) {
         <CardTitle className="text-lg font-semibold text-[#1A1D1F]">
           Cash Flow
         </CardTitle>
-        <div className="relative">
-          <button
-            onClick={() => setShowDropdown(!showDropdown)}
-            className="flex items-center gap-1.5 rounded-lg border border-[#EFEFEF] px-3 py-1.5 transition-colors hover:bg-[#F4F5F7]"
-          >
-            <span className="text-xs font-medium text-[#6F767E]">{PERIOD_LABELS[period]}</span>
-            <svg className="h-3.5 w-3.5 text-[#9A9FA5]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-            </svg>
-          </button>
-          {showDropdown && (
-            <div className="absolute right-0 top-full z-10 mt-1 w-40 rounded-lg border border-[#EFEFEF] bg-white py-1 shadow-lg">
-              {(Object.keys(PERIOD_LABELS) as TimePeriod[]).map((p) => (
-                <button
-                  key={p}
-                  onClick={() => { setPeriod(p); setShowDropdown(false); }}
-                  className={`w-full px-3 py-2 text-left text-xs transition-colors hover:bg-[#F4F5F7] ${
-                    period === p ? "font-medium text-[#6C9B8B]" : "text-[#6F767E]"
-                  }`}
-                >
-                  {PERIOD_LABELS[p]}
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
+        <PeriodSelector
+          period={period}
+          labels={PERIOD_LABELS}
+          onChange={setPeriod}
+          customRange={customRange}
+          onCustomRangeChange={setCustomRange}
+          dataRange={dataRange}
+        />
       </CardHeader>
       <CardContent>
         <div className="mb-1">
