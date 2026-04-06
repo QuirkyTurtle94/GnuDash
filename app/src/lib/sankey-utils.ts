@@ -1,0 +1,312 @@
+import type { MonthlyExpenseByCategory, MonthlyCashFlow } from "@/lib/types/gnucash";
+import { formatCurrencyShort } from "@/lib/format";
+
+// ── Library-agnostic intermediate format ──────────────────────────────
+
+export interface SankeyNode {
+  id: string;
+  label: string;
+  color: string;
+  depth?: number; // explicit column position (0-indexed from left)
+}
+
+export interface SankeyLink {
+  source: string; // node id
+  target: string; // node id
+  value: number;
+  sourceColor: string; // colour of the source node (for faded mode)
+}
+
+export interface SankeyData {
+  nodes: SankeyNode[];
+  links: SankeyLink[];
+}
+
+// ── Time period helpers ───────────────────────────────────────────────
+
+export type SankeyPeriod = "this-month" | "last-month" | "last-3m" | "last-6m" | "last-12m" | "all-time";
+
+export const SANKEY_PERIOD_LABELS: Record<SankeyPeriod, string> = {
+  "this-month": "This Month",
+  "last-month": "Last Month",
+  "last-3m": "Last 3 Months",
+  "last-6m": "Last 6 Months",
+  "last-12m": "Last 12 Months",
+  "all-time": "All Time",
+};
+
+/**
+ * Derive the set of months to include by slicing from the end of the
+ * cashFlowSeries array — the same approach the Cash Flow chart uses.
+ * This ensures the Sankey always matches the dashboard totals.
+ */
+function getMonthsForPeriod(
+  cashFlowSeries: MonthlyCashFlow[],
+  period: SankeyPeriod,
+): Set<string> {
+  if (cashFlowSeries.length === 0) return new Set();
+
+  let slice: MonthlyCashFlow[];
+  switch (period) {
+    case "this-month":
+      slice = cashFlowSeries.slice(-1);
+      break;
+    case "last-month":
+      slice = cashFlowSeries.slice(-2, -1);
+      break;
+    case "last-3m":
+      slice = cashFlowSeries.slice(-3);
+      break;
+    case "last-6m":
+      slice = cashFlowSeries.slice(-6);
+      break;
+    case "last-12m":
+      slice = cashFlowSeries.slice(-12);
+      break;
+    case "all-time":
+      slice = cashFlowSeries;
+      break;
+  }
+
+  return new Set(slice.map((s) => s.month));
+}
+
+// ── Colour constants ──────────────────────────────────────────────────
+
+const INCOME_NODE_COLOR = "#6C9B8B";
+const EXPENSE_NODE_COLOR = "#F87171";
+const TOTAL_INCOME_COLOR = "#4A7A6B";
+const TOTAL_EXPENSE_COLOR = "#DC2626";
+const POSITIVE_CASHFLOW_COLOR = "#22C55E";
+const NEGATIVE_CASHFLOW_COLOR = "#EF4444";
+const FILTERED_OUT_COLOR = "#D1D5DB";
+
+// ── Link colour modes ────────────────────────────────────────────────
+
+export type LinkColorMode = "source" | "grey";
+
+/** Convert a hex colour (#RRGGBB) to rgba with the given alpha (0–1). */
+function hexToRgba(hex: string, alpha: number): string {
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+  return `rgba(${r},${g},${b},${alpha})`;
+}
+
+export function resolveLinkColor(
+  link: SankeyLink,
+  mode: LinkColorMode,
+  greyColor: string,
+): string {
+  if (mode === "grey") return hexToRgba(greyColor, 0.3);
+  // "source" mode: faded version of the source node colour
+  return hexToRgba(link.sourceColor, 0.35);
+}
+
+// ── Build Sankey data ─────────────────────────────────────────────────
+
+interface BuildOptions {
+  incomeByCategory: MonthlyExpenseByCategory[];
+  expenseByCategory: MonthlyExpenseByCategory[];
+  cashFlowSeries: MonthlyCashFlow[];
+  incomeCategoryColors: Record<string, string>;
+  expenseCategoryColors: Record<string, string>;
+  period: SankeyPeriod;
+  depth: number; // 1–6
+  selectedIncomeCategories: Set<string> | null; // null = all
+  selectedExpenseCategories: Set<string> | null; // null = all
+}
+
+interface AggResult {
+  selected: Map<string, number>;   // categories the user has selected
+  filteredOut: number;              // total of deselected categories
+}
+
+/** Aggregate rows for the given set of months, grouped at the requested depth. */
+function aggregateByDepth(
+  rows: MonthlyExpenseByCategory[],
+  months: Set<string>,
+  depth: number,
+  selected: Set<string> | null,
+): AggResult {
+  const totals = new Map<string, number>();
+  let filteredOut = 0;
+
+  for (const row of rows) {
+    if (!months.has(row.month)) continue;
+
+    const parts = row.pathParts.slice(0, depth);
+    const key = parts.join(":");
+
+    if (selected && !selected.has(parts[0])) {
+      filteredOut += row.amount;
+      continue;
+    }
+
+    totals.set(key, (totals.get(key) ?? 0) + row.amount);
+  }
+
+  return { selected: totals, filteredOut };
+}
+
+export function buildSankeyData(opts: BuildOptions): SankeyData {
+  const { period, depth, incomeCategoryColors, expenseCategoryColors } = opts;
+  const months = getMonthsForPeriod(opts.cashFlowSeries, period);
+
+  const incomeResult = aggregateByDepth(opts.incomeByCategory, months, depth, opts.selectedIncomeCategories);
+  const expenseResult = aggregateByDepth(opts.expenseByCategory, months, depth, opts.selectedExpenseCategories);
+
+  // Use cashFlowSeries as the single source of truth for totals —
+  // this is the same data the dashboard Cash Flow card uses, so values always match.
+  const matchingMonths = opts.cashFlowSeries.filter((s) => months.has(s.month));
+  const totalIncome = matchingMonths.reduce((sum, s) => sum + s.income, 0);
+  const totalExpenses = matchingMonths.reduce((sum, s) => sum + s.expenses, 0);
+  const netCashFlow = matchingMonths.reduce((sum, s) => sum + s.net, 0);
+
+  // The category breakdowns may not sum exactly to the cashFlowSeries totals
+  // (different SQL queries). Attribute any difference to the "Other" bucket
+  // alongside user-filtered categories.
+  const categoryIncomeTotal = Array.from(incomeResult.selected.values()).reduce((a, b) => a + b, 0);
+  const categoryExpenseTotal = Array.from(expenseResult.selected.values()).reduce((a, b) => a + b, 0);
+  const incomeRemainder = totalIncome - categoryIncomeTotal;
+  const expenseRemainder = totalExpenses - categoryExpenseTotal;
+
+  const nodes: SankeyNode[] = [];
+  const links: SankeyLink[] = [];
+
+  // Income category nodes + links to "Total Income"
+  for (const [category, amount] of incomeResult.selected) {
+    if (amount <= 0) continue;
+    const topLevel = category.split(":")[0];
+    const color = incomeCategoryColors[topLevel] ?? INCOME_NODE_COLOR;
+    const nodeId = `income:${category}`;
+    nodes.push({ id: nodeId, label: category.split(":").pop()!, color });
+    links.push({
+      source: nodeId,
+      target: "total-income",
+      value: amount,
+      sourceColor: color,
+    });
+  }
+
+  // "Other Income" node for filtered-out categories + any query discrepancy
+  if (incomeRemainder > 0) {
+    nodes.push({ id: "income:__other__", label: "Other Income", color: FILTERED_OUT_COLOR });
+    links.push({
+      source: "income:__other__",
+      target: "total-income",
+      value: incomeRemainder,
+      sourceColor: FILTERED_OUT_COLOR,
+    });
+  }
+
+  // Total Income node (column 1)
+  nodes.push({ id: "total-income", label: "Total Income", color: TOTAL_INCOME_COLOR, depth: 1 });
+
+  // Total Expenses node (column 2)
+  nodes.push({ id: "total-expenses", label: "Total Expenses", color: TOTAL_EXPENSE_COLOR, depth: 2 });
+
+  // Expense category nodes + links from "Total Expenses"
+  for (const [category, amount] of expenseResult.selected) {
+    if (amount <= 0) continue;
+    const topLevel = category.split(":")[0];
+    const color = expenseCategoryColors[topLevel] ?? EXPENSE_NODE_COLOR;
+    const nodeId = `expense:${category}`;
+    nodes.push({ id: nodeId, label: category.split(":").pop()!, color });
+    links.push({
+      source: "total-expenses",
+      target: nodeId,
+      value: amount,
+      sourceColor: TOTAL_EXPENSE_COLOR,
+    });
+  }
+
+  // "Other Expenses" node for filtered-out categories + any query discrepancy
+  if (expenseRemainder > 0) {
+    nodes.push({ id: "expense:__other__", label: "Other Expenses", color: FILTERED_OUT_COLOR });
+    links.push({
+      source: "total-expenses",
+      target: "expense:__other__",
+      value: expenseRemainder,
+      sourceColor: FILTERED_OUT_COLOR,
+    });
+  }
+
+  // Link from Total Income → Total Expenses (the main flow)
+  if (totalExpenses > 0 && totalIncome > 0) {
+    const flowAmount = Math.min(totalIncome, totalExpenses);
+    links.push({
+      source: "total-income",
+      target: "total-expenses",
+      value: flowAmount,
+      sourceColor: TOTAL_INCOME_COLOR,
+    });
+  }
+
+  // Balancing node: positive or negative cash flow
+  // Placed at depth 2 (same column as Total Expenses) so it aligns visually
+  if (netCashFlow > 0) {
+    nodes.push({ id: "net-cashflow", label: "Positive Cash Flow", color: POSITIVE_CASHFLOW_COLOR, depth: 2 });
+    links.push({
+      source: "total-income",
+      target: "net-cashflow",
+      value: netCashFlow,
+      sourceColor: POSITIVE_CASHFLOW_COLOR,
+    });
+  } else if (netCashFlow < 0) {
+    nodes.push({ id: "net-cashflow", label: "Negative Cash Flow", color: NEGATIVE_CASHFLOW_COLOR, depth: 1 });
+    links.push({
+      source: "net-cashflow",
+      target: "total-expenses",
+      value: Math.abs(netCashFlow),
+      sourceColor: NEGATIVE_CASHFLOW_COLOR,
+    });
+  }
+
+  return { nodes, links };
+}
+
+// ── ECharts format converter ──────────────────────────────────────────
+
+export interface EChartsSankeyNode {
+  name: string;
+  label: string;
+  itemStyle: { color: string };
+  depth?: number;
+}
+
+export interface EChartsSankeyData {
+  nodes: EChartsSankeyNode[];
+  links: Array<{ source: string; target: string; value: number; lineStyle: { color: string } }>;
+}
+
+export function toEChartsFormat(
+  data: SankeyData,
+  linkColorMode: LinkColorMode,
+  greyColor: string,
+): EChartsSankeyData {
+  return {
+    nodes: data.nodes.map((n) => ({
+      name: n.id,
+      label: n.label,
+      itemStyle: { color: n.color },
+      ...(n.depth !== undefined ? { depth: n.depth } : {}),
+    })),
+    links: data.links.map((l) => ({
+      source: l.source,
+      target: l.target,
+      value: l.value,
+      lineStyle: { color: resolveLinkColor(l, linkColorMode, greyColor) },
+    })),
+  };
+}
+
+// ── Extract unique top-level categories ───────────────────────────────
+
+export function getTopLevelCategories(rows: MonthlyExpenseByCategory[]): string[] {
+  const seen = new Set<string>();
+  for (const row of rows) {
+    if (row.pathParts.length > 0) seen.add(row.pathParts[0]);
+  }
+  return Array.from(seen).sort();
+}

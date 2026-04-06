@@ -11,6 +11,7 @@ import {
   CreditCard,
   TrendingUp,
   Target,
+  GitFork,
   LogOut,
   Download,
 } from "lucide-react";
@@ -24,6 +25,7 @@ const mainNav = [
   { icon: CreditCard, label: "Spending", href: "/spending" },
   { icon: TrendingUp, label: "Investment", href: "/investment" },
   { icon: Target, label: "Budget", href: "/budget" },
+  { icon: GitFork, label: "Sankey", href: "/sankey" },
 ];
 
 
