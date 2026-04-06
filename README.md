@@ -33,6 +33,7 @@ To clear your data, use the dashboard's clear/reset option or clear your browser
 - **Income Analysis** — Income sources with drill-down and monthly trends
 - **Account Balances** — Current balances across all accounts
 - **Investment Portfolio** — Holdings, allocation, performance, and value over time
+- **Sankey Diagram** — Interactive cash flow Sankey with drag-and-drop, depth control, category filters, and PNG/SVG export
 - **Budget Tracking** — Budget vs actual with expense/income tabs, YTD variance
 - **Transaction Ledger** — Searchable, sortable transaction history with split details
 - **Transaction Editing** — Add, edit, and delete transactions with full double-entry enforcement
@@ -72,12 +73,20 @@ Charts are fully interactive — click any bar or segment to drill down into bre
     <td><img src="app/screenshots/07-transactions.png" width="450" /></td>
   </tr>
   <tr>
+    <td><strong>Sankey</strong></td>
     <td><strong>Accounts</strong></td>
-    <td><strong>Upload</strong></td>
   </tr>
   <tr>
+    <td><img src="app/screenshots/09-sankey.png" width="450" /></td>
     <td><img src="app/screenshots/08-accounts.png" width="450" /></td>
+  </tr>
+  <tr>
+    <td><strong>Upload</strong></td>
+    <td></td>
+  </tr>
+  <tr>
     <td><img src="app/screenshots/01-upload.png" width="450" /></td>
+    <td></td>
   </tr>
 </table>
 
@@ -116,7 +125,7 @@ GnuDash is a fully static site — no backend server required. See the **[Deploy
 | Language | TypeScript |
 | Styling | Tailwind CSS |
 | UI Components | shadcn/ui |
-| Charts | Recharts |
+| Charts | Recharts, ECharts (Sankey) |
 | Database | SQLite WASM (client-side, in-browser) |
 | Persistence | Origin Private File System (OPFS) |
 
