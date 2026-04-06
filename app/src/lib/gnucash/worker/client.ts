@@ -132,11 +132,18 @@ export class GnuCashWorkerClient {
   /**
    * Open a .gnucash file by reading it into an ArrayBuffer and sending to the Worker.
    * The Worker persists it to OPFS if available.
+   *
+   * GNUCash files can be SQLite3, XML, or gzip-compressed XML/SQLite.
+   * We detect the format and handle accordingly:
+   *  - SQLite3: pass through
+   *  - Gzip: decompress, then re-check (could be SQLite or XML inside)
+   *  - XML: reject with a helpful error message
    */
   async openFile(file: File, writable: boolean = false): Promise<void> {
     await this.wasmReady;
 
-    const buffer = await file.arrayBuffer();
+    let buffer = await file.arrayBuffer();
+    buffer = await resolveGnuCashBuffer(buffer);
 
     return new Promise<void>((resolve, reject) => {
       // Temporarily override message handler to catch the init response
@@ -320,4 +327,93 @@ export class GnuCashWorkerClient {
     this.send({ type: "close" });
     this.worker.terminate();
   }
+}
+
+// ── File-format detection & decompression ────────────────────────
+
+const SQLITE_MAGIC = [0x53, 0x51, 0x4c, 0x69]; // "SQLi"
+const GZIP_MAGIC = [0x1f, 0x8b];
+
+function startsWithMagic(bytes: Uint8Array, magic: number[]): boolean {
+  if (bytes.length < magic.length) return false;
+  return magic.every((b, i) => bytes[i] === b);
+}
+
+function looksLikeXml(bytes: Uint8Array): boolean {
+  // Check for "<?xm" or "<gnc" — the two common XML .gnucash openings
+  if (bytes.length < 4) return false;
+  const head = new TextDecoder().decode(bytes.slice(0, 256));
+  return head.trimStart().startsWith("<");
+}
+
+async function decompressGzip(buffer: ArrayBuffer): Promise<ArrayBuffer> {
+  const ds = new DecompressionStream("gzip");
+  const writer = ds.writable.getWriter();
+  const reader = ds.readable.getReader();
+
+  writer.write(new Uint8Array(buffer));
+  writer.close();
+
+  const chunks: Uint8Array[] = [];
+  let totalLength = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    chunks.push(value);
+    totalLength += value.byteLength;
+  }
+
+  const result = new Uint8Array(totalLength);
+  let offset = 0;
+  for (const chunk of chunks) {
+    result.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return result.buffer;
+}
+
+/**
+ * Detect the format of a .gnucash file buffer and return a valid SQLite buffer,
+ * or throw a descriptive error if the format is unsupported.
+ */
+async function resolveGnuCashBuffer(buffer: ArrayBuffer): Promise<ArrayBuffer> {
+  let bytes = new Uint8Array(buffer);
+
+  // Already a SQLite file — pass through
+  if (startsWithMagic(bytes, SQLITE_MAGIC)) {
+    return buffer;
+  }
+
+  // Gzip-compressed — decompress and re-check the inner content
+  if (startsWithMagic(bytes, GZIP_MAGIC)) {
+    const decompressed = await decompressGzip(buffer);
+    bytes = new Uint8Array(decompressed);
+
+    if (startsWithMagic(bytes, SQLITE_MAGIC)) {
+      return decompressed;
+    }
+
+    if (looksLikeXml(bytes)) {
+      throw new Error(
+        "This .gnucash file uses gzip-compressed XML format, which is not supported. " +
+        "Please open it in GNUCash and re-save using Edit → Preferences → General → File Format → sqlite3."
+      );
+    }
+
+    throw new Error(
+      "The decompressed .gnucash file is not a recognised format. " +
+      "Please re-save it in GNUCash using the sqlite3 file format."
+    );
+  }
+
+  // Plain XML
+  if (looksLikeXml(bytes)) {
+    throw new Error(
+      "This .gnucash file uses XML format, which is not supported. " +
+      "Please open it in GNUCash and re-save using Edit → Preferences → General → File Format → sqlite3."
+    );
+  }
+
+  // Unknown format — let SQLite WASM give its own error
+  return buffer;
 }
