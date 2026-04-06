@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useDashboard } from "@/lib/dashboard-context";
+import { type CustomRange, getDataRange } from "@/lib/period-utils";
 import { NetWorthChart } from "@/components/dashboard/charts/net-worth-chart";
 import { CashFlowChart } from "@/components/dashboard/charts/cash-flow-chart";
 import { SpendingOverview } from "@/components/dashboard/charts/spending-overview";
@@ -25,6 +26,14 @@ const LIABILITY_COLORS = [
 export default function DashboardPage() {
   const { data } = useDashboard();
   const [selectedAssetType, setSelectedAssetType] = useState<string | null>(null);
+  const [period, setPeriod] = useState<string>("last-6m");
+  const [customRange, setCustomRange] = useState<CustomRange | null>(null);
+
+  const dataRange = useMemo(
+    () => getDataRange(data?.cashFlowSeries ?? []) ?? { min: "2020-01", max: "2026-01" },
+    [data],
+  );
+
   if (!data) return null;
 
   const c = data.currency;
@@ -33,26 +42,36 @@ export default function DashboardPage() {
 
   return (
     <div className="flex flex-col gap-4 sm:gap-6">
-      {/* Row 1: Net Worth */}
+      {/* Row 1: Net Worth (own period selector, defaults to all-time) */}
       <NetWorthChart
         series={data.netWorthSeries}
         currentNetWorth={data.currentNetWorth}
         currency={c}
       />
 
-      {/* Row 2: Spending Overview + Income Overview */}
+      {/* Row 2: Income Overview + Spending Overview (synced period) */}
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-5">
+        <IncomeOverview
+          monthlyIncome={data.monthlyIncomeByCategory}
+          categoryColors={data.incomeCategoryColors}
+          currency={c}
+          linkTo="/income"
+          externalPeriod={period}
+          externalCustomRange={customRange}
+          onExternalPeriodChange={setPeriod}
+          onExternalCustomRangeChange={setCustomRange}
+          externalDataRange={dataRange}
+        />
         <SpendingOverview
           monthlyExpenses={data.monthlyExpensesByCategory}
           categoryColors={data.expenseCategoryColors}
           currency={c}
           linkTo="/spending"
-        />
-        <IncomeOverview
-          monthlyIncome={data.monthlyIncomeByCategory}
-          categoryColors={data.incomeCategoryColors}
-          currency={c}
-          linkTo="/transactions"
+          externalPeriod={period}
+          externalCustomRange={customRange}
+          onExternalPeriodChange={setPeriod}
+          onExternalCustomRangeChange={setCustomRange}
+          externalDataRange={dataRange}
         />
       </div>
 
@@ -62,6 +81,11 @@ export default function DashboardPage() {
         currentIncome={data.currentMonthIncome}
         currentExpenses={data.currentMonthExpenses}
         currency={c}
+        externalPeriod={period}
+        externalCustomRange={customRange}
+        onExternalPeriodChange={setPeriod}
+        onExternalCustomRangeChange={setCustomRange}
+        externalDataRange={dataRange}
       />
 
       {/* Row 4: Assets + Liabilities */}

@@ -93,7 +93,7 @@ export function MonthlyExpenseBarCard({
         amount: totals.get(month) ?? 0,
       };
     });
-  }, [monthlyExpenses, period, selectedCategory, excluded]);
+  }, [monthlyExpenses, period, customRange, selectedCategory, excluded]);
 
   const maxAmount = useMemo(
     () => Math.max(...barData.map((d) => d.amount), 0),

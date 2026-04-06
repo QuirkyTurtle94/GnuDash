@@ -54,7 +54,7 @@ export function ExpenseTableCard({ transactions, currency, title = "Expenses" }:
   }
 
   // Reset page when filters change
-  const filterKey = `${period}-${selectedCategory}-${selectedMonth}-${selectedAccount}-${[...excluded].join(",")}`;
+  const filterKey = `${period}-${customRange?.start}-${customRange?.end}-${selectedCategory}-${selectedMonth}-${selectedAccount}-${[...excluded].join(",")}`;
 
   const filtered = useMemo(() => {
     const validMonths = new Set(selectedMonth ? [selectedMonth] : getMonthsForPeriod(period, customRange ?? undefined));
@@ -84,7 +84,7 @@ export function ExpenseTableCard({ transactions, currency, title = "Expenses" }:
 
       return true;
     }).sort((a, b) => compareTx(a, b, sortField, sortDir));
-  }, [transactions, period, selectedCategory, selectedMonth, selectedAccount, excluded, sortField, sortDir]);
+  }, [transactions, period, customRange, selectedCategory, selectedMonth, selectedAccount, excluded, sortField, sortDir]);
 
   // Reset page when filters change
   useMemo(() => setPage(0), [filterKey]);

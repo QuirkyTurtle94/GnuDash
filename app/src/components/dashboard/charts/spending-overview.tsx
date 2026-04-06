@@ -18,17 +18,25 @@ import type { MonthlyExpenseByCategory } from "@/lib/types/gnucash";
 
 type TimePeriod = "this-month" | "last-month" | "this-year" | "last-12m" | "custom";
 
-const PERIOD_LABELS: Record<TimePeriod, string> = {
+const PERIOD_LABELS: Record<string, string> = {
   "this-month": "This Month",
   "last-month": "Last Month",
+  "last-6m": "Last 6 Months",
   "this-year": "This Year",
   "last-12m": "Last 12 Months",
+  "all-time": "All Time",
   "custom": "Custom",
 };
 
-function getMonthsForPeriod(period: TimePeriod, customRange?: CustomRange | null): string[] {
+function getMonthsForPeriod(period: string, customRange?: CustomRange | null, monthlyData?: MonthlyExpenseByCategory[]): string[] {
   if (period === "custom") {
     return customRange ? getMonthsBetween(customRange.start, customRange.end) : [];
+  }
+  if (period === "all-time") {
+    // Return all unique months from the data
+    const seen = new Set<string>();
+    if (monthlyData) for (const row of monthlyData) seen.add(row.month);
+    return Array.from(seen).sort();
   }
   const now = new Date();
   const y = now.getFullYear();
@@ -40,6 +48,14 @@ function getMonthsForPeriod(period: TimePeriod, customRange?: CustomRange | null
     case "last-month": {
       const d = new Date(y, m - 1, 1);
       return [`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`];
+    }
+    case "last-6m": {
+      const months: string[] = [];
+      for (let i = 5; i >= 0; i--) {
+        const d = new Date(y, m - i, 1);
+        months.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`);
+      }
+      return months;
     }
     case "this-year": {
       const months: string[] = [];
@@ -56,6 +72,8 @@ function getMonthsForPeriod(period: TimePeriod, customRange?: CustomRange | null
       }
       return months;
     }
+    default:
+      return [];
   }
 }
 
@@ -63,13 +81,22 @@ interface SpendingOverviewProps {
   monthlyExpenses: MonthlyExpenseByCategory[];
   categoryColors: Record<string, string>;
   currency: string;
-  /** If set, the card title links to this URL */
   linkTo?: string;
+  externalPeriod?: string;
+  externalCustomRange?: CustomRange | null;
+  onExternalPeriodChange?: (p: string) => void;
+  onExternalCustomRangeChange?: (r: CustomRange) => void;
+  externalDataRange?: { min: string; max: string };
 }
 
-export function SpendingOverview({ monthlyExpenses, categoryColors, currency, linkTo }: SpendingOverviewProps) {
-  const [period, setPeriod] = useState<TimePeriod>("this-month");
-  const [customRange, setCustomRange] = useState<CustomRange | null>(null);
+export function SpendingOverview({ monthlyExpenses, categoryColors, currency, linkTo, externalPeriod, externalCustomRange, onExternalPeriodChange, onExternalCustomRangeChange, externalDataRange }: SpendingOverviewProps) {
+  const [localPeriod, setLocalPeriod] = useState<TimePeriod>("this-month");
+  const [localCustomRange, setLocalCustomRange] = useState<CustomRange | null>(null);
+
+  const isExternal = externalPeriod !== undefined;
+  const isSynced = isExternal && !!onExternalPeriodChange;
+  const period = (isExternal ? externalPeriod : localPeriod) as TimePeriod;
+  const customRange = isExternal ? (externalCustomRange ?? null) : localCustomRange;
   const [depth, setDepth] = useState(1);
   const [showDepthDropdown, setShowDepthDropdown] = useState(false);
   // Drill-down: null = top-level view, string = path prefix to filter by
@@ -92,7 +119,7 @@ export function SpendingOverview({ monthlyExpenses, categoryColors, currency, li
   const { categories, total } = useMemo(() => {
     if (!monthlyExpenses) return { categories: [], total: 0 };
 
-    const validMonths = new Set(getMonthsForPeriod(period, customRange));
+    const validMonths = new Set(getMonthsForPeriod(period, customRange, monthlyExpenses));
     const drillParts = drillPath ? drillPath.split(":") : null;
     const drillDepth = drillParts ? drillParts.length : 0;
     const totals = new Map<string, number>();
@@ -199,7 +226,8 @@ export function SpendingOverview({ monthlyExpenses, categoryColors, currency, li
           )}
         </CardTitle>
         <div className="flex items-center gap-2">
-          {/* Depth selector */}
+          {/* Depth selector (hidden when externally controlled) */}
+          {!isExternal && (
           <div className="relative">
             <button
               onClick={() => setShowDepthDropdown(!showDepthDropdown)}
@@ -228,16 +256,28 @@ export function SpendingOverview({ monthlyExpenses, categoryColors, currency, li
               </div>
             )}
           </div>
+          )}
 
           {/* Period selector */}
-          <PeriodSelector
-            period={period}
-            labels={PERIOD_LABELS}
-            onChange={setPeriod}
-            customRange={customRange}
-            onCustomRangeChange={setCustomRange}
-            dataRange={dataRange}
-          />
+          {isSynced ? (
+            <PeriodSelector
+              period={period}
+              labels={PERIOD_LABELS}
+              onChange={(p) => onExternalPeriodChange!(p)}
+              customRange={customRange}
+              onCustomRangeChange={(r) => onExternalCustomRangeChange!(r)}
+              dataRange={externalDataRange ?? dataRange}
+            />
+          ) : !isExternal ? (
+            <PeriodSelector
+              period={localPeriod}
+              labels={PERIOD_LABELS}
+              onChange={setLocalPeriod}
+              customRange={localCustomRange}
+              onCustomRangeChange={setLocalCustomRange}
+              dataRange={dataRange}
+            />
+          ) : null}
         </div>
       </CardHeader>
       <CardContent>

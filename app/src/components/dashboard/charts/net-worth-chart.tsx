@@ -56,12 +56,19 @@ interface NetWorthChartProps {
   series: MonthlyNetWorth[];
   currentNetWorth: number;
   currency: string;
+  externalPeriod?: string;
+  externalCustomRange?: CustomRange | null;
 }
 
-export function NetWorthChart({ series, currentNetWorth, currency }: NetWorthChartProps) {
-  const [period, setPeriod] = useState<TimePeriod>("all-time");
-  const [customRange, setCustomRange] = useState<CustomRange | null>(null);
-  const [showBreakdown, setShowBreakdown] = useState(false);
+export function NetWorthChart({ series, currentNetWorth, currency, externalPeriod, externalCustomRange }: NetWorthChartProps) {
+  const [localPeriod, setLocalPeriod] = useState<TimePeriod>("all-time");
+  const [localCustomRange, setLocalCustomRange] = useState<CustomRange | null>(null);
+  const [showAssets, setShowAssets] = useState(false);
+  const [showLiabilities, setShowLiabilities] = useState(false);
+
+  const isExternal = externalPeriod !== undefined;
+  const period = (isExternal ? externalPeriod : localPeriod) as TimePeriod;
+  const customRange = isExternal ? (externalCustomRange ?? null) : localCustomRange;
 
   const dataRange = useMemo(() => getDataRange(series) ?? { min: "2020-01", max: "2026-01" }, [series]);
   const filtered = useMemo(() => {
@@ -72,15 +79,23 @@ export function NetWorthChart({ series, currentNetWorth, currency }: NetWorthCha
       case "custom":
         if (!customRange) return series;
         return series.filter((s) => s.month >= customRange.start && s.month <= customRange.end);
+      default: {
+        // Handle periods from the dashboard selector (this-month, last-month)
+        if (period === "this-month") return series.slice(-1);
+        if (period === "last-month") return series.slice(-2, -1);
+        return series;
+      }
     }
   }, [series, period, customRange]);
 
   // Compute nice Y-axis ticks at multiples of 1, 2, 5 × 10^n
   const { yDomain, yTicks } = useMemo(() => {
     if (filtered.length === 0) return { yDomain: [0, 0] as [number, number], yTicks: [0] };
-    const values = showBreakdown
-      ? [...filtered.map((d) => d.netWorth), ...filtered.map((d) => d.assets), ...filtered.map((d) => d.liabilities)]
-      : filtered.map((d) => d.netWorth);
+    const values = [
+      ...filtered.map((d) => d.netWorth),
+      ...(showAssets ? filtered.map((d) => d.assets) : []),
+      ...(showLiabilities ? filtered.map((d) => d.liabilities) : []),
+    ];
     const rawMin = Math.min(...values);
     const rawMax = Math.max(...values);
     const range = rawMax - rawMin || Math.abs(rawMax) || 1;
@@ -102,7 +117,7 @@ export function NetWorthChart({ series, currentNetWorth, currency }: NetWorthCha
       ticks.push(Math.round(v * 100) / 100);
     }
     return { yDomain: [niceMin, niceMax] as [number, number], yTicks: ticks };
-  }, [filtered, showBreakdown]);
+  }, [filtered, showAssets, showLiabilities]);
 
   const pctChange = useMemo(() => {
     if (filtered.length < 2) return null;
@@ -120,23 +135,35 @@ export function NetWorthChart({ series, currentNetWorth, currency }: NetWorthCha
         </CardTitle>
         <div className="flex items-center gap-2">
           <button
-            onClick={() => setShowBreakdown((v) => !v)}
+            onClick={() => setShowAssets((v) => !v)}
             className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors ${
-              showBreakdown
-                ? "border-[#6C9B8B] bg-[#6C9B8B]/10 text-[#6C9B8B]"
+              showAssets
+                ? "border-[#3B6B8A] bg-[#3B6B8A]/10 text-[#3B6B8A]"
                 : "border-[#EFEFEF] text-[#6F767E] hover:bg-[#F4F5F7]"
             }`}
           >
-            Assets / Liabilities
+            Assets
           </button>
-          <PeriodSelector
-            period={period}
-            labels={PERIOD_LABELS}
-            onChange={setPeriod}
-            customRange={customRange}
-            onCustomRangeChange={setCustomRange}
-            dataRange={dataRange}
-          />
+          <button
+            onClick={() => setShowLiabilities((v) => !v)}
+            className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors ${
+              showLiabilities
+                ? "border-[#F87171] bg-[#F87171]/10 text-[#F87171]"
+                : "border-[#EFEFEF] text-[#6F767E] hover:bg-[#F4F5F7]"
+            }`}
+          >
+            Liabilities
+          </button>
+          {!isExternal && (
+            <PeriodSelector
+              period={localPeriod}
+              labels={PERIOD_LABELS}
+              onChange={setLocalPeriod}
+              customRange={localCustomRange}
+              onCustomRangeChange={setLocalCustomRange}
+              dataRange={dataRange}
+            />
+          )}
         </div>
       </CardHeader>
       <CardContent>
@@ -231,7 +258,7 @@ export function NetWorthChart({ series, currentNetWorth, currency }: NetWorthCha
                   );
                 }}
               />
-              {showBreakdown && (
+              {showAssets && (
                 <Area
                   type="monotone"
                   dataKey="assets"
@@ -241,7 +268,7 @@ export function NetWorthChart({ series, currentNetWorth, currency }: NetWorthCha
                   fill="url(#assetsGradient)"
                 />
               )}
-              {showBreakdown && (
+              {showLiabilities && (
                 <Area
                   type="monotone"
                   dataKey="liabilities"
