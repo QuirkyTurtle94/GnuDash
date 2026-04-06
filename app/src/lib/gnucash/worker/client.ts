@@ -18,6 +18,7 @@ import type {
   DashboardData,
 } from "@/lib/types/gnucash";
 import type { WorkerRequest, WorkerResponse, DomainFunction, MutationAction, CreateTransactionPayload, DeleteTransactionPayload, EditTransactionPayload, CreateAccountPayload, UpdateAccountPayload, DeleteAccountPayload, CreateCommodityPayload } from "./messages";
+import { parseGnuCashXml } from "../xml/parser";
 
 type PendingRequest = {
   resolve: (data: unknown) => void;
@@ -135,29 +136,55 @@ export class GnuCashWorkerClient {
    *
    * GNUCash files can be SQLite3, XML, or gzip-compressed XML/SQLite.
    * We detect the format and handle accordingly:
-   *  - SQLite3: pass through
+   *  - SQLite3: pass through to worker
    *  - Gzip: decompress, then re-check (could be SQLite or XML inside)
-   *  - XML: reject with a helpful error message
+   *  - XML: parse on main thread and send structured data to worker
+   *
+   * Returns { isXml } so the caller can enforce read-only mode for XML files.
    */
-  async openFile(file: File, writable: boolean = false): Promise<void> {
+  async openFile(file: File, writable: boolean = false): Promise<{ isXml: boolean }> {
     await this.wasmReady;
 
     let buffer = await file.arrayBuffer();
-    buffer = await resolveGnuCashBuffer(buffer);
+    const resolved = await resolveGnuCashBuffer(buffer);
 
-    return new Promise<void>((resolve, reject) => {
-      // Temporarily override message handler to catch the init response
+    if (resolved.type === "xml") {
+      // Parse XML on the main thread (needs DOMParser), send structured data to worker
+      const xmlString = new TextDecoder().decode(resolved.buffer);
+      const xmlData = parseGnuCashXml(xmlString);
+
+      return new Promise<{ isXml: boolean }>((resolve, reject) => {
+        const prevHandler = this.worker.onmessage;
+        this.worker.onmessage = (e: MessageEvent<WorkerResponse>) => {
+          const msg = e.data;
+          if (msg.type === "ready") {
+            this.worker.onmessage = prevHandler;
+            resolve({ isXml: true });
+          } else if (msg.type === "init-error") {
+            this.worker.onmessage = prevHandler;
+            reject(new Error(msg.message));
+          } else {
+            this.handleMessage(msg);
+          }
+        };
+
+        this.send({ type: "init-xml", xmlData });
+      });
+    }
+
+    // SQLite path
+    buffer = resolved.buffer;
+    return new Promise<{ isXml: boolean }>((resolve, reject) => {
       const prevHandler = this.worker.onmessage;
       this.worker.onmessage = (e: MessageEvent<WorkerResponse>) => {
         const msg = e.data;
         if (msg.type === "ready") {
           this.worker.onmessage = prevHandler;
-          resolve();
+          resolve({ isXml: false });
         } else if (msg.type === "init-error") {
           this.worker.onmessage = prevHandler;
           reject(new Error(msg.message));
         } else {
-          // Delegate other messages to normal handler
           this.handleMessage(msg);
         }
       };
@@ -372,16 +399,20 @@ async function decompressGzip(buffer: ArrayBuffer): Promise<ArrayBuffer> {
   return result.buffer;
 }
 
+type ResolvedBuffer =
+  | { type: "sqlite"; buffer: ArrayBuffer }
+  | { type: "xml"; buffer: ArrayBuffer };
+
 /**
- * Detect the format of a .gnucash file buffer and return a valid SQLite buffer,
- * or throw a descriptive error if the format is unsupported.
+ * Detect the format of a .gnucash file buffer and return a typed result.
+ * Handles SQLite3, gzip-compressed, and XML formats.
  */
-async function resolveGnuCashBuffer(buffer: ArrayBuffer): Promise<ArrayBuffer> {
+async function resolveGnuCashBuffer(buffer: ArrayBuffer): Promise<ResolvedBuffer> {
   let bytes = new Uint8Array(buffer);
 
   // Already a SQLite file — pass through
   if (startsWithMagic(bytes, SQLITE_MAGIC)) {
-    return buffer;
+    return { type: "sqlite", buffer };
   }
 
   // Gzip-compressed — decompress and re-check the inner content
@@ -390,14 +421,11 @@ async function resolveGnuCashBuffer(buffer: ArrayBuffer): Promise<ArrayBuffer> {
     bytes = new Uint8Array(decompressed);
 
     if (startsWithMagic(bytes, SQLITE_MAGIC)) {
-      return decompressed;
+      return { type: "sqlite", buffer: decompressed };
     }
 
     if (looksLikeXml(bytes)) {
-      throw new Error(
-        "This .gnucash file uses gzip-compressed XML format, which is not supported. " +
-        "Please open it in GNUCash and re-save using Edit → Preferences → General → File Format → sqlite3."
-      );
+      return { type: "xml", buffer: decompressed };
     }
 
     throw new Error(
@@ -408,12 +436,9 @@ async function resolveGnuCashBuffer(buffer: ArrayBuffer): Promise<ArrayBuffer> {
 
   // Plain XML
   if (looksLikeXml(bytes)) {
-    throw new Error(
-      "This .gnucash file uses XML format, which is not supported. " +
-      "Please open it in GNUCash and re-save using Edit → Preferences → General → File Format → sqlite3."
-    );
+    return { type: "xml", buffer };
   }
 
   // Unknown format — let SQLite WASM give its own error
-  return buffer;
+  return { type: "sqlite", buffer };
 }

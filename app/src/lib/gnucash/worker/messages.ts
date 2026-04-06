@@ -3,8 +3,11 @@
  * Messages are at the domain-function level, not raw SQL.
  */
 
+import type { GnuCashXmlData } from "../xml/types";
+
 export type WorkerRequest =
   | { type: "init"; fileBuffer: ArrayBuffer; writable?: boolean }
+  | { type: "init-xml"; xmlData: GnuCashXmlData }
   | { type: "init-opfs"; fileName: string; writable?: boolean }
   | { type: "query"; id: string; fn: DomainFunction }
   | { type: "mutation"; id: string; action: MutationAction; payload: unknown }
