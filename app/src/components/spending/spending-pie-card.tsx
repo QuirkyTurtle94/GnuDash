@@ -76,7 +76,7 @@ export function SpendingPieCard({ monthlyExpenses, categoryColors, currency, tit
 
     const t = cats.reduce((sum, c) => sum + c.amount, 0);
     return { categories: cats, total: t };
-  }, [monthlyExpenses, categoryColors, period, selectedCategory, selectedMonth, drillDepth]);
+  }, [monthlyExpenses, categoryColors, period, customRange, selectedCategory, selectedMonth, drillDepth]);
 
   const { activeCategories, activeTotal } = useMemo(() => {
     const active = categories.filter((c) => !excluded.has(c.fullPath));
@@ -110,7 +110,7 @@ export function SpendingPieCard({ monthlyExpenses, categoryColors, currency, tit
         validMonths.has(row.month) &&
         row.pathParts.slice(0, parts.length).join(":") === fullPath
     );
-  }, [monthlyExpenses, period, selectedMonth]);
+  }, [monthlyExpenses, period, customRange, selectedMonth]);
 
   const handleSliceClick = useCallback((data: { fullPath: string }) => {
     if (!data.fullPath) return;

@@ -27,15 +27,17 @@ const PERIOD_LABELS: Record<TimePeriod, string> = {
   "custom": "Custom",
 };
 
-function getSlice(series: MonthlyCashFlow[], period: TimePeriod, customRange?: CustomRange | null): MonthlyCashFlow[] {
+function getSlice(series: MonthlyCashFlow[], period: string, customRange?: CustomRange | null): MonthlyCashFlow[] {
   switch (period) {
     case "this-month": return series.slice(-1);
     case "last-month": return series.slice(-2, -1);
     case "last-6m": return series.slice(-6);
     case "last-12m": return series.slice(-12);
+    case "all-time": return series;
     case "custom":
       if (!customRange) return series;
       return series.filter((s) => s.month >= customRange.start && s.month <= customRange.end);
+    default: return series;
   }
 }
 
@@ -51,11 +53,17 @@ interface CashFlowChartProps {
   currentIncome: number;
   currentExpenses: number;
   currency: string;
+  externalPeriod?: string;
+  externalCustomRange?: CustomRange | null;
 }
 
-export function CashFlowChart({ series, currency }: CashFlowChartProps) {
-  const [period, setPeriod] = useState<TimePeriod>("last-6m");
-  const [customRange, setCustomRange] = useState<CustomRange | null>(null);
+export function CashFlowChart({ series, currency, externalPeriod, externalCustomRange }: CashFlowChartProps) {
+  const [localPeriod, setLocalPeriod] = useState<TimePeriod>("last-6m");
+  const [localCustomRange, setLocalCustomRange] = useState<CustomRange | null>(null);
+
+  const isExternal = externalPeriod !== undefined;
+  const period = (isExternal ? externalPeriod : localPeriod) as TimePeriod;
+  const customRange = isExternal ? (externalCustomRange ?? null) : localCustomRange;
 
   const dataRange = useMemo(() => getDataRange(series) ?? { min: "2020-01", max: "2026-01" }, [series]);
   const filtered = useMemo(() => getSlice(series, period, customRange), [series, period, customRange]);
@@ -68,14 +76,16 @@ export function CashFlowChart({ series, currency }: CashFlowChartProps) {
         <CardTitle className="text-lg font-semibold text-[#1A1D1F]">
           Cash Flow
         </CardTitle>
-        <PeriodSelector
-          period={period}
-          labels={PERIOD_LABELS}
-          onChange={setPeriod}
-          customRange={customRange}
-          onCustomRangeChange={setCustomRange}
-          dataRange={dataRange}
-        />
+        {!isExternal && (
+          <PeriodSelector
+            period={localPeriod}
+            labels={PERIOD_LABELS}
+            onChange={setLocalPeriod}
+            customRange={localCustomRange}
+            onCustomRangeChange={setLocalCustomRange}
+            dataRange={dataRange}
+          />
+        )}
       </CardHeader>
       <CardContent>
         <div className="mb-1">

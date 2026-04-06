@@ -56,12 +56,18 @@ interface NetWorthChartProps {
   series: MonthlyNetWorth[];
   currentNetWorth: number;
   currency: string;
+  externalPeriod?: string;
+  externalCustomRange?: CustomRange | null;
 }
 
-export function NetWorthChart({ series, currentNetWorth, currency }: NetWorthChartProps) {
-  const [period, setPeriod] = useState<TimePeriod>("all-time");
-  const [customRange, setCustomRange] = useState<CustomRange | null>(null);
+export function NetWorthChart({ series, currentNetWorth, currency, externalPeriod, externalCustomRange }: NetWorthChartProps) {
+  const [localPeriod, setLocalPeriod] = useState<TimePeriod>("all-time");
+  const [localCustomRange, setLocalCustomRange] = useState<CustomRange | null>(null);
   const [showBreakdown, setShowBreakdown] = useState(false);
+
+  const isExternal = externalPeriod !== undefined;
+  const period = (isExternal ? externalPeriod : localPeriod) as TimePeriod;
+  const customRange = isExternal ? (externalCustomRange ?? null) : localCustomRange;
 
   const dataRange = useMemo(() => getDataRange(series) ?? { min: "2020-01", max: "2026-01" }, [series]);
   const filtered = useMemo(() => {
@@ -72,6 +78,12 @@ export function NetWorthChart({ series, currentNetWorth, currency }: NetWorthCha
       case "custom":
         if (!customRange) return series;
         return series.filter((s) => s.month >= customRange.start && s.month <= customRange.end);
+      default: {
+        // Handle periods from the dashboard selector (this-month, last-month)
+        if (period === "this-month") return series.slice(-1);
+        if (period === "last-month") return series.slice(-2, -1);
+        return series;
+      }
     }
   }, [series, period, customRange]);
 
@@ -129,14 +141,16 @@ export function NetWorthChart({ series, currentNetWorth, currency }: NetWorthCha
           >
             Assets / Liabilities
           </button>
-          <PeriodSelector
-            period={period}
-            labels={PERIOD_LABELS}
-            onChange={setPeriod}
-            customRange={customRange}
-            onCustomRangeChange={setCustomRange}
-            dataRange={dataRange}
-          />
+          {!isExternal && (
+            <PeriodSelector
+              period={localPeriod}
+              labels={PERIOD_LABELS}
+              onChange={setLocalPeriod}
+              customRange={localCustomRange}
+              onCustomRangeChange={setLocalCustomRange}
+              dataRange={dataRange}
+            />
+          )}
         </div>
       </CardHeader>
       <CardContent>

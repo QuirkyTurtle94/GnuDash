@@ -1,13 +1,26 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useDashboard } from "@/lib/dashboard-context";
+import { PeriodSelector } from "@/components/ui/period-selector";
+import { type CustomRange, getDataRange } from "@/lib/period-utils";
 import { NetWorthChart } from "@/components/dashboard/charts/net-worth-chart";
 import { CashFlowChart } from "@/components/dashboard/charts/cash-flow-chart";
 import { SpendingOverview } from "@/components/dashboard/charts/spending-overview";
 import { IncomeOverview } from "@/components/dashboard/charts/income-overview";
 import { BalancePie } from "@/components/dashboard/charts/balance-pie";
 import { TopBalances } from "@/components/dashboard/charts/top-balances";
+
+type DashboardPeriod = "this-month" | "last-month" | "last-6m" | "last-12m" | "all-time" | "custom";
+
+const DASHBOARD_PERIOD_LABELS: Record<DashboardPeriod, string> = {
+  "this-month": "This Month",
+  "last-month": "Last Month",
+  "last-6m": "Last 6 Months",
+  "last-12m": "Last 12 Months",
+  "all-time": "All Time",
+  "custom": "Custom",
+};
 
 const ASSET_TYPES = new Set(["ASSET", "BANK", "CASH", "STOCK", "MUTUAL", "RECEIVABLE"]);
 const LIABILITY_TYPES = new Set(["LIABILITY", "CREDIT", "PAYABLE"]);
@@ -25,6 +38,14 @@ const LIABILITY_COLORS = [
 export default function DashboardPage() {
   const { data } = useDashboard();
   const [selectedAssetType, setSelectedAssetType] = useState<string | null>(null);
+  const [period, setPeriod] = useState<DashboardPeriod>("last-12m");
+  const [customRange, setCustomRange] = useState<CustomRange | null>(null);
+
+  const dataRange = useMemo(
+    () => getDataRange(data?.cashFlowSeries ?? []) ?? { min: "2020-01", max: "2026-01" },
+    [data],
+  );
+
   if (!data) return null;
 
   const c = data.currency;
@@ -33,11 +54,26 @@ export default function DashboardPage() {
 
   return (
     <div className="flex flex-col gap-4 sm:gap-6">
+      {/* Dashboard header with global period selector */}
+      <div className="flex items-center justify-between">
+        <h2 className="text-lg font-semibold text-[#1A1D1F] sm:text-xl">Dashboard</h2>
+        <PeriodSelector
+          period={period}
+          labels={DASHBOARD_PERIOD_LABELS}
+          onChange={setPeriod}
+          customRange={customRange}
+          onCustomRangeChange={setCustomRange}
+          dataRange={dataRange}
+        />
+      </div>
+
       {/* Row 1: Net Worth */}
       <NetWorthChart
         series={data.netWorthSeries}
         currentNetWorth={data.currentNetWorth}
         currency={c}
+        externalPeriod={period}
+        externalCustomRange={customRange}
       />
 
       {/* Row 2: Spending Overview + Income Overview */}
@@ -47,12 +83,16 @@ export default function DashboardPage() {
           categoryColors={data.expenseCategoryColors}
           currency={c}
           linkTo="/spending"
+          externalPeriod={period}
+          externalCustomRange={customRange}
         />
         <IncomeOverview
           monthlyIncome={data.monthlyIncomeByCategory}
           categoryColors={data.incomeCategoryColors}
           currency={c}
           linkTo="/transactions"
+          externalPeriod={period}
+          externalCustomRange={customRange}
         />
       </div>
 
@@ -62,6 +102,8 @@ export default function DashboardPage() {
         currentIncome={data.currentMonthIncome}
         currentExpenses={data.currentMonthExpenses}
         currency={c}
+        externalPeriod={period}
+        externalCustomRange={customRange}
       />
 
       {/* Row 4: Assets + Liabilities */}
