@@ -248,7 +248,8 @@ export function parseGnuCashXml(xmlString: string): GnuCashXmlData {
     if (slotsEl) {
       const slotKeys = slotsEl.getElementsByTagNameNS(NS.slot, "key");
       for (const keyEl of Array.from(slotKeys)) {
-        if (keyEl.textContent?.trim() === "book-closing") {
+        const slotKey = keyEl.textContent?.trim() ?? "";
+        if (slotKey === "book-closing" || slotKey === "book_closing") {
           closingTransactionGuids.push(guid);
           break;
         }

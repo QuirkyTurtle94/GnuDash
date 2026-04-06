@@ -46,9 +46,11 @@ function computeIdealHeight(data: EChartsSankeyData): number {
 interface SankeyEChartsProps {
   data: EChartsSankeyData;
   currency: string;
+  /** Extra controls rendered on the left side of the bottom bar */
+  bottomBarLeft?: React.ReactNode;
 }
 
-export function SankeyECharts({ data, currency }: SankeyEChartsProps) {
+export function SankeyECharts({ data, currency, bottomBarLeft }: SankeyEChartsProps) {
   const chartRef = useRef<ReactEChartsCore>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [containerHeight, setContainerHeight] = useState(600);
@@ -189,7 +191,7 @@ export function SankeyECharts({ data, currency }: SankeyEChartsProps) {
       </div>
 
       <div className="mt-3 flex items-center justify-between">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-3">
           <span className="text-xs text-[#9A9FA5]">
             {zoom !== 1
               ? `${Math.round(effectiveScale * 100)}%`
@@ -204,6 +206,12 @@ export function SankeyECharts({ data, currency }: SankeyEChartsProps) {
             >
               Reset
             </button>
+          )}
+          {bottomBarLeft && (
+            <>
+              <div className="h-4 w-px bg-[#EFEFEF]" />
+              {bottomBarLeft}
+            </>
           )}
         </div>
         <div className="flex gap-2">

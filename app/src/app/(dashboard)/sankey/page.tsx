@@ -111,20 +111,14 @@ export default function SankeyPage() {
             Cash Flow Sankey
           </CardTitle>
 
-          <div className="flex items-center gap-3">
-            {data.hasClosingTransactions && (
-              <ExcludeClosingToggle checked={excludeClosing} onChange={setExcludeClosing} />
-            )}
-            <DepthSlider depth={depth} onChange={setDepth} />
-            <PeriodSelector
-              period={period}
-              labels={SANKEY_PERIOD_LABELS}
-              onChange={setPeriod}
-              customRange={customRange}
-              onCustomRangeChange={setCustomRange}
-              dataRange={dataRange}
-            />
-          </div>
+          <PeriodSelector
+            period={period}
+            labels={SANKEY_PERIOD_LABELS}
+            onChange={setPeriod}
+            customRange={customRange}
+            onCustomRangeChange={setCustomRange}
+            dataRange={dataRange}
+          />
         </CardHeader>
 
         <CardContent>
@@ -152,7 +146,18 @@ export default function SankeyPage() {
               No data for the selected period and categories.
             </div>
           ) : (
-            <SankeyECharts data={echartsData} currency={data.currency} />
+            <SankeyECharts
+              data={echartsData}
+              currency={data.currency}
+              bottomBarLeft={
+                <div className="flex items-center gap-3">
+                  {data.hasClosingTransactions && (
+                    <ExcludeClosingToggle checked={excludeClosing} onChange={setExcludeClosing} />
+                  )}
+                  <DepthSlider depth={depth} onChange={setDepth} />
+                </div>
+              }
+            />
           )}
         </CardContent>
       </Card>

@@ -2,7 +2,7 @@ import type { ParseContext } from "../context";
 
 /** SQL fragment to exclude book-closing transactions via LEFT JOIN. */
 export const EXCLUDE_CLOSING_JOIN =
-  `LEFT JOIN slots cl ON cl.obj_guid = t.guid AND cl.name = 'book-closing'`;
+  `LEFT JOIN slots cl ON cl.obj_guid = t.guid AND cl.name IN ('book-closing', 'book_closing')`;
 
 export const EXCLUDE_CLOSING_WHERE = `cl.id IS NULL`;
 
@@ -15,7 +15,7 @@ export function hasClosingTransactions(ctx: ParseContext): boolean {
   if (!tableExists) return false;
 
   const row = ctx.db
-    .prepare(`SELECT 1 FROM slots WHERE name = 'book-closing' LIMIT 1`)
+    .prepare(`SELECT 1 FROM slots WHERE name IN ('book-closing', 'book_closing') LIMIT 1`)
     .get();
   return !!row;
 }

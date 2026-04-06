@@ -4,6 +4,7 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import {
   type CustomRange,
   formatDate,
+  isValidDate,
   monthToFirstDay,
   monthToLastDay,
 } from "@/lib/period-utils";
@@ -74,42 +75,7 @@ export function PeriodSelector<T extends string>({
   const presetKeys = Object.keys(labels).filter((k) => k !== "custom") as T[];
 
   return (
-    <div ref={containerRef} className="relative">
-      <button
-        onClick={() => setOpen(!open)}
-        className="flex items-center gap-1.5 rounded-lg border border-[#EFEFEF] px-3 py-1.5 transition-colors hover:bg-[#F4F5F7]"
-      >
-        <span className="text-xs font-medium text-[#6F767E] whitespace-nowrap">{displayLabel}</span>
-        <svg className="h-3.5 w-3.5 text-[#9A9FA5]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-        </svg>
-      </button>
-
-      {open && (
-        <div className="absolute right-0 top-full z-10 mt-1 w-44 rounded-lg border border-[#EFEFEF] bg-white py-1 shadow-lg">
-          {presetKeys.map((p) => (
-            <button
-              key={p}
-              onClick={() => handlePresetClick(p)}
-              className={`w-full px-3 py-2 text-left text-xs transition-colors hover:bg-[#F4F5F7] ${
-                period === p ? "font-medium text-[#6C9B8B]" : "text-[#6F767E]"
-              }`}
-            >
-              {labels[p]}
-            </button>
-          ))}
-          <div className="mx-2 my-1 border-t border-[#EFEFEF]" />
-          <button
-            onClick={handleCustomClick}
-            className={`w-full px-3 py-2 text-left text-xs transition-colors hover:bg-[#F4F5F7] ${
-              isCustom ? "font-medium text-[#6C9B8B]" : "text-[#6F767E]"
-            }`}
-          >
-            Custom
-          </button>
-        </div>
-      )}
-
+    <div className="flex items-center gap-2">
       {isCustom && customRange && (
         <CustomDateRange
           range={customRange}
@@ -117,6 +83,45 @@ export function PeriodSelector<T extends string>({
           dataRange={dataRange}
         />
       )}
+
+      <div ref={containerRef} className="relative">
+        <button
+          onClick={() => setOpen(!open)}
+          className="flex items-center gap-1.5 rounded-lg border border-[#EFEFEF] px-3 py-1.5 transition-colors hover:bg-[#F4F5F7]"
+        >
+          <span className="text-xs font-medium text-[#6F767E] whitespace-nowrap">
+            {isCustom ? "Custom" : displayLabel}
+          </span>
+          <svg className="h-3.5 w-3.5 text-[#9A9FA5]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+          </svg>
+        </button>
+
+        {open && (
+          <div className="absolute right-0 top-full z-10 mt-1 w-44 rounded-lg border border-[#EFEFEF] bg-white py-1 shadow-lg">
+            {presetKeys.map((p) => (
+              <button
+                key={p}
+                onClick={() => handlePresetClick(p)}
+                className={`w-full px-3 py-2 text-left text-xs transition-colors hover:bg-[#F4F5F7] ${
+                  period === p ? "font-medium text-[#6C9B8B]" : "text-[#6F767E]"
+                }`}
+              >
+                {labels[p]}
+              </button>
+            ))}
+            <div className="mx-2 my-1 border-t border-[#EFEFEF]" />
+            <button
+              onClick={handleCustomClick}
+              className={`w-full px-3 py-2 text-left text-xs transition-colors hover:bg-[#F4F5F7] ${
+                isCustom ? "font-medium text-[#6C9B8B]" : "text-[#6F767E]"
+              }`}
+            >
+              Custom
+            </button>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -131,6 +136,7 @@ interface CustomDateRangeProps {
 
 function CustomDateRange({ range, onChange, dataRange }: CustomDateRangeProps) {
   const [editingField, setEditingField] = useState<"start" | "end" | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   const minDate = monthToFirstDay(dataRange.min);
   const maxDate = monthToLastDay(dataRange.max);
@@ -147,45 +153,120 @@ function CustomDateRange({ range, onChange, dataRange }: CustomDateRangeProps) {
     [editingField, range, onChange],
   );
 
+  // Close calendar on click outside
+  useEffect(() => {
+    if (!editingField) return;
+    function handleClick(e: MouseEvent) {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setEditingField(null);
+      }
+    }
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [editingField]);
+
   return (
-    <div className="mt-2 flex flex-col gap-2">
-      <div className="flex items-center gap-2">
-        <DateButton
-          label={formatDate(range.start)}
-          active={editingField === "start"}
-          onClick={() => setEditingField(editingField === "start" ? null : "start")}
-        />
-        <span className="text-xs text-[#9A9FA5]">to</span>
-        <DateButton
-          label={formatDate(range.end)}
-          active={editingField === "end"}
-          onClick={() => setEditingField(editingField === "end" ? null : "end")}
-        />
-      </div>
+    <div ref={containerRef} className="relative flex items-center gap-2">
+      <DateInput
+        value={range.start}
+        active={editingField === "start"}
+        onClick={() => setEditingField(editingField === "start" ? null : "start")}
+        onDateChange={(date) => {
+          onChange({ ...range, start: date <= range.end ? date : range.end });
+          setEditingField(null);
+        }}
+        minDate={minDate}
+        maxDate={range.end}
+      />
+      <span className="text-xs text-[#9A9FA5]">to</span>
+      <DateInput
+        value={range.end}
+        active={editingField === "end"}
+        onClick={() => setEditingField(editingField === "end" ? null : "end")}
+        onDateChange={(date) => {
+          onChange({ ...range, end: date >= range.start ? date : range.start });
+          setEditingField(null);
+        }}
+        minDate={range.start}
+        maxDate={maxDate}
+      />
 
       {editingField && (
-        <CalendarPicker
-          selected={editingField === "start" ? range.start : range.end}
-          minDate={editingField === "start" ? minDate : range.start}
-          maxDate={editingField === "end" ? maxDate : range.end}
-          onSelect={handleDateSelect}
-        />
+        <div className="absolute right-0 top-full z-20 mt-1">
+          <CalendarPicker
+            selected={editingField === "start" ? range.start : range.end}
+            minDate={editingField === "start" ? minDate : range.start}
+            maxDate={editingField === "end" ? maxDate : range.end}
+            onSelect={handleDateSelect}
+          />
+        </div>
       )}
     </div>
   );
 }
 
-function DateButton({ label, active, onClick }: { label: string; active: boolean; onClick: () => void }) {
+function DateInput({
+  value,
+  active,
+  onClick,
+  onDateChange,
+  minDate,
+  maxDate,
+}: {
+  value: string; // YYYY-MM-DD
+  active: boolean;
+  onClick: () => void;
+  onDateChange: (date: string) => void;
+  minDate: string;
+  maxDate: string;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [text, setText] = useState("");
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  function startEditing() {
+    setText(value);
+    setEditing(true);
+    // Focus after render
+    setTimeout(() => inputRef.current?.select(), 0);
+  }
+
+  function commit() {
+    if (isValidDate(text) && text >= minDate && text <= maxDate) {
+      onDateChange(text);
+    }
+    setEditing(false);
+  }
+
+  if (editing) {
+    return (
+      <input
+        ref={inputRef}
+        type="text"
+        value={text}
+        onChange={(e) => setText(e.target.value)}
+        onBlur={commit}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") commit();
+          if (e.key === "Escape") setEditing(false);
+        }}
+        placeholder="YYYY-MM-DD"
+        className="w-[7.5rem] rounded-md border border-[#6C9B8B] bg-[#F0F7F5] px-2 py-1.5 text-xs text-[#4A7A6B] font-medium outline-none"
+      />
+    );
+  }
+
   return (
     <button
       onClick={onClick}
-      className={`flex-1 rounded-md border px-2 py-1.5 text-xs transition-colors cursor-pointer ${
+      onDoubleClick={startEditing}
+      className={`w-[7.5rem] whitespace-nowrap rounded-md border px-2 py-1.5 text-xs transition-colors cursor-pointer ${
         active
           ? "border-[#6C9B8B] bg-[#F0F7F5] text-[#4A7A6B] font-medium"
           : "border-[#EFEFEF] text-[#6F767E] hover:border-[#D0D5DD]"
       }`}
     >
-      {label}
+      {formatDate(value)}
     </button>
   );
 }
