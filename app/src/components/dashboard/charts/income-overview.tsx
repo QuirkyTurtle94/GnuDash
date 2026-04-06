@@ -18,11 +18,13 @@ import type { MonthlyExpenseByCategory } from "@/lib/types/gnucash";
 
 type TimePeriod = "this-month" | "last-month" | "this-year" | "last-12m" | "custom";
 
-const PERIOD_LABELS: Record<TimePeriod, string> = {
+const PERIOD_LABELS: Record<string, string> = {
   "this-month": "This Month",
   "last-month": "Last Month",
+  "last-6m": "Last 6 Months",
   "this-year": "This Year",
   "last-12m": "Last 12 Months",
+  "all-time": "All Time",
   "custom": "Custom",
 };
 
@@ -78,13 +80,17 @@ interface IncomeOverviewProps {
   linkTo?: string;
   externalPeriod?: string;
   externalCustomRange?: CustomRange | null;
+  onExternalPeriodChange?: (p: string) => void;
+  onExternalCustomRangeChange?: (r: CustomRange) => void;
+  externalDataRange?: { min: string; max: string };
 }
 
-export function IncomeOverview({ monthlyIncome, categoryColors, currency, linkTo, externalPeriod, externalCustomRange }: IncomeOverviewProps) {
+export function IncomeOverview({ monthlyIncome, categoryColors, currency, linkTo, externalPeriod, externalCustomRange, onExternalPeriodChange, onExternalCustomRangeChange, externalDataRange }: IncomeOverviewProps) {
   const [localPeriod, setLocalPeriod] = useState<TimePeriod>("this-month");
   const [localCustomRange, setLocalCustomRange] = useState<CustomRange | null>(null);
 
   const isExternal = externalPeriod !== undefined;
+  const isSynced = isExternal && !!onExternalPeriodChange;
   const period = (isExternal ? externalPeriod : localPeriod) as TimePeriod;
   const customRange = isExternal ? (externalCustomRange ?? null) : localCustomRange;
   const [drillPath, setDrillPath] = useState<string | null>(null);
@@ -173,7 +179,16 @@ export function IncomeOverview({ monthlyIncome, categoryColors, currency, linkTo
             <Link href={linkTo} className="hover:text-[#3B6B8A] transition-colors">Income Overview</Link>
           ) : "Income Overview"}
         </CardTitle>
-        {!isExternal && (
+        {isSynced ? (
+          <PeriodSelector
+            period={period}
+            labels={PERIOD_LABELS}
+            onChange={(p) => onExternalPeriodChange!(p)}
+            customRange={customRange}
+            onCustomRangeChange={(r) => onExternalCustomRangeChange!(r)}
+            dataRange={externalDataRange ?? dataRange}
+          />
+        ) : !isExternal ? (
           <PeriodSelector
             period={localPeriod}
             labels={PERIOD_LABELS}
@@ -182,7 +197,7 @@ export function IncomeOverview({ monthlyIncome, categoryColors, currency, linkTo
             onCustomRangeChange={setLocalCustomRange}
             dataRange={dataRange}
           />
-        )}
+        ) : null}
       </CardHeader>
       <CardContent>
         {categories.length === 0 ? (

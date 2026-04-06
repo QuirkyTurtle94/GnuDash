@@ -19,11 +19,13 @@ import type { MonthlyCashFlow } from "@/lib/types/gnucash";
 
 type TimePeriod = "this-month" | "last-month" | "last-6m" | "last-12m" | "custom";
 
-const PERIOD_LABELS: Record<TimePeriod, string> = {
+const PERIOD_LABELS: Record<string, string> = {
   "this-month": "This Month",
   "last-month": "Last Month",
   "last-6m": "Last 6 Months",
+  "this-year": "This Year",
   "last-12m": "Last 12 Months",
+  "all-time": "All Time",
   "custom": "Custom",
 };
 
@@ -33,6 +35,10 @@ function getSlice(series: MonthlyCashFlow[], period: string, customRange?: Custo
     case "last-month": return series.slice(-2, -1);
     case "last-6m": return series.slice(-6);
     case "last-12m": return series.slice(-12);
+    case "this-year": {
+      const year = String(new Date().getFullYear());
+      return series.filter((s) => s.month.startsWith(year));
+    }
     case "all-time": return series;
     case "custom":
       if (!customRange) return series;
@@ -55,13 +61,17 @@ interface CashFlowChartProps {
   currency: string;
   externalPeriod?: string;
   externalCustomRange?: CustomRange | null;
+  onExternalPeriodChange?: (p: string) => void;
+  onExternalCustomRangeChange?: (r: CustomRange) => void;
+  externalDataRange?: { min: string; max: string };
 }
 
-export function CashFlowChart({ series, currency, externalPeriod, externalCustomRange }: CashFlowChartProps) {
+export function CashFlowChart({ series, currency, externalPeriod, externalCustomRange, onExternalPeriodChange, onExternalCustomRangeChange, externalDataRange }: CashFlowChartProps) {
   const [localPeriod, setLocalPeriod] = useState<TimePeriod>("last-6m");
   const [localCustomRange, setLocalCustomRange] = useState<CustomRange | null>(null);
 
   const isExternal = externalPeriod !== undefined;
+  const isSynced = isExternal && !!onExternalPeriodChange;
   const period = (isExternal ? externalPeriod : localPeriod) as TimePeriod;
   const customRange = isExternal ? (externalCustomRange ?? null) : localCustomRange;
 
@@ -76,7 +86,16 @@ export function CashFlowChart({ series, currency, externalPeriod, externalCustom
         <CardTitle className="text-lg font-semibold text-[#1A1D1F]">
           Cash Flow
         </CardTitle>
-        {!isExternal && (
+        {isSynced ? (
+          <PeriodSelector
+            period={period}
+            labels={PERIOD_LABELS}
+            onChange={(p) => onExternalPeriodChange!(p)}
+            customRange={customRange}
+            onCustomRangeChange={(r) => onExternalCustomRangeChange!(r)}
+            dataRange={externalDataRange ?? dataRange}
+          />
+        ) : !isExternal ? (
           <PeriodSelector
             period={localPeriod}
             labels={PERIOD_LABELS}
@@ -85,7 +104,7 @@ export function CashFlowChart({ series, currency, externalPeriod, externalCustom
             onCustomRangeChange={setLocalCustomRange}
             dataRange={dataRange}
           />
-        )}
+        ) : null}
       </CardHeader>
       <CardContent>
         <div className="mb-1">
