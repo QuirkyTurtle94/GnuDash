@@ -1,11 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import {
-  type LinkColorMode,
-} from "@/lib/sankey-utils";
 
-// ── Depth slider ──────────────────────────────────────────────────────
+// ── Depth control ─────────────────────────────────────────────────────
 
 interface DepthSliderProps {
   depth: number;
@@ -14,17 +11,23 @@ interface DepthSliderProps {
 
 export function DepthSlider({ depth, onChange }: DepthSliderProps) {
   return (
-    <div className="flex items-center gap-2">
+    <div className="flex items-center gap-1.5">
       <span className="text-xs text-[#6F767E] whitespace-nowrap">Depth</span>
-      <input
-        type="range"
-        min={1}
-        max={6}
-        value={depth}
-        onChange={(e) => onChange(Number(e.target.value))}
-        className="h-1.5 w-20 cursor-pointer appearance-none rounded-full bg-[#EFEFEF] accent-[#6C9B8B]"
-      />
+      <button
+        onClick={() => onChange(Math.max(1, depth - 1))}
+        disabled={depth <= 1}
+        className="flex h-6 w-6 items-center justify-center rounded border border-[#EFEFEF] text-sm text-[#6F767E] transition-colors hover:bg-[#F4F5F7] disabled:opacity-30 disabled:cursor-default"
+      >
+        −
+      </button>
       <span className="w-4 text-center text-xs font-medium text-[#1A1D1F]">{depth}</span>
+      <button
+        onClick={() => onChange(Math.min(6, depth + 1))}
+        disabled={depth >= 6}
+        className="flex h-6 w-6 items-center justify-center rounded border border-[#EFEFEF] text-sm text-[#6F767E] transition-colors hover:bg-[#F4F5F7] disabled:opacity-30 disabled:cursor-default"
+      >
+        +
+      </button>
     </div>
   );
 }
@@ -109,50 +112,3 @@ export function CategoryFilter({ label, categories, selected, onChange, colors }
   );
 }
 
-// ── Link colour control ───────────────────────────────────────────────
-
-interface LinkColorControlProps {
-  mode: LinkColorMode;
-  greyColor: string;
-  onModeChange: (m: LinkColorMode) => void;
-  onGreyColorChange: (c: string) => void;
-}
-
-export function LinkColorControl({ mode, greyColor, onModeChange, onGreyColorChange }: LinkColorControlProps) {
-  return (
-    <div className="flex items-center gap-2">
-      <span className="text-xs text-[#6F767E] whitespace-nowrap">Flows</span>
-      <div className="flex rounded-lg border border-[#EFEFEF] overflow-hidden">
-        <button
-          onClick={() => onModeChange("source")}
-          className={`px-2.5 py-1 text-xs transition-colors ${
-            mode === "source"
-              ? "bg-[#6C9B8B] text-white"
-              : "text-[#6F767E] hover:bg-[#F4F5F7]"
-          }`}
-        >
-          Colour
-        </button>
-        <button
-          onClick={() => onModeChange("grey")}
-          className={`px-2.5 py-1 text-xs transition-colors ${
-            mode === "grey"
-              ? "bg-[#6C9B8B] text-white"
-              : "text-[#6F767E] hover:bg-[#F4F5F7]"
-          }`}
-        >
-          Grey
-        </button>
-      </div>
-      {mode === "grey" && (
-        <input
-          type="color"
-          value={greyColor}
-          onChange={(e) => onGreyColorChange(e.target.value)}
-          className="h-6 w-6 cursor-pointer rounded border border-[#EFEFEF] p-0.5"
-          title="Pick flow grey shade"
-        />
-      )}
-    </div>
-  );
-}

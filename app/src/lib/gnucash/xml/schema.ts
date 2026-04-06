@@ -101,4 +101,19 @@ export const GNUCASH_SCHEMA_DDL = `
     amount_num INTEGER NOT NULL,
     amount_denom INTEGER NOT NULL DEFAULT 100
   );
+
+  CREATE TABLE IF NOT EXISTS slots (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    obj_guid TEXT NOT NULL,
+    name TEXT NOT NULL,
+    slot_type INTEGER NOT NULL DEFAULT 4,
+    int64_val INTEGER,
+    string_val TEXT,
+    double_val REAL,
+    timespec_val TEXT,
+    guid_val TEXT,
+    numeric_val_num INTEGER,
+    numeric_val_denom INTEGER,
+    gdate_val TEXT
+  );
 `;

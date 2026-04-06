@@ -91,13 +91,19 @@ export function SankeyECharts({ data, currency }: SankeyEChartsProps) {
     [],
   );
 
-  const handleWheel = useCallback((e: React.WheelEvent) => {
-    if (!e.ctrlKey && !e.metaKey) return;
-    e.preventDefault();
-    setZoom((prev) => {
-      const delta = e.deltaY > 0 ? -0.1 : 0.1;
-      return Math.min(3, Math.max(0.5, prev + delta));
-    });
+  // Attach non-passive wheel listener so we can preventDefault and capture scroll
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    function onWheel(e: WheelEvent) {
+      e.preventDefault();
+      setZoom((prev) => {
+        const delta = e.deltaY > 0 ? -0.005 : 0.005;
+        return Math.min(3, Math.max(0.5, prev + delta));
+      });
+    }
+    el.addEventListener("wheel", onWheel, { passive: false });
+    return () => el.removeEventListener("wheel", onWheel);
   }, []);
 
   const resetZoom = useCallback(() => setZoom(1), []);
@@ -161,7 +167,6 @@ export function SankeyECharts({ data, currency }: SankeyEChartsProps) {
     <div>
       <div
         ref={containerRef}
-        onWheel={handleWheel}
         className="overflow-hidden rounded-lg"
         style={{ height: `${visibleHeight}px` }}
       >
@@ -189,8 +194,8 @@ export function SankeyECharts({ data, currency }: SankeyEChartsProps) {
             {zoom !== 1
               ? `${Math.round(effectiveScale * 100)}%`
               : autoScale < 1
-                ? `Fit ${Math.round(autoScale * 100)}% · Ctrl + scroll to zoom`
-                : "Ctrl + scroll to zoom"}
+                ? `Fit ${Math.round(autoScale * 100)}% · Scroll to zoom`
+                : "Scroll to zoom"}
           </span>
           {zoom !== 1 && (
             <button

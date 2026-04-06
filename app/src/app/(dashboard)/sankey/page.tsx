@@ -4,8 +4,9 @@ import { useState, useMemo, useEffect } from "react";
 import dynamic from "next/dynamic";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { PeriodSelector } from "@/components/ui/period-selector";
-import { DepthSlider, CategoryFilter, LinkColorControl } from "@/components/sankey/sankey-controls";
+import { DepthSlider, CategoryFilter } from "@/components/sankey/sankey-controls";
 import { useDashboard } from "@/lib/dashboard-context";
+import { ExcludeClosingToggle } from "@/components/ui/exclude-closing-toggle";
 import { type CustomRange, getDataRange } from "@/lib/period-utils";
 import {
   buildSankeyData,
@@ -13,7 +14,6 @@ import {
   getTopLevelCategories,
   SANKEY_PERIOD_LABELS,
   type SankeyPeriod,
-  type LinkColorMode,
 } from "@/lib/sankey-utils";
 
 const SankeyECharts = dynamic(
@@ -35,16 +35,26 @@ export default function SankeyPage() {
   const [period, setPeriod] = useState<SankeyPeriod>("last-6m");
   const [customRange, setCustomRange] = useState<CustomRange | null>(null);
   const [depth, setDepth] = useState(1);
-  const [linkColorMode, setLinkColorMode] = useState<LinkColorMode>("source");
-  const [greyColor, setGreyColor] = useState("#9A9FA5");
+  const [excludeClosing, setExcludeClosing] = useState(!!data?.hasClosingTransactions);
+
+  const activeIncome = excludeClosing && data?.monthlyIncomeByCategoryExcludingClosing
+    ? data.monthlyIncomeByCategoryExcludingClosing : data?.monthlyIncomeByCategory ?? [];
+  const activeExpenses = excludeClosing && data?.monthlyExpensesByCategoryExcludingClosing
+    ? data.monthlyExpensesByCategoryExcludingClosing : data?.monthlyExpensesByCategory ?? [];
+  const activeCashFlow = excludeClosing && data?.cashFlowSeriesExcludingClosing
+    ? data.cashFlowSeriesExcludingClosing : data?.cashFlowSeries ?? [];
+  const activeIncomeColors = excludeClosing && data?.incomeCategoryColorsExcludingClosing
+    ? data.incomeCategoryColorsExcludingClosing : data?.incomeCategoryColors ?? {};
+  const activeExpenseColors = excludeClosing && data?.expenseCategoryColorsExcludingClosing
+    ? data.expenseCategoryColorsExcludingClosing : data?.expenseCategoryColors ?? {};
 
   const incomeCategories = useMemo(
-    () => (data ? getTopLevelCategories(data.monthlyIncomeByCategory) : []),
-    [data],
+    () => getTopLevelCategories(activeIncome),
+    [activeIncome],
   );
   const expenseCategories = useMemo(
-    () => (data ? getTopLevelCategories(data.monthlyExpensesByCategory) : []),
-    [data],
+    () => getTopLevelCategories(activeExpenses),
+    [activeExpenses],
   );
 
   const [selectedIncome, setSelectedIncome] = useState<Set<string>>(new Set());
@@ -63,18 +73,18 @@ export default function SankeyPage() {
   const expenseKey = Array.from(selectedExpense).sort().join(",");
 
   const dataRange = useMemo(
-    () => getDataRange(data?.cashFlowSeries ?? []) ?? { min: "2020-01", max: "2026-01" },
-    [data],
+    () => getDataRange(activeCashFlow) ?? { min: "2020-01", max: "2026-01" },
+    [activeCashFlow],
   );
 
   const sankeyData = useMemo(() => {
     if (!data || !initialized) return null;
     return buildSankeyData({
-      incomeByCategory: data.monthlyIncomeByCategory,
-      expenseByCategory: data.monthlyExpensesByCategory,
-      cashFlowSeries: data.cashFlowSeries,
-      incomeCategoryColors: data.incomeCategoryColors,
-      expenseCategoryColors: data.expenseCategoryColors,
+      incomeByCategory: activeIncome,
+      expenseByCategory: activeExpenses,
+      cashFlowSeries: activeCashFlow,
+      incomeCategoryColors: activeIncomeColors,
+      expenseCategoryColors: activeExpenseColors,
       period,
       depth,
       selectedIncomeCategories: selectedIncome,
@@ -82,11 +92,11 @@ export default function SankeyPage() {
       customRange: customRange ?? undefined,
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [data, period, customRange, depth, incomeKey, expenseKey, initialized]);
+  }, [data, period, customRange, depth, incomeKey, expenseKey, initialized, excludeClosing]);
 
   const echartsData = useMemo(
-    () => (sankeyData ? toEChartsFormat(sankeyData, linkColorMode, greyColor) : null),
-    [sankeyData, linkColorMode, greyColor],
+    () => (sankeyData ? toEChartsFormat(sankeyData, "source", "#9A9FA5") : null),
+    [sankeyData],
   );
 
   if (!data) return null;
@@ -102,13 +112,10 @@ export default function SankeyPage() {
           </CardTitle>
 
           <div className="flex items-center gap-3">
+            {data.hasClosingTransactions && (
+              <ExcludeClosingToggle checked={excludeClosing} onChange={setExcludeClosing} />
+            )}
             <DepthSlider depth={depth} onChange={setDepth} />
-            <LinkColorControl
-              mode={linkColorMode}
-              greyColor={greyColor}
-              onModeChange={setLinkColorMode}
-              onGreyColorChange={setGreyColor}
-            />
             <PeriodSelector
               period={period}
               labels={SANKEY_PERIOD_LABELS}
@@ -128,14 +135,14 @@ export default function SankeyPage() {
               categories={incomeCategories}
               selected={selectedIncome}
               onChange={setSelectedIncome}
-              colors={data.incomeCategoryColors}
+              colors={activeIncomeColors}
             />
             <CategoryFilter
               label="Expenses"
               categories={expenseCategories}
               selected={selectedExpense}
               onChange={setSelectedExpense}
-              colors={data.expenseCategoryColors}
+              colors={activeExpenseColors}
             />
           </div>
 

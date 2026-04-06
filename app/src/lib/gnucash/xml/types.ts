@@ -87,4 +87,6 @@ export interface GnuCashXmlData {
     periodType: string;
     periodStart: string;
   }[];
+  /** Transaction GUIDs that have a book-closing slot. */
+  closingTransactionGuids: string[];
 }

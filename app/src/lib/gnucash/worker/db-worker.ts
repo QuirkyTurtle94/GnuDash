@@ -16,6 +16,7 @@ import { computeTopBalances } from "../domain/balances";
 import { getLedgerTransactions, getRecentTransactions } from "../domain/ledger";
 import { computeBudgetData } from "../domain/budgets";
 import { getUpcomingBills } from "../domain/bills";
+import { hasClosingTransactions } from "../domain/closing";
 import { formatMonth } from "../shared/dates";
 import { createWritableWasmAdapter } from "../engine/db/writable-wasm-adapter";
 import { TransactionBuilder } from "../engine/builders/transaction-builder";
@@ -214,6 +215,14 @@ function initFromXmlData(data: GnuCashXmlData): void {
     });
   }
 
+  // Book-closing slots
+  for (const txGuid of data.closingTransactionGuids) {
+    db.exec({
+      sql: `INSERT INTO slots (obj_guid, name, slot_type, string_val) VALUES (?, 'book-closing', 4, 'true')`,
+      bind: [txGuid],
+    });
+  }
+
   const adapter = createWasmAdapter(db);
   validateSchema(adapter);
   ctx = buildParseContext(adapter);
@@ -258,6 +267,27 @@ function getFullDashboardData(): DashboardData {
       ? ((currentIncome - currentExpenses) / currentIncome) * 100
       : 0;
 
+  const hasClosing = hasClosingTransactions(ctx);
+
+  // If closing transactions exist, also compute versions with them excluded
+  let cashFlowSeriesExcludingClosing: typeof cashFlowSeries | undefined;
+  let expenseBreakdownExcludingClosing: typeof expenseBreakdown | undefined;
+  let monthlyExpensesByCategoryExcludingClosing: typeof monthlyExpensesByCategory | undefined;
+  let expenseCategoryColorsExcludingClosing: typeof expenseCategoryColors | undefined;
+  let monthlyIncomeByCategoryExcludingClosing: typeof monthlyIncomeByCategory | undefined;
+  let incomeCategoryColorsExcludingClosing: typeof incomeCategoryColors | undefined;
+
+  if (hasClosing) {
+    cashFlowSeriesExcludingClosing = computeCashFlowSeries(ctx, true);
+    const excExpense = computeExpenseBreakdown(ctx, true);
+    expenseBreakdownExcludingClosing = excExpense.categories;
+    monthlyExpensesByCategoryExcludingClosing = excExpense.monthly;
+    expenseCategoryColorsExcludingClosing = excExpense.colors;
+    const excIncome = computeIncomeBreakdown(ctx, true);
+    monthlyIncomeByCategoryExcludingClosing = excIncome.monthly;
+    incomeCategoryColorsExcludingClosing = excIncome.colors;
+  }
+
   const baseCommodity = ctx.commodityMap.get(ctx.baseCurrencyGuid);
 
   return {
@@ -292,6 +322,13 @@ function getFullDashboardData(): DashboardData {
       fullname: c.fullname,
       fraction: c.fraction,
     })),
+    hasClosingTransactions: hasClosing,
+    cashFlowSeriesExcludingClosing,
+    expenseBreakdownExcludingClosing,
+    monthlyExpensesByCategoryExcludingClosing,
+    expenseCategoryColorsExcludingClosing,
+    monthlyIncomeByCategoryExcludingClosing,
+    incomeCategoryColorsExcludingClosing,
   };
 }
 

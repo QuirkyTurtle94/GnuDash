@@ -227,6 +227,7 @@ export function parseGnuCashXml(xmlString: string): GnuCashXmlData {
 
   // ── 3. Transactions ─────────────────────────────────────────────
   const transactions: XmlParsedTransaction[] = [];
+  const closingTransactionGuids: string[] = [];
 
   // Only parse transactions directly under gnc:book, skip template-transactions
   const transactionEls = bookEl.getElementsByTagNameNS(NS.gnc, "transaction");
@@ -241,6 +242,18 @@ export function parseGnuCashXml(xmlString: string): GnuCashXmlData {
     if (inTemplate) continue;
 
     const guid = childText(el, NS.trn, "id");
+
+    // Check for book-closing slot
+    const slotsEl = childEl(el, NS.trn, "slots");
+    if (slotsEl) {
+      const slotKeys = slotsEl.getElementsByTagNameNS(NS.slot, "key");
+      for (const keyEl of Array.from(slotKeys)) {
+        if (keyEl.textContent?.trim() === "book-closing") {
+          closingTransactionGuids.push(guid);
+          break;
+        }
+      }
+    }
 
     // Resolve currency
     const currencyEl = childEl(el, NS.trn, "currency");
@@ -443,5 +456,6 @@ export function parseGnuCashXml(xmlString: string): GnuCashXmlData {
     budgetAmounts,
     schedxactions,
     recurrences,
+    closingTransactionGuids,
   };
 }

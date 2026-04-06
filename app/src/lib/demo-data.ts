@@ -464,6 +464,7 @@ export function generateDemoData(): DashboardData {
     savingsRate,
     budgetData,
     ledgerTransactions,
+    hasClosingTransactions: false,
   };
 }
 

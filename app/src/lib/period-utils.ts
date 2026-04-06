@@ -1,7 +1,7 @@
-/** Represents a user-defined custom date range in YYYY-MM format. */
+/** Represents a user-defined custom date range in YYYY-MM-DD format. */
 export interface CustomRange {
-  start: string; // "YYYY-MM"
-  end: string;   // "YYYY-MM"
+  start: string; // "YYYY-MM-DD"
+  end: string;   // "YYYY-MM-DD"
 }
 
 /** Generate all YYYY-MM strings from start to end inclusive. */
@@ -55,4 +55,38 @@ export function formatMonth(month: string): string {
 /** Validate a YYYY-MM string. */
 export function isValidMonth(value: string): boolean {
   return /^\d{4}-(?:0[1-9]|1[0-2])$/.test(value);
+}
+
+/** Extract YYYY-MM from a YYYY-MM-DD date string. */
+export function dateToMonth(date: string): string {
+  return date.slice(0, 7);
+}
+
+/** Convert YYYY-MM to YYYY-MM-01. */
+export function monthToFirstDay(month: string): string {
+  return `${month}-01`;
+}
+
+/** Convert YYYY-MM to the last day of that month. */
+export function monthToLastDay(month: string): string {
+  const [y, m] = month.split("-").map(Number);
+  const lastDay = new Date(y, m, 0).getDate();
+  return `${month}-${String(lastDay).padStart(2, "0")}`;
+}
+
+/** Format YYYY-MM-DD as "Jan 6, 2024" for display. */
+export function formatDate(date: string): string {
+  const [y, m, d] = date.split("-");
+  const names = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  return `${names[parseInt(m) - 1]} ${parseInt(d)}, ${y}`;
+}
+
+/** Validate a YYYY-MM-DD string. */
+export function isValidDate(value: string): boolean {
+  return /^\d{4}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12]\d|3[01])$/.test(value);
+}
+
+/** Get all months (YYYY-MM) that overlap a YYYY-MM-DD date range. */
+export function getMonthsForDateRange(start: string, end: string): string[] {
+  return getMonthsBetween(dateToMonth(start), dateToMonth(end));
 }

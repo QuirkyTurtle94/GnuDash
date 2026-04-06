@@ -14,7 +14,7 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { PeriodSelector } from "@/components/ui/period-selector";
 import { formatCurrency, formatCurrencyShort } from "@/lib/format";
-import { type CustomRange, getDataRange } from "@/lib/period-utils";
+import { type CustomRange, getDataRange, dateToMonth } from "@/lib/period-utils";
 import type { MonthlyNetWorth } from "@/lib/types/gnucash";
 
 type TimePeriod = "last-6m" | "last-12m" | "all-time" | "custom";
@@ -78,7 +78,7 @@ export function NetWorthChart({ series, currentNetWorth, currency, externalPerio
       case "all-time": return series;
       case "custom":
         if (!customRange) return series;
-        return series.filter((s) => s.month >= customRange.start && s.month <= customRange.end);
+        return series.filter((s) => s.month >= dateToMonth(customRange.start) && s.month <= dateToMonth(customRange.end));
       default: {
         // Handle periods from the dashboard selector (this-month, last-month)
         if (period === "this-month") return series.slice(-1);
