@@ -18,6 +18,7 @@ import type {
   DashboardData,
 } from "@/lib/types/gnucash";
 import type { WorkerRequest, WorkerResponse, DomainFunction, MutationAction, CreateTransactionPayload, DeleteTransactionPayload, EditTransactionPayload, CreateAccountPayload, UpdateAccountPayload, DeleteAccountPayload, CreateCommodityPayload } from "./messages";
+import { parseGnuCashXml } from "../xml/parser";
 
 type PendingRequest = {
   resolve: (data: unknown) => void;
@@ -132,25 +133,58 @@ export class GnuCashWorkerClient {
   /**
    * Open a .gnucash file by reading it into an ArrayBuffer and sending to the Worker.
    * The Worker persists it to OPFS if available.
+   *
+   * GNUCash files can be SQLite3, XML, or gzip-compressed XML/SQLite.
+   * We detect the format and handle accordingly:
+   *  - SQLite3: pass through to worker
+   *  - Gzip: decompress, then re-check (could be SQLite or XML inside)
+   *  - XML: parse on main thread and send structured data to worker
+   *
+   * Returns { isXml } so the caller can enforce read-only mode for XML files.
    */
-  async openFile(file: File, writable: boolean = false): Promise<void> {
+  async openFile(file: File, writable: boolean = false): Promise<{ isXml: boolean }> {
     await this.wasmReady;
 
-    const buffer = await file.arrayBuffer();
+    let buffer = await file.arrayBuffer();
+    const resolved = await resolveGnuCashBuffer(buffer);
 
-    return new Promise<void>((resolve, reject) => {
-      // Temporarily override message handler to catch the init response
+    if (resolved.type === "xml") {
+      // Parse XML on the main thread (needs DOMParser), send structured data to worker
+      const xmlString = new TextDecoder().decode(resolved.buffer);
+      const xmlData = parseGnuCashXml(xmlString);
+
+      return new Promise<{ isXml: boolean }>((resolve, reject) => {
+        const prevHandler = this.worker.onmessage;
+        this.worker.onmessage = (e: MessageEvent<WorkerResponse>) => {
+          const msg = e.data;
+          if (msg.type === "ready") {
+            this.worker.onmessage = prevHandler;
+            resolve({ isXml: true });
+          } else if (msg.type === "init-error") {
+            this.worker.onmessage = prevHandler;
+            reject(new Error(msg.message));
+          } else {
+            this.handleMessage(msg);
+          }
+        };
+
+        this.send({ type: "init-xml", xmlData });
+      });
+    }
+
+    // SQLite path
+    buffer = resolved.buffer;
+    return new Promise<{ isXml: boolean }>((resolve, reject) => {
       const prevHandler = this.worker.onmessage;
       this.worker.onmessage = (e: MessageEvent<WorkerResponse>) => {
         const msg = e.data;
         if (msg.type === "ready") {
           this.worker.onmessage = prevHandler;
-          resolve();
+          resolve({ isXml: false });
         } else if (msg.type === "init-error") {
           this.worker.onmessage = prevHandler;
           reject(new Error(msg.message));
         } else {
-          // Delegate other messages to normal handler
           this.handleMessage(msg);
         }
       };
@@ -320,4 +354,91 @@ export class GnuCashWorkerClient {
     this.send({ type: "close" });
     this.worker.terminate();
   }
+}
+
+// ── File-format detection & decompression ────────────────────────
+
+const SQLITE_MAGIC = [0x53, 0x51, 0x4c, 0x69]; // "SQLi"
+const GZIP_MAGIC = [0x1f, 0x8b];
+
+function startsWithMagic(bytes: Uint8Array, magic: number[]): boolean {
+  if (bytes.length < magic.length) return false;
+  return magic.every((b, i) => bytes[i] === b);
+}
+
+function looksLikeXml(bytes: Uint8Array): boolean {
+  // Check for "<?xm" or "<gnc" — the two common XML .gnucash openings
+  if (bytes.length < 4) return false;
+  const head = new TextDecoder().decode(bytes.slice(0, 256));
+  return head.trimStart().startsWith("<");
+}
+
+async function decompressGzip(buffer: ArrayBuffer): Promise<ArrayBuffer> {
+  const ds = new DecompressionStream("gzip");
+  const writer = ds.writable.getWriter();
+  const reader = ds.readable.getReader();
+
+  writer.write(new Uint8Array(buffer));
+  writer.close();
+
+  const chunks: Uint8Array[] = [];
+  let totalLength = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    chunks.push(value);
+    totalLength += value.byteLength;
+  }
+
+  const result = new Uint8Array(totalLength);
+  let offset = 0;
+  for (const chunk of chunks) {
+    result.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return result.buffer;
+}
+
+type ResolvedBuffer =
+  | { type: "sqlite"; buffer: ArrayBuffer }
+  | { type: "xml"; buffer: ArrayBuffer };
+
+/**
+ * Detect the format of a .gnucash file buffer and return a typed result.
+ * Handles SQLite3, gzip-compressed, and XML formats.
+ */
+async function resolveGnuCashBuffer(buffer: ArrayBuffer): Promise<ResolvedBuffer> {
+  let bytes = new Uint8Array(buffer);
+
+  // Already a SQLite file — pass through
+  if (startsWithMagic(bytes, SQLITE_MAGIC)) {
+    return { type: "sqlite", buffer };
+  }
+
+  // Gzip-compressed — decompress and re-check the inner content
+  if (startsWithMagic(bytes, GZIP_MAGIC)) {
+    const decompressed = await decompressGzip(buffer);
+    bytes = new Uint8Array(decompressed);
+
+    if (startsWithMagic(bytes, SQLITE_MAGIC)) {
+      return { type: "sqlite", buffer: decompressed };
+    }
+
+    if (looksLikeXml(bytes)) {
+      return { type: "xml", buffer: decompressed };
+    }
+
+    throw new Error(
+      "The decompressed .gnucash file is not a recognised format. " +
+      "Please re-save it in GNUCash using the sqlite3 file format."
+    );
+  }
+
+  // Plain XML
+  if (looksLikeXml(bytes)) {
+    return { type: "xml", buffer };
+  }
+
+  // Unknown format — let SQLite WASM give its own error
+  return { type: "sqlite", buffer };
 }

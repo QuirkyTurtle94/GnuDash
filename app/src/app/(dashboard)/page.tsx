@@ -86,6 +86,7 @@ export default function DashboardPage() {
         onExternalPeriodChange={setPeriod}
         onExternalCustomRangeChange={setCustomRange}
         externalDataRange={dataRange}
+        seriesExcludingClosing={data.cashFlowSeriesExcludingClosing}
       />
 
       {/* Row 4: Assets + Liabilities */}

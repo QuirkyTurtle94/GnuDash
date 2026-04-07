@@ -1,4 +1,4 @@
-import { type CustomRange, getMonthsBetween } from "@/lib/period-utils";
+import { type CustomRange, getMonthsForDateRange } from "@/lib/period-utils";
 
 export type TimePeriod = "this-month" | "last-month" | "last-6m" | "this-year" | "last-12m" | "custom";
 
@@ -47,6 +47,6 @@ export function getMonthsForPeriod(period: TimePeriod, customRange?: CustomRange
       return months;
     }
     case "custom":
-      return customRange ? getMonthsBetween(customRange.start, customRange.end) : [];
+      return customRange ? getMonthsForDateRange(customRange.start, customRange.end) : [];
   }
 }

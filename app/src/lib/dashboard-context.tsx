@@ -25,6 +25,7 @@ interface DashboardContextType {
   error: string | null;
   uploadedAt: Date | null;
   isWritable: boolean;
+  isXmlSource: boolean;
   toggleWritable: () => Promise<void>;
   uploadFile: (file: File, writable?: boolean) => Promise<void>;
   loadDemo: () => Promise<void>;
@@ -47,6 +48,7 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
   const [error, setError] = useState<string | null>(null);
   const [uploadedAt, setUploadedAt] = useState<Date | null>(null);
   const [isWritable, setIsWritable] = useState(false);
+  const [isXmlSource, setIsXmlSource] = useState(false);
   const clientRef = useRef<GnuCashWorkerClient | null>(null);
 
   function getClient(): GnuCashWorkerClient {
@@ -143,14 +145,15 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
     try {
       const client = getClient();
       await client.waitForReady();
-      await client.openFile(file, writable);
+      const { isXml } = await client.openFile(file, writable);
       const dashboardData = await client.getFullDashboardData();
       const now = new Date();
       setData(dashboardData);
       setUploadedAt(now);
-      setIsWritable(writable);
+      setIsXmlSource(isXml);
+      setIsWritable(isXml ? false : writable);
       sessionStorage.setItem(UPLOADED_AT_KEY, now.toISOString());
-      sessionStorage.setItem(WRITABLE_KEY, String(writable));
+      sessionStorage.setItem(WRITABLE_KEY, String(isXml ? false : writable));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Upload failed");
     } finally {
@@ -178,6 +181,7 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
     setError(null);
     setUploadedAt(null);
     setIsWritable(false);
+    setIsXmlSource(false);
     sessionStorage.removeItem(STORAGE_KEY);
     sessionStorage.removeItem(UPLOADED_AT_KEY);
     sessionStorage.removeItem(WRITABLE_KEY);
@@ -250,7 +254,7 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
 
   return (
     <DashboardContext.Provider
-      value={{ data, isLoading, error, uploadedAt, isWritable, toggleWritable, uploadFile, loadDemo, clearData, createTransaction, deleteTransaction: deleteTransactionFn, editTransaction, createAccount: createAccountFn, updateAccount: updateAccountFn, deleteAccountWithReallocation: deleteAccountWithReallocationFn, createCommodity: createCommodityFn, exportFile }}
+      value={{ data, isLoading, error, uploadedAt, isWritable, isXmlSource, toggleWritable, uploadFile, loadDemo, clearData, createTransaction, deleteTransaction: deleteTransactionFn, editTransaction, createAccount: createAccountFn, updateAccount: updateAccountFn, deleteAccountWithReallocation: deleteAccountWithReallocationFn, createCommodity: createCommodityFn, exportFile }}
     >
       {children}
     </DashboardContext.Provider>

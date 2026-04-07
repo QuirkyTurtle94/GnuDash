@@ -275,4 +275,17 @@ export interface DashboardData {
   budgetData: BudgetData | null;
   ledgerTransactions: LedgerTransaction[];
   commodities: CommodityInfo[];
+  hasClosingTransactions: boolean;
+  /** Cash flow series with closing transactions excluded (only present when hasClosingTransactions is true). */
+  cashFlowSeriesExcludingClosing?: MonthlyCashFlow[];
+  /** Monthly expenses by category with closing transactions excluded. */
+  monthlyExpensesByCategoryExcludingClosing?: MonthlyExpenseByCategory[];
+  /** Expense categories with closing transactions excluded. */
+  expenseBreakdownExcludingClosing?: ExpenseCategory[];
+  /** Expense category colors with closing transactions excluded. */
+  expenseCategoryColorsExcludingClosing?: Record<string, string>;
+  /** Monthly income by category with closing transactions excluded. */
+  monthlyIncomeByCategoryExcludingClosing?: MonthlyExpenseByCategory[];
+  /** Income category colors with closing transactions excluded. */
+  incomeCategoryColorsExcludingClosing?: Record<string, string>;
 }

@@ -46,9 +46,11 @@ function computeIdealHeight(data: EChartsSankeyData): number {
 interface SankeyEChartsProps {
   data: EChartsSankeyData;
   currency: string;
+  /** Extra controls rendered on the left side of the bottom bar */
+  bottomBarLeft?: React.ReactNode;
 }
 
-export function SankeyECharts({ data, currency }: SankeyEChartsProps) {
+export function SankeyECharts({ data, currency, bottomBarLeft }: SankeyEChartsProps) {
   const chartRef = useRef<ReactEChartsCore>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [containerHeight, setContainerHeight] = useState(600);
@@ -91,13 +93,19 @@ export function SankeyECharts({ data, currency }: SankeyEChartsProps) {
     [],
   );
 
-  const handleWheel = useCallback((e: React.WheelEvent) => {
-    if (!e.ctrlKey && !e.metaKey) return;
-    e.preventDefault();
-    setZoom((prev) => {
-      const delta = e.deltaY > 0 ? -0.1 : 0.1;
-      return Math.min(3, Math.max(0.5, prev + delta));
-    });
+  // Attach non-passive wheel listener so we can preventDefault and capture scroll
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    function onWheel(e: WheelEvent) {
+      e.preventDefault();
+      setZoom((prev) => {
+        const delta = e.deltaY > 0 ? -0.005 : 0.005;
+        return Math.min(3, Math.max(0.5, prev + delta));
+      });
+    }
+    el.addEventListener("wheel", onWheel, { passive: false });
+    return () => el.removeEventListener("wheel", onWheel);
   }, []);
 
   const resetZoom = useCallback(() => setZoom(1), []);
@@ -161,7 +169,6 @@ export function SankeyECharts({ data, currency }: SankeyEChartsProps) {
     <div>
       <div
         ref={containerRef}
-        onWheel={handleWheel}
         className="overflow-hidden rounded-lg"
         style={{ height: `${visibleHeight}px` }}
       >
@@ -184,13 +191,13 @@ export function SankeyECharts({ data, currency }: SankeyEChartsProps) {
       </div>
 
       <div className="mt-3 flex items-center justify-between">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-3">
           <span className="text-xs text-[#9A9FA5]">
             {zoom !== 1
               ? `${Math.round(effectiveScale * 100)}%`
               : autoScale < 1
-                ? `Fit ${Math.round(autoScale * 100)}% · Ctrl + scroll to zoom`
-                : "Ctrl + scroll to zoom"}
+                ? `Fit ${Math.round(autoScale * 100)}% · Scroll to zoom`
+                : "Scroll to zoom"}
           </span>
           {zoom !== 1 && (
             <button
@@ -199,6 +206,12 @@ export function SankeyECharts({ data, currency }: SankeyEChartsProps) {
             >
               Reset
             </button>
+          )}
+          {bottomBarLeft && (
+            <>
+              <div className="h-4 w-px bg-[#EFEFEF]" />
+              {bottomBarLeft}
+            </>
           )}
         </div>
         <div className="flex gap-2">

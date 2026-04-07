@@ -3,10 +3,10 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import {
   type CustomRange,
-  monthToIndex,
-  indexToMonth,
-  formatMonth,
-  isValidMonth,
+  formatDate,
+  isValidDate,
+  monthToFirstDay,
+  monthToLastDay,
 } from "@/lib/period-utils";
 
 interface PeriodSelectorProps<T extends string> {
@@ -55,7 +55,10 @@ export function PeriodSelector<T extends string>({
 
   const handleCustomClick = useCallback(() => {
     if (!customRange) {
-      onCustomRangeChange({ start: dataRange.min, end: dataRange.max });
+      onCustomRangeChange({
+        start: monthToFirstDay(dataRange.min),
+        end: monthToLastDay(dataRange.max),
+      });
     }
     onChange("custom" as T);
     onPeriodSideEffect?.();
@@ -66,154 +69,313 @@ export function PeriodSelector<T extends string>({
 
   // Display label
   const displayLabel = isCustom && customRange
-    ? `${formatMonth(customRange.start)} – ${formatMonth(customRange.end)}`
+    ? `${formatDate(customRange.start)} – ${formatDate(customRange.end)}`
     : labels[period] ?? period;
 
   const presetKeys = Object.keys(labels).filter((k) => k !== "custom") as T[];
 
   return (
-    <div ref={containerRef} className="relative">
-      <button
-        onClick={() => setOpen(!open)}
-        className="flex items-center gap-1.5 rounded-lg border border-[#EFEFEF] px-3 py-1.5 transition-colors hover:bg-[#F4F5F7]"
-      >
-        <span className="text-xs font-medium text-[#6F767E] whitespace-nowrap">{displayLabel}</span>
-        <svg className="h-3.5 w-3.5 text-[#9A9FA5]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-        </svg>
-      </button>
-
-      {open && (
-        <div className="absolute right-0 top-full z-10 mt-1 w-44 rounded-lg border border-[#EFEFEF] bg-white py-1 shadow-lg">
-          {presetKeys.map((p) => (
-            <button
-              key={p}
-              onClick={() => handlePresetClick(p)}
-              className={`w-full px-3 py-2 text-left text-xs transition-colors hover:bg-[#F4F5F7] ${
-                period === p ? "font-medium text-[#6C9B8B]" : "text-[#6F767E]"
-              }`}
-            >
-              {labels[p]}
-            </button>
-          ))}
-          <div className="mx-2 my-1 border-t border-[#EFEFEF]" />
-          <button
-            onClick={handleCustomClick}
-            className={`w-full px-3 py-2 text-left text-xs transition-colors hover:bg-[#F4F5F7] ${
-              isCustom ? "font-medium text-[#6C9B8B]" : "text-[#6F767E]"
-            }`}
-          >
-            Custom
-          </button>
-        </div>
-      )}
-
+    <div className="flex items-center gap-2">
       {isCustom && customRange && (
-        <CustomRangeSlider
+        <CustomDateRange
           range={customRange}
           onChange={onCustomRangeChange}
           dataRange={dataRange}
         />
       )}
+
+      <div ref={containerRef} className="relative">
+        <button
+          onClick={() => setOpen(!open)}
+          className="flex items-center gap-1.5 rounded-lg border border-[#EFEFEF] px-3 py-1.5 transition-colors hover:bg-[#F4F5F7]"
+        >
+          <span className="text-xs font-medium text-[#6F767E] whitespace-nowrap">
+            {isCustom ? "Custom" : displayLabel}
+          </span>
+          <svg className="h-3.5 w-3.5 text-[#9A9FA5]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+          </svg>
+        </button>
+
+        {open && (
+          <div className="absolute right-0 top-full z-10 mt-1 w-44 rounded-lg border border-[#EFEFEF] bg-white py-1 shadow-lg">
+            {presetKeys.map((p) => (
+              <button
+                key={p}
+                onClick={() => handlePresetClick(p)}
+                className={`w-full px-3 py-2 text-left text-xs transition-colors hover:bg-[#F4F5F7] ${
+                  period === p ? "font-medium text-[#6C9B8B]" : "text-[#6F767E]"
+                }`}
+              >
+                {labels[p]}
+              </button>
+            ))}
+            <div className="mx-2 my-1 border-t border-[#EFEFEF]" />
+            <button
+              onClick={handleCustomClick}
+              className={`w-full px-3 py-2 text-left text-xs transition-colors hover:bg-[#F4F5F7] ${
+                isCustom ? "font-medium text-[#6C9B8B]" : "text-[#6F767E]"
+              }`}
+            >
+              Custom
+            </button>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
 
-// ── Dual-handle range slider ──────────────────────────────────────────
+// ── Custom date range with calendar pickers ──────────────────────────
 
-interface CustomRangeSliderProps {
+interface CustomDateRangeProps {
   range: CustomRange;
   onChange: (range: CustomRange) => void;
   dataRange: { min: string; max: string };
 }
 
-function CustomRangeSlider({ range, onChange, dataRange }: CustomRangeSliderProps) {
-  const totalMonths = monthToIndex(dataRange.min, dataRange.max);
-  const startIdx = monthToIndex(dataRange.min, range.start);
-  const endIdx = monthToIndex(dataRange.min, range.end);
+function CustomDateRange({ range, onChange, dataRange }: CustomDateRangeProps) {
+  const [editingField, setEditingField] = useState<"start" | "end" | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
 
-  function handleStartSlider(e: React.ChangeEvent<HTMLInputElement>) {
-    const idx = Math.min(Number(e.target.value), endIdx);
-    const month = indexToMonth(dataRange.min, idx);
-    onChange({ ...range, start: month });
-  }
+  const minDate = monthToFirstDay(dataRange.min);
+  const maxDate = monthToLastDay(dataRange.max);
 
-  function handleEndSlider(e: React.ChangeEvent<HTMLInputElement>) {
-    const idx = Math.max(Number(e.target.value), startIdx);
-    const month = indexToMonth(dataRange.min, idx);
-    onChange({ ...range, end: month });
-  }
+  const handleDateSelect = useCallback(
+    (date: string) => {
+      if (editingField === "start") {
+        onChange({ ...range, start: date <= range.end ? date : range.end });
+      } else if (editingField === "end") {
+        onChange({ ...range, end: date >= range.start ? date : range.start });
+      }
+      setEditingField(null);
+    },
+    [editingField, range, onChange],
+  );
 
-  function handleStartMonth(e: React.ChangeEvent<HTMLInputElement>) {
-    const v = e.target.value;
-    if (isValidMonth(v) && v >= dataRange.min && v <= range.end) {
-      onChange({ ...range, start: v });
+  // Close calendar on click outside
+  useEffect(() => {
+    if (!editingField) return;
+    function handleClick(e: MouseEvent) {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setEditingField(null);
+      }
     }
-  }
-
-  function handleEndMonth(e: React.ChangeEvent<HTMLInputElement>) {
-    const v = e.target.value;
-    if (isValidMonth(v) && v <= dataRange.max && v >= range.start) {
-      onChange({ ...range, end: v });
-    }
-  }
-
-  // Percentage positions for the filled track
-  const leftPct = totalMonths > 0 ? (startIdx / totalMonths) * 100 : 0;
-  const rightPct = totalMonths > 0 ? ((totalMonths - endIdx) / totalMonths) * 100 : 0;
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [editingField]);
 
   return (
-    <div className="mt-2 flex flex-col gap-2">
-      {/* Slider */}
-      <div className="relative h-6 flex items-center min-w-[200px]">
-        {/* Track background */}
-        <div className="absolute inset-x-0 h-1.5 rounded-full bg-[#EFEFEF]" />
-        {/* Filled track */}
-        <div
-          className="absolute h-1.5 rounded-full bg-[#6C9B8B]"
-          style={{ left: `${leftPct}%`, right: `${rightPct}%` }}
-        />
-        {/* Start handle */}
-        <input
-          type="range"
-          min={0}
-          max={totalMonths}
-          value={startIdx}
-          onChange={handleStartSlider}
-          className="absolute inset-x-0 h-1.5 w-full appearance-none bg-transparent pointer-events-none [&::-webkit-slider-thumb]:pointer-events-auto [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-[#6C9B8B] [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-white [&::-webkit-slider-thumb]:shadow [&::-webkit-slider-thumb]:cursor-pointer [&::-moz-range-thumb]:pointer-events-auto [&::-moz-range-thumb]:h-4 [&::-moz-range-thumb]:w-4 [&::-moz-range-thumb]:appearance-none [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:bg-[#6C9B8B] [&::-moz-range-thumb]:border-2 [&::-moz-range-thumb]:border-white [&::-moz-range-thumb]:shadow [&::-moz-range-thumb]:cursor-pointer"
-          style={{ zIndex: startIdx > totalMonths - 5 ? 5 : 3 }}
-        />
-        {/* End handle */}
-        <input
-          type="range"
-          min={0}
-          max={totalMonths}
-          value={endIdx}
-          onChange={handleEndSlider}
-          className="absolute inset-x-0 h-1.5 w-full appearance-none bg-transparent pointer-events-none [&::-webkit-slider-thumb]:pointer-events-auto [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-[#6C9B8B] [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-white [&::-webkit-slider-thumb]:shadow [&::-webkit-slider-thumb]:cursor-pointer [&::-moz-range-thumb]:pointer-events-auto [&::-moz-range-thumb]:h-4 [&::-moz-range-thumb]:w-4 [&::-moz-range-thumb]:appearance-none [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:bg-[#6C9B8B] [&::-moz-range-thumb]:border-2 [&::-moz-range-thumb]:border-white [&::-moz-range-thumb]:shadow [&::-moz-range-thumb]:cursor-pointer"
-          style={{ zIndex: 4 }}
-        />
+    <div ref={containerRef} className="relative flex items-center gap-2">
+      <DateInput
+        value={range.start}
+        active={editingField === "start"}
+        onClick={() => setEditingField(editingField === "start" ? null : "start")}
+        onDateChange={(date) => {
+          onChange({ ...range, start: date <= range.end ? date : range.end });
+          setEditingField(null);
+        }}
+        minDate={minDate}
+        maxDate={range.end}
+      />
+      <span className="text-xs text-[#9A9FA5]">to</span>
+      <DateInput
+        value={range.end}
+        active={editingField === "end"}
+        onClick={() => setEditingField(editingField === "end" ? null : "end")}
+        onDateChange={(date) => {
+          onChange({ ...range, end: date >= range.start ? date : range.start });
+          setEditingField(null);
+        }}
+        minDate={range.start}
+        maxDate={maxDate}
+      />
+
+      {editingField && (
+        <div className="absolute right-0 top-full z-20 mt-1">
+          <CalendarPicker
+            selected={editingField === "start" ? range.start : range.end}
+            minDate={editingField === "start" ? minDate : range.start}
+            maxDate={editingField === "end" ? maxDate : range.end}
+            onSelect={handleDateSelect}
+          />
+        </div>
+      )}
+    </div>
+  );
+}
+
+function DateInput({
+  value,
+  active,
+  onClick,
+  onDateChange,
+  minDate,
+  maxDate,
+}: {
+  value: string; // YYYY-MM-DD
+  active: boolean;
+  onClick: () => void;
+  onDateChange: (date: string) => void;
+  minDate: string;
+  maxDate: string;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [text, setText] = useState("");
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  function startEditing() {
+    setText(value);
+    setEditing(true);
+    // Focus after render
+    setTimeout(() => inputRef.current?.select(), 0);
+  }
+
+  function commit() {
+    if (isValidDate(text) && text >= minDate && text <= maxDate) {
+      onDateChange(text);
+    }
+    setEditing(false);
+  }
+
+  if (editing) {
+    return (
+      <input
+        ref={inputRef}
+        type="text"
+        value={text}
+        onChange={(e) => setText(e.target.value)}
+        onBlur={commit}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") commit();
+          if (e.key === "Escape") setEditing(false);
+        }}
+        placeholder="YYYY-MM-DD"
+        className="w-[7.5rem] rounded-md border border-[#6C9B8B] bg-[#F0F7F5] px-2 py-1.5 text-xs text-[#4A7A6B] font-medium outline-none"
+      />
+    );
+  }
+
+  return (
+    <button
+      onClick={onClick}
+      onDoubleClick={startEditing}
+      className={`w-[7.5rem] whitespace-nowrap rounded-md border px-2 py-1.5 text-xs transition-colors cursor-pointer ${
+        active
+          ? "border-[#6C9B8B] bg-[#F0F7F5] text-[#4A7A6B] font-medium"
+          : "border-[#EFEFEF] text-[#6F767E] hover:border-[#D0D5DD]"
+      }`}
+    >
+      {formatDate(value)}
+    </button>
+  );
+}
+
+// ── Calendar picker ─────────────────────────────────────────────────
+
+const MONTH_NAMES = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+const DAY_HEADERS = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
+
+interface CalendarPickerProps {
+  selected: string; // YYYY-MM-DD
+  minDate: string;
+  maxDate: string;
+  onSelect: (date: string) => void;
+}
+
+function CalendarPicker({ selected, minDate, maxDate, onSelect }: CalendarPickerProps) {
+  const [sy, sm] = selected.split("-").map(Number);
+  const [viewYear, setViewYear] = useState(sy);
+  const [viewMonth, setViewMonth] = useState(sm); // 1-indexed
+
+  const firstDayOfWeek = new Date(viewYear, viewMonth - 1, 1).getDay();
+  const daysInMonth = new Date(viewYear, viewMonth, 0).getDate();
+
+  const canPrev = `${viewYear}-${String(viewMonth).padStart(2, "0")}` > minDate.slice(0, 7);
+  const canNext = `${viewYear}-${String(viewMonth).padStart(2, "0")}` < maxDate.slice(0, 7);
+
+  function prev() {
+    if (!canPrev) return;
+    if (viewMonth === 1) { setViewYear(viewYear - 1); setViewMonth(12); }
+    else setViewMonth(viewMonth - 1);
+  }
+
+  function next() {
+    if (!canNext) return;
+    if (viewMonth === 12) { setViewYear(viewYear + 1); setViewMonth(1); }
+    else setViewMonth(viewMonth + 1);
+  }
+
+  function toDateStr(day: number): string {
+    return `${viewYear}-${String(viewMonth).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+  }
+
+  const days: (number | null)[] = [];
+  for (let i = 0; i < firstDayOfWeek; i++) days.push(null);
+  for (let d = 1; d <= daysInMonth; d++) days.push(d);
+
+  return (
+    <div className="rounded-lg border border-[#EFEFEF] bg-white p-3 shadow-lg">
+      {/* Header */}
+      <div className="mb-2 flex items-center justify-between">
+        <button
+          onClick={prev}
+          disabled={!canPrev}
+          className="flex h-6 w-6 items-center justify-center rounded text-[#6F767E] transition-colors hover:bg-[#F4F5F7] disabled:opacity-30 disabled:cursor-default"
+        >
+          <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+          </svg>
+        </button>
+        <span className="text-xs font-medium text-[#1A1D1F]">
+          {MONTH_NAMES[viewMonth - 1]} {viewYear}
+        </span>
+        <button
+          onClick={next}
+          disabled={!canNext}
+          className="flex h-6 w-6 items-center justify-center rounded text-[#6F767E] transition-colors hover:bg-[#F4F5F7] disabled:opacity-30 disabled:cursor-default"
+        >
+          <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+          </svg>
+        </button>
       </div>
 
-      {/* Month pickers */}
-      <div className="flex items-center gap-2">
-        <input
-          type="month"
-          value={range.start}
-          min={dataRange.min}
-          max={range.end}
-          onChange={handleStartMonth}
-          className="h-7 flex-1 rounded-md border border-[#EFEFEF] px-1.5 text-xs text-[#6F767E] outline-none focus:border-[#6C9B8B] cursor-pointer"
-        />
-        <span className="text-xs text-[#9A9FA5]">to</span>
-        <input
-          type="month"
-          value={range.end}
-          min={range.start}
-          max={dataRange.max}
-          onChange={handleEndMonth}
-          className="h-7 flex-1 rounded-md border border-[#EFEFEF] px-1.5 text-xs text-[#6F767E] outline-none focus:border-[#6C9B8B] cursor-pointer"
-        />
+      {/* Day headers */}
+      <div className="grid grid-cols-7 mb-1">
+        {DAY_HEADERS.map((d) => (
+          <div key={d} className="text-center text-[10px] font-medium text-[#9A9FA5] py-0.5">
+            {d}
+          </div>
+        ))}
+      </div>
+
+      {/* Day grid */}
+      <div className="grid grid-cols-7">
+        {days.map((day, i) => {
+          if (day === null) return <div key={`empty-${i}`} />;
+
+          const dateStr = toDateStr(day);
+          const isSelected = dateStr === selected;
+          const isDisabled = dateStr < minDate || dateStr > maxDate;
+
+          return (
+            <button
+              key={day}
+              onClick={() => !isDisabled && onSelect(dateStr)}
+              disabled={isDisabled}
+              className={`flex h-7 w-7 items-center justify-center rounded-full text-[11px] transition-colors mx-auto ${
+                isSelected
+                  ? "bg-[#6C9B8B] text-white font-medium"
+                  : isDisabled
+                    ? "text-[#D0D5DD] cursor-default"
+                    : "text-[#1A1D1F] hover:bg-[#F0F7F5] cursor-pointer"
+              }`}
+            >
+              {day}
+            </button>
+          );
+        })}
       </div>
     </div>
   );

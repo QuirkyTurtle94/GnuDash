@@ -16,6 +16,7 @@ import { computeTopBalances } from "../domain/balances";
 import { getLedgerTransactions, getRecentTransactions } from "../domain/ledger";
 import { computeBudgetData } from "../domain/budgets";
 import { getUpcomingBills } from "../domain/bills";
+import { hasClosingTransactions } from "../domain/closing";
 import { formatMonth } from "../shared/dates";
 import { createWritableWasmAdapter } from "../engine/db/writable-wasm-adapter";
 import { TransactionBuilder } from "../engine/builders/transaction-builder";
@@ -28,6 +29,8 @@ import { updateAccount, deleteAccountWithReallocation } from "../engine/operatio
 import { createCommodity } from "../engine/operations/commodity-ops";
 import type { AccountType } from "../engine/types";
 import type { WorkerRequest, WorkerResponse, DomainFunction, CreateTransactionPayload, DeleteTransactionPayload, EditTransactionPayload, CreateAccountPayload, UpdateAccountPayload, DeleteAccountPayload, CreateCommodityPayload } from "./messages";
+import type { GnuCashXmlData } from "../xml/types";
+import { GNUCASH_SCHEMA_DDL } from "../xml/schema";
 
 let sqlite3: Sqlite3Static;
 let db: WasmDatabase | null = null;
@@ -114,6 +117,117 @@ function initFromOpfs(writable: boolean): void {
   }
 }
 
+/**
+ * Creates an in-memory SQLite DB from parsed GNUCash XML data.
+ * Always read-only — no OPFS persistence.
+ */
+function initFromXmlData(data: GnuCashXmlData): void {
+  closeDb();
+  isWritable = false;
+  writableAdapter = null;
+
+  db = new sqlite3.oo1.DB();
+  db.exec({ sql: GNUCASH_SCHEMA_DDL });
+
+  // Books
+  db.exec({
+    sql: `INSERT INTO books (guid, root_account_guid) VALUES (?, ?)`,
+    bind: [data.bookGuid, data.rootAccountGuid],
+  });
+
+  // Commodities
+  for (const c of data.commodities) {
+    db.exec({
+      sql: `INSERT INTO commodities (guid, namespace, mnemonic, fullname, cusip, fraction) VALUES (?, ?, ?, ?, ?, ?)`,
+      bind: [c.guid, c.namespace, c.mnemonic, c.fullname, c.cusip, c.fraction],
+    });
+  }
+
+  // Accounts
+  for (const a of data.accounts) {
+    db.exec({
+      sql: `INSERT INTO accounts (guid, name, account_type, commodity_guid, parent_guid, code, description, hidden, placeholder) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      bind: [a.guid, a.name, a.accountType, a.commodityGuid, a.parentGuid, a.code, a.description, a.hidden, a.placeholder],
+    });
+  }
+
+  // Transactions and splits
+  for (const t of data.transactions) {
+    db.exec({
+      sql: `INSERT INTO transactions (guid, currency_guid, num, post_date, enter_date, description) VALUES (?, ?, ?, ?, ?, ?)`,
+      bind: [t.guid, t.currencyGuid, t.num, t.postDate, t.enterDate, t.description],
+    });
+
+    for (const s of t.splits) {
+      // Parse num/denom from the "num/denom" strings
+      const valSlash = s.value.indexOf("/");
+      const valueNum = valSlash === -1 ? Number(s.value) || 0 : Number(s.value.slice(0, valSlash)) || 0;
+      const valueDenom = valSlash === -1 ? 1 : Number(s.value.slice(valSlash + 1)) || 1;
+
+      const qtySlash = s.quantity.indexOf("/");
+      const quantityNum = qtySlash === -1 ? Number(s.quantity) || 0 : Number(s.quantity.slice(0, qtySlash)) || 0;
+      const quantityDenom = qtySlash === -1 ? 1 : Number(s.quantity.slice(qtySlash + 1)) || 1;
+
+      db.exec({
+        sql: `INSERT INTO splits (guid, tx_guid, account_guid, memo, action, reconcile_state, value_num, value_denom, quantity_num, quantity_denom, lot_guid) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        bind: [s.guid, t.guid, s.accountGuid, s.memo, s.action, s.reconcileState, valueNum, valueDenom, quantityNum, quantityDenom, s.lotGuid],
+      });
+    }
+  }
+
+  // Prices
+  for (const p of data.prices) {
+    db.exec({
+      sql: `INSERT INTO prices (guid, commodity_guid, currency_guid, date, source, type, value_num, value_denom) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      bind: [p.guid, p.commodityGuid, p.currencyGuid, p.date, p.source, p.type, p.valueNum, p.valueDenom],
+    });
+  }
+
+  // Scheduled transactions
+  for (const sx of data.schedxactions) {
+    db.exec({
+      sql: `INSERT INTO schedxactions (guid, name, enabled, start_date, end_date, last_occur, num_occur, rem_occur, auto_create) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      bind: [sx.guid, sx.name, sx.enabled, sx.startDate, sx.endDate, sx.lastOccur, sx.numOccur, sx.remOccur, sx.autoCreate],
+    });
+  }
+
+  // Recurrences
+  for (const r of data.recurrences) {
+    db.exec({
+      sql: `INSERT INTO recurrences (obj_guid, recurrence_mult, recurrence_period_type, recurrence_period_start) VALUES (?, ?, ?, ?)`,
+      bind: [r.objGuid, r.mult, r.periodType, r.periodStart],
+    });
+  }
+
+  // Budgets
+  for (const b of data.budgets) {
+    db.exec({
+      sql: `INSERT INTO budgets (guid, name, description, num_periods) VALUES (?, ?, ?, ?)`,
+      bind: [b.guid, b.name, b.description, b.numPeriods],
+    });
+  }
+
+  // Budget amounts
+  for (const ba of data.budgetAmounts) {
+    db.exec({
+      sql: `INSERT INTO budget_amounts (budget_guid, account_guid, period_num, amount_num, amount_denom) VALUES (?, ?, ?, ?, ?)`,
+      bind: [ba.budgetGuid, ba.accountGuid, ba.periodNum, ba.amountNum, ba.amountDenom],
+    });
+  }
+
+  // Book-closing slots
+  for (const txGuid of data.closingTransactionGuids) {
+    db.exec({
+      sql: `INSERT INTO slots (obj_guid, name, slot_type, string_val) VALUES (?, 'book-closing', 4, 'true')`,
+      bind: [txGuid],
+    });
+  }
+
+  const adapter = createWasmAdapter(db);
+  validateSchema(adapter);
+  ctx = buildParseContext(adapter);
+}
+
 function closeDb(): void {
   if (db) {
     db.close();
@@ -153,6 +267,27 @@ function getFullDashboardData(): DashboardData {
       ? ((currentIncome - currentExpenses) / currentIncome) * 100
       : 0;
 
+  const hasClosing = hasClosingTransactions(ctx);
+
+  // If closing transactions exist, also compute versions with them excluded
+  let cashFlowSeriesExcludingClosing: typeof cashFlowSeries | undefined;
+  let expenseBreakdownExcludingClosing: typeof expenseBreakdown | undefined;
+  let monthlyExpensesByCategoryExcludingClosing: typeof monthlyExpensesByCategory | undefined;
+  let expenseCategoryColorsExcludingClosing: typeof expenseCategoryColors | undefined;
+  let monthlyIncomeByCategoryExcludingClosing: typeof monthlyIncomeByCategory | undefined;
+  let incomeCategoryColorsExcludingClosing: typeof incomeCategoryColors | undefined;
+
+  if (hasClosing) {
+    cashFlowSeriesExcludingClosing = computeCashFlowSeries(ctx, true);
+    const excExpense = computeExpenseBreakdown(ctx, true);
+    expenseBreakdownExcludingClosing = excExpense.categories;
+    monthlyExpensesByCategoryExcludingClosing = excExpense.monthly;
+    expenseCategoryColorsExcludingClosing = excExpense.colors;
+    const excIncome = computeIncomeBreakdown(ctx, true);
+    monthlyIncomeByCategoryExcludingClosing = excIncome.monthly;
+    incomeCategoryColorsExcludingClosing = excIncome.colors;
+  }
+
   const baseCommodity = ctx.commodityMap.get(ctx.baseCurrencyGuid);
 
   return {
@@ -187,6 +322,13 @@ function getFullDashboardData(): DashboardData {
       fullname: c.fullname,
       fraction: c.fraction,
     })),
+    hasClosingTransactions: hasClosing,
+    cashFlowSeriesExcludingClosing,
+    expenseBreakdownExcludingClosing,
+    monthlyExpensesByCategoryExcludingClosing,
+    expenseCategoryColorsExcludingClosing,
+    monthlyIncomeByCategoryExcludingClosing,
+    incomeCategoryColorsExcludingClosing,
   };
 }
 
@@ -366,6 +508,17 @@ self.onmessage = async (e: MessageEvent<WorkerRequest>) => {
       try {
         await initFromBuffer(msg.fileBuffer, msg.writable ?? false);
         console.log("[db-worker] DB opened from uploaded file via SQLite WASM", isWritable ? "(read-write)" : "(read-only)");
+        post({ type: "ready" });
+      } catch (err) {
+        post({ type: "init-error", message: (err as Error).message });
+      }
+      break;
+    }
+
+    case "init-xml": {
+      try {
+        initFromXmlData(msg.xmlData);
+        console.log("[db-worker] DB created from XML data (read-only)");
         post({ type: "ready" });
       } catch (err) {
         post({ type: "init-error", message: (err as Error).message });

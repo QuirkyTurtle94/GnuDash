@@ -1757,6 +1757,7 @@ exports[`parseGnuCashFile > snapshot: full DashboardData 1`] = `
       "net": 2960,
     },
   ],
+  "cashFlowSeriesExcludingClosing": undefined,
   "commodities": [
     {
       "fraction": 100,
@@ -1807,10 +1808,12 @@ exports[`parseGnuCashFile > snapshot: full DashboardData 1`] = `
       "name": "Utilities",
     },
   ],
+  "expenseBreakdownExcludingClosing": undefined,
   "expenseCategoryColors": {
     "Food": "#4A7A6B",
     "Utilities": "#5C8C7C",
   },
+  "expenseCategoryColorsExcludingClosing": undefined,
   "expenseTransactions": [
     {
       "accountName": "Water",
@@ -1879,10 +1882,12 @@ exports[`parseGnuCashFile > snapshot: full DashboardData 1`] = `
       ],
     },
   ],
+  "hasClosingTransactions": false,
   "incomeCategoryColors": {
     "Freelance": "#4A7A9A",
     "Salary": "#3B6B8A",
   },
+  "incomeCategoryColorsExcludingClosing": undefined,
   "incomeTransactions": [
     {
       "accountName": "Salary",
@@ -2525,6 +2530,7 @@ exports[`parseGnuCashFile > snapshot: full DashboardData 1`] = `
       ],
     },
   ],
+  "monthlyExpensesByCategoryExcludingClosing": undefined,
   "monthlyIncomeByCategory": [
     {
       "amount": 3000,
@@ -2563,6 +2569,7 @@ exports[`parseGnuCashFile > snapshot: full DashboardData 1`] = `
       ],
     },
   ],
+  "monthlyIncomeByCategoryExcludingClosing": undefined,
   "netWorthSeries": [
     {
       "assets": 17760,

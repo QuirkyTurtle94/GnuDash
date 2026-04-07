@@ -1,6 +1,6 @@
 import type { MonthlyExpenseByCategory, MonthlyCashFlow } from "@/lib/types/gnucash";
 import { formatCurrencyShort } from "@/lib/format";
-import type { CustomRange } from "@/lib/period-utils";
+import { type CustomRange, dateToMonth } from "@/lib/period-utils";
 
 // ── Library-agnostic intermediate format ──────────────────────────────
 
@@ -72,7 +72,7 @@ function getMonthsForPeriod(
     case "custom":
       if (!customRange) return new Set();
       slice = cashFlowSeries.filter(
-        (s) => s.month >= customRange.start && s.month <= customRange.end,
+        (s) => s.month >= dateToMonth(customRange.start) && s.month <= dateToMonth(customRange.end),
       );
       break;
   }

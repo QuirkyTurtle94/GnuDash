@@ -1,8 +1,12 @@
 import type { MonthlyCashFlow } from "@/lib/types/gnucash";
 import type { ParseContext } from "../context";
 import { sqlMonth } from "../shared/dates";
+import { EXCLUDE_CLOSING_JOIN, EXCLUDE_CLOSING_WHERE } from "./closing";
 
-export function computeCashFlowSeries(ctx: ParseContext): MonthlyCashFlow[] {
+export function computeCashFlowSeries(ctx: ParseContext, excludeClosing = false): MonthlyCashFlow[] {
+  const closingJoin = excludeClosing ? EXCLUDE_CLOSING_JOIN : "";
+  const closingWhere = excludeClosing ? `AND ${EXCLUDE_CLOSING_WHERE}` : "";
+
   const rows = ctx.db
     .prepare(
       `SELECT
@@ -14,7 +18,9 @@ export function computeCashFlowSeries(ctx: ParseContext): MonthlyCashFlow[] {
       FROM splits s
       JOIN accounts a ON s.account_guid = a.guid
       JOIN transactions t ON s.tx_guid = t.guid
+      ${closingJoin}
       WHERE a.account_type IN ('INCOME', 'EXPENSE')
+      ${closingWhere}
       GROUP BY ${sqlMonth("t.post_date")}
       ORDER BY month`
     )

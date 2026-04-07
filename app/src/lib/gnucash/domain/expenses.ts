@@ -2,9 +2,11 @@ import type { ExpenseCategory, MonthlyExpenseByCategory, ExpenseTransaction } fr
 import type { ParseContext } from "../context";
 import { getAccountPath } from "../shared/accounts";
 import { parseGnuCashDate, formatISODate, sqlMonth } from "../shared/dates";
+import { EXCLUDE_CLOSING_JOIN, EXCLUDE_CLOSING_WHERE } from "./closing";
 
 export function computeExpenseBreakdown(
-  ctx: ParseContext
+  ctx: ParseContext,
+  excludeClosing = false,
 ): { categories: ExpenseCategory[]; monthly: MonthlyExpenseByCategory[]; colors: Record<string, string> } {
   const { db, accounts, accountMap, rootAccount, topExpenseGuids } = ctx;
 
@@ -21,6 +23,9 @@ export function computeExpenseBreakdown(
     colorMap[cat.name] = colorPalette[i % colorPalette.length];
   });
 
+  const closingJoin = excludeClosing ? EXCLUDE_CLOSING_JOIN : "";
+  const closingWhere = excludeClosing ? `AND ${EXCLUDE_CLOSING_WHERE}` : "";
+
   const rows = db
     .prepare(
       `SELECT
@@ -30,7 +35,9 @@ export function computeExpenseBreakdown(
       FROM splits s
       JOIN accounts a ON s.account_guid = a.guid
       JOIN transactions t ON s.tx_guid = t.guid
+      ${closingJoin}
       WHERE a.account_type = 'EXPENSE'
+      ${closingWhere}
       GROUP BY s.account_guid, ${sqlMonth("t.post_date")}
       ORDER BY month`
     )

@@ -13,7 +13,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { PeriodSelector } from "@/components/ui/period-selector";
 import { formatCurrency } from "@/lib/format";
 import { assignShades } from "@/lib/color-utils";
-import { type CustomRange, getDataRange, getMonthsBetween } from "@/lib/period-utils";
+import { type CustomRange, getDataRange, getMonthsForDateRange } from "@/lib/period-utils";
 import type { MonthlyExpenseByCategory } from "@/lib/types/gnucash";
 
 type TimePeriod = "this-month" | "last-month" | "this-year" | "last-12m" | "custom";
@@ -30,7 +30,7 @@ const PERIOD_LABELS: Record<string, string> = {
 
 function getMonthsForPeriod(period: string, customRange?: CustomRange | null, monthlyData?: MonthlyExpenseByCategory[]): string[] {
   if (period === "custom") {
-    return customRange ? getMonthsBetween(customRange.start, customRange.end) : [];
+    return customRange ? getMonthsForDateRange(customRange.start, customRange.end) : [];
   }
   if (period === "all-time") {
     // Return all unique months from the data

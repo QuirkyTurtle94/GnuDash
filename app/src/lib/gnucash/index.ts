@@ -11,6 +11,7 @@ import { computeTopBalances } from "./domain/balances";
 import { getLedgerTransactions, getRecentTransactions } from "./domain/ledger";
 import { computeBudgetData } from "./domain/budgets";
 import { getUpcomingBills } from "./domain/bills";
+import { hasClosingTransactions } from "./domain/closing";
 import { formatMonth } from "./shared/dates";
 
 export function parseGnuCashFile(filePath: string): DashboardData {
@@ -46,6 +47,26 @@ export function parseGnuCashFile(filePath: string): DashboardData {
         ? ((currentIncome - currentExpenses) / currentIncome) * 100
         : 0;
 
+    const hasClosing = hasClosingTransactions(ctx);
+
+    let cashFlowSeriesExcludingClosing: typeof cashFlowSeries | undefined;
+    let expenseBreakdownExcludingClosing: typeof expenseBreakdown | undefined;
+    let monthlyExpensesByCategoryExcludingClosing: typeof monthlyExpensesByCategory | undefined;
+    let expenseCategoryColorsExcludingClosing: typeof expenseCategoryColors | undefined;
+    let monthlyIncomeByCategoryExcludingClosing: typeof monthlyIncomeByCategory | undefined;
+    let incomeCategoryColorsExcludingClosing: typeof incomeCategoryColors | undefined;
+
+    if (hasClosing) {
+      cashFlowSeriesExcludingClosing = computeCashFlowSeries(ctx, true);
+      const excExpense = computeExpenseBreakdown(ctx, true);
+      expenseBreakdownExcludingClosing = excExpense.categories;
+      monthlyExpensesByCategoryExcludingClosing = excExpense.monthly;
+      expenseCategoryColorsExcludingClosing = excExpense.colors;
+      const excIncome = computeIncomeBreakdown(ctx, true);
+      monthlyIncomeByCategoryExcludingClosing = excIncome.monthly;
+      incomeCategoryColorsExcludingClosing = excIncome.colors;
+    }
+
     const baseCommodity = ctx.commodityMap.get(ctx.baseCurrencyGuid);
 
     return {
@@ -80,6 +101,13 @@ export function parseGnuCashFile(filePath: string): DashboardData {
         fullname: c.fullname,
         fraction: c.fraction,
       })),
+      hasClosingTransactions: hasClosing,
+      cashFlowSeriesExcludingClosing,
+      expenseBreakdownExcludingClosing,
+      monthlyExpensesByCategoryExcludingClosing,
+      expenseCategoryColorsExcludingClosing,
+      monthlyIncomeByCategoryExcludingClosing,
+      incomeCategoryColorsExcludingClosing,
     };
   } finally {
     db.close();

@@ -2,9 +2,11 @@ import type { MonthlyExpenseByCategory, ExpenseTransaction } from "@/lib/types/g
 import type { ParseContext } from "../context";
 import { getAccountPath } from "../shared/accounts";
 import { parseGnuCashDate, formatISODate, sqlMonth } from "../shared/dates";
+import { EXCLUDE_CLOSING_JOIN, EXCLUDE_CLOSING_WHERE } from "./closing";
 
 export function computeIncomeBreakdown(
-  ctx: ParseContext
+  ctx: ParseContext,
+  excludeClosing = false,
 ): { monthly: MonthlyExpenseByCategory[]; colors: Record<string, string> } {
   const { db, accounts, accountMap, rootAccount, topIncomeGuids } = ctx;
 
@@ -20,6 +22,9 @@ export function computeIncomeBreakdown(
     colorMap[cat.name] = colorPalette[i % colorPalette.length];
   });
 
+  const closingJoin = excludeClosing ? EXCLUDE_CLOSING_JOIN : "";
+  const closingWhere = excludeClosing ? `AND ${EXCLUDE_CLOSING_WHERE}` : "";
+
   const rows = db
     .prepare(
       `SELECT
@@ -29,7 +34,9 @@ export function computeIncomeBreakdown(
       FROM splits s
       JOIN accounts a ON s.account_guid = a.guid
       JOIN transactions t ON s.tx_guid = t.guid
+      ${closingJoin}
       WHERE a.account_type = 'INCOME'
+      ${closingWhere}
       GROUP BY s.account_guid, ${sqlMonth("t.post_date")}
       ORDER BY month`
     )
