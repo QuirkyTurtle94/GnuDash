@@ -2,6 +2,7 @@
 
 import { useMemo } from "react";
 import { useDashboard } from "@/lib/dashboard-context";
+import { useClosing } from "@/lib/closing-context";
 import { SpendingFilterProvider, useSpendingFilter } from "@/lib/spending-filter-context";
 import { PERIOD_LABELS } from "@/lib/spending-utils";
 import { PeriodSelector } from "@/components/ui/period-selector";
@@ -97,9 +98,14 @@ function ActiveFilters() {
 
 function IncomeContent() {
   const { data } = useDashboard();
+  const { excludeClosing } = useClosing();
   if (!data) return null;
 
   const c = data.currency;
+  const activeIncome = excludeClosing && data.monthlyIncomeByCategoryExcludingClosing
+    ? data.monthlyIncomeByCategoryExcludingClosing : data.monthlyIncomeByCategory;
+  const activeIncomeColors = excludeClosing && data.incomeCategoryColorsExcludingClosing
+    ? data.incomeCategoryColorsExcludingClosing : data.incomeCategoryColors;
 
   return (
     <div className="flex flex-col gap-4 sm:gap-6">
@@ -113,14 +119,14 @@ function IncomeContent() {
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-5">
         <SpendingPieCard
-          monthlyExpenses={data.monthlyIncomeByCategory}
-          categoryColors={data.incomeCategoryColors}
+          monthlyExpenses={activeIncome}
+          categoryColors={activeIncomeColors}
           currency={c}
           title="Income Breakdown"
           accentColor="#3B6B8A"
         />
         <MonthlyExpenseBarCard
-          monthlyExpenses={data.monthlyIncomeByCategory}
+          monthlyExpenses={activeIncome}
           currency={c}
           title="Monthly Income"
           barColor="#3B6B8A"

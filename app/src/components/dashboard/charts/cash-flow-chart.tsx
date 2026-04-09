@@ -13,7 +13,6 @@ import {
 } from "recharts";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { PeriodSelector } from "@/components/ui/period-selector";
-import { ExcludeClosingToggle } from "@/components/ui/exclude-closing-toggle";
 import { formatCurrency, formatCurrencyShort } from "@/lib/format";
 import { type CustomRange, getDataRange, dateToMonth } from "@/lib/period-utils";
 import type { MonthlyCashFlow } from "@/lib/types/gnucash";
@@ -65,21 +64,18 @@ interface CashFlowChartProps {
   onExternalPeriodChange?: (p: string) => void;
   onExternalCustomRangeChange?: (r: CustomRange) => void;
   externalDataRange?: { min: string; max: string };
-  /** Alternate series with closing transactions excluded (shown when toggle is on). */
-  seriesExcludingClosing?: MonthlyCashFlow[];
 }
 
-export function CashFlowChart({ series, currency, externalPeriod, externalCustomRange, onExternalPeriodChange, onExternalCustomRangeChange, externalDataRange, seriesExcludingClosing }: CashFlowChartProps) {
+export function CashFlowChart({ series, currency, externalPeriod, externalCustomRange, onExternalPeriodChange, onExternalCustomRangeChange, externalDataRange }: CashFlowChartProps) {
   const [localPeriod, setLocalPeriod] = useState<TimePeriod>("last-6m");
   const [localCustomRange, setLocalCustomRange] = useState<CustomRange | null>(null);
-  const [excludeClosing, setExcludeClosing] = useState(!!seriesExcludingClosing);
 
   const isExternal = externalPeriod !== undefined;
   const isSynced = isExternal && !!onExternalPeriodChange;
   const period = (isExternal ? externalPeriod : localPeriod) as TimePeriod;
   const customRange = isExternal ? (externalCustomRange ?? null) : localCustomRange;
 
-  const activeSeries = excludeClosing && seriesExcludingClosing ? seriesExcludingClosing : series;
+  const activeSeries = series;
 
   const dataRange = useMemo(() => getDataRange(activeSeries) ?? { min: "2020-01", max: "2026-01" }, [activeSeries]);
   const filtered = useMemo(() => getSlice(activeSeries, period, customRange), [activeSeries, period, customRange]);
@@ -93,9 +89,6 @@ export function CashFlowChart({ series, currency, externalPeriod, externalCustom
           Cash Flow
         </CardTitle>
         <div className="flex items-center gap-3">
-          {seriesExcludingClosing && (
-            <ExcludeClosingToggle checked={excludeClosing} onChange={setExcludeClosing} />
-          )}
         {isSynced ? (
           <PeriodSelector
             period={period}
