@@ -1,12 +1,60 @@
 "use client";
 
-import { useState } from "react";
-import { Menu, Eye, EyeOff, Pencil, Lock, BookX } from "lucide-react";
+import { useState, useRef, useEffect } from "react";
+import { Menu, Eye, EyeOff, Pencil, Lock, BookX, ChevronDown } from "lucide-react";
 import { useDashboard } from "@/lib/dashboard-context";
 import { PrivacyProvider, usePrivacy } from "@/lib/privacy-context";
 import { ClosingProvider, useClosing } from "@/lib/closing-context";
 import { FileUpload } from "@/components/upload/file-upload";
 import { Sidebar } from "@/components/dashboard/sidebar";
+
+function CurrencySelector() {
+  const { data, setCurrency } = useDashboard();
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    }
+    if (open) document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [open]);
+
+  if (!data || !data.availableCurrencies || data.availableCurrencies.length <= 1) return null;
+
+  return (
+    <div className="relative" ref={ref}>
+      <button
+        onClick={() => setOpen((v) => !v)}
+        className="flex items-center gap-1 rounded-lg border border-[#EFEFEF] px-2.5 py-1.5 text-xs font-medium text-[#6F767E] transition-colors hover:bg-[#F4F5F7]"
+        title="Change display currency"
+      >
+        {data.currency}
+        <ChevronDown className="h-3 w-3" />
+      </button>
+      {open && (
+        <div className="absolute right-0 top-full z-50 mt-1 max-h-60 w-48 overflow-y-auto rounded-lg border border-[#EFEFEF] bg-white py-1 shadow-lg">
+          {data.availableCurrencies.map((c) => (
+            <button
+              key={c.guid}
+              onClick={() => {
+                setCurrency(c.guid);
+                setOpen(false);
+              }}
+              className={`flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs transition-colors hover:bg-[#F4F5F7] ${
+                c.mnemonic === data.currency ? "font-semibold text-[#3B6B8A]" : "text-[#6F767E]"
+              }`}
+            >
+              <span className="w-10 font-mono">{c.mnemonic}</span>
+              <span className="truncate text-[#9A9FA5]">{c.fullname}</span>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 
 function DashboardInner({ children }: { children: React.ReactNode }) {
   const { data, isWritable, isXmlSource, toggleWritable } = useDashboard();
@@ -93,6 +141,7 @@ function DashboardInner({ children }: { children: React.ReactNode }) {
                 <span className="hidden sm:inline">{excludeClosing ? "Closing excluded" : "Exclude closing"}</span>
               </button>
             )}
+            <CurrencySelector />
             <button
               onClick={toggleHideValues}
               className={`flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors ${

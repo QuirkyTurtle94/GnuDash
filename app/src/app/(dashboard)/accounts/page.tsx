@@ -215,14 +215,15 @@ function AccountRow({
           </span>
         </td>
 
-        {/* Balance */}
+        {/* Balance (in account's native currency) */}
         <td className="whitespace-nowrap py-2.5 pr-3 text-right text-xs font-medium" data-v>
           {account.type !== "ROOT" && (() => {
             const creditTypes = new Set(["INCOME", "EQUITY", "LIABILITY", "CREDIT", "PAYABLE"]);
-            const displayBalance = creditTypes.has(account.type) ? -account.balance : account.balance;
+            const displayBalance = creditTypes.has(account.type) ? -account.nativeBalance : account.nativeBalance;
+            const displayCurrency = account.nativeCurrencyMnemonic;
             return (
               <span className={displayBalance < 0 ? "text-[#E87C6B]" : "text-[#1A1D1F]"}>
-                {displayBalance < 0 ? "−" : ""}{formatCurrency(Math.abs(displayBalance), currency)}
+                {displayBalance < 0 ? "−" : ""}{formatCurrency(Math.abs(displayBalance), displayCurrency)}
               </span>
             );
           })()}

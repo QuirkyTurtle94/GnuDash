@@ -11,6 +11,7 @@ export type WorkerRequest =
   | { type: "init-opfs"; fileName: string; writable?: boolean }
   | { type: "query"; id: string; fn: DomainFunction }
   | { type: "mutation"; id: string; action: MutationAction; payload: unknown }
+  | { type: "set-currency"; id: string; currencyGuid: string }
   | { type: "export"; id: string }
   | { type: "close" };
 

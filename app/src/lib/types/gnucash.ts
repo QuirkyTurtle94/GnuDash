@@ -152,6 +152,10 @@ export interface AccountNode {
   placeholder: boolean;
   /** Account balance in base currency, including all descendant accounts */
   balance: number;
+  /** Account balance in native commodity (for parents: children converted to parent's commodity) */
+  nativeBalance: number;
+  /** Currency mnemonic for nativeBalance display (e.g. "USD" for a USD brokerage; for stocks: the trading currency) */
+  nativeCurrencyMnemonic: string;
   children: AccountNode[];
 }
 
@@ -433,6 +437,8 @@ export interface DashboardData {
   ledgerTransactions: LedgerTransaction[];
   /** All commodities/currencies in the file */
   commodities: CommodityInfo[];
+  /** Currencies available for the display currency selector (CURRENCY namespace only) */
+  availableCurrencies: { guid: string; mnemonic: string; fullname: string }[];
   /** True if the file contains book-closing transactions (year-end entries that zero out income/expense) */
   hasClosingTransactions: boolean;
   /** Cash flow series with closing transactions excluded (only present when hasClosingTransactions is true). */

@@ -16,7 +16,7 @@ import { sqlYear, sqlMonthNum } from "../shared/dates";
  * Returns null if no budgets table exists or no budgets are defined.
  */
 export function computeBudgetData(ctx: ParseContext): BudgetData | null {
-  const { db, accounts, accountMap, rootAccount, topExpenseGuids, topIncomeGuids } = ctx;
+  const { db, accounts, accountMap, commodityMap, fxRates, rootAccount, topExpenseGuids, topIncomeGuids } = ctx;
 
   // Check if budgets table exists
   const tableCheck = db
@@ -46,11 +46,12 @@ export function computeBudgetData(ctx: ParseContext): BudgetData | null {
     )
     .all() as { budget_guid: string; account_guid: string; period_num: number; amount: number }[];
 
-  // Fetch actuals for all expense/income leaf accounts
+  // Fetch actuals for all expense/income leaf accounts (with FX conversion)
   const actualRows = db
     .prepare(
       `SELECT
         s.account_guid,
+        a.commodity_guid,
         ${sqlMonthNum("t.post_date")} AS month_num,
         ${sqlYear("t.post_date")} AS year,
         SUM(CAST(s.quantity_num AS REAL) / s.quantity_denom) AS actual
@@ -60,17 +61,21 @@ export function computeBudgetData(ctx: ParseContext): BudgetData | null {
       WHERE a.account_type IN ('EXPENSE', 'INCOME')
       GROUP BY s.account_guid, ${sqlYear("t.post_date")}, ${sqlMonthNum("t.post_date")}`
     )
-    .all() as { account_guid: string; month_num: string; year: string; actual: number }[];
+    .all() as { account_guid: string; commodity_guid: string; month_num: string; year: string; actual: number }[];
 
   const allYears = new Set<number>();
   const actualsMap = new Map<string, Map<string, Map<number, number>>>();
   for (const row of actualRows) {
     allYears.add(parseInt(row.year));
     const period = parseInt(row.month_num) - 1;
+    // Convert from account's commodity to base currency
+    const commodity = commodityMap.get(row.commodity_guid);
+    const rate = commodity?.namespace === "CURRENCY" ? fxRates.rate(row.commodity_guid) : 1;
+    const converted = row.actual * rate;
     if (!actualsMap.has(row.account_guid)) actualsMap.set(row.account_guid, new Map());
     const yearMap = actualsMap.get(row.account_guid)!;
     if (!yearMap.has(row.year)) yearMap.set(row.year, new Map());
-    yearMap.get(row.year)!.set(period, (yearMap.get(row.year)!.get(period) ?? 0) + row.actual);
+    yearMap.get(row.year)!.set(period, (yearMap.get(row.year)!.get(period) ?? 0) + converted);
   }
   const availableYears = [...allYears].sort((a, b) => b - a);
 
@@ -92,13 +97,19 @@ export function computeBudgetData(ctx: ParseContext): BudgetData | null {
     return result;
   }
 
-  // Build budget amounts map: budgetGuid -> accountGuid -> periodNum -> amount
+  // Build budget amounts map: budgetGuid -> accountGuid -> periodNum -> amount (FX-converted)
   const budgetAmountsMap = new Map<string, Map<string, Map<number, number>>>();
   for (const row of amountRows) {
+    // Convert budget amount from account's commodity to base currency
+    const account = accountMap.get(row.account_guid);
+    const commodity = account ? commodityMap.get(account.commodity_guid) : undefined;
+    const rate = commodity?.namespace === "CURRENCY" ? fxRates.rate(account!.commodity_guid) : 1;
+    const converted = row.amount * rate;
+
     if (!budgetAmountsMap.has(row.budget_guid)) budgetAmountsMap.set(row.budget_guid, new Map());
     const accountAmounts = budgetAmountsMap.get(row.budget_guid)!;
     if (!accountAmounts.has(row.account_guid)) accountAmounts.set(row.account_guid, new Map());
-    accountAmounts.get(row.account_guid)!.set(row.period_num, row.amount);
+    accountAmounts.get(row.account_guid)!.set(row.period_num, converted);
   }
 
   /**
