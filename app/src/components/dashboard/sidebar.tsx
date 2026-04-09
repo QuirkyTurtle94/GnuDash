@@ -11,6 +11,7 @@ import {
   CreditCard,
   TrendingUp,
   Target,
+  Banknote,
   GitFork,
   LogOut,
   Download,
@@ -25,6 +26,7 @@ const mainNav = [
   { icon: CreditCard, label: "Spending", href: "/spending" },
   { icon: TrendingUp, label: "Investment", href: "/investment" },
   { icon: Target, label: "Budget", href: "/budget" },
+  { icon: Banknote, label: "Cash Flow", href: "/cash-flow" },
   { icon: GitFork, label: "Sankey", href: "/sankey" },
 ];
 

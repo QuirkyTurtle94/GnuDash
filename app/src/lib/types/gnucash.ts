@@ -249,6 +249,17 @@ export interface BudgetData {
   availableYears: number[];
 }
 
+export interface CashFlowBudgetForBudget {
+  outflowCategories: BudgetCategoryRow[];
+  inflowCategories: BudgetCategoryRow[];
+}
+
+export interface CashFlowBudgetData {
+  budgets: BudgetInfo[];
+  categoriesByBudget: Record<string, CashFlowBudgetForBudget>;
+  availableYears: number[];
+}
+
 export interface DashboardData {
   currency: string; // ISO 4217 code detected from GNUCash (e.g. "GBP", "USD")
   currencyGuid: string; // GUID of the base currency commodity
@@ -273,6 +284,7 @@ export interface DashboardData {
   currentMonthExpenses: number;
   savingsRate: number;
   budgetData: BudgetData | null;
+  cashFlowBudgetData: CashFlowBudgetData | null;
   ledgerTransactions: LedgerTransaction[];
   commodities: CommodityInfo[];
   hasClosingTransactions: boolean;

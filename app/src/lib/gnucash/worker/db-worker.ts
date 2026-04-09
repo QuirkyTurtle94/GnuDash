@@ -15,6 +15,7 @@ import { computeInvestments, computeInvestmentValueSeries } from "../domain/inve
 import { computeTopBalances } from "../domain/balances";
 import { getLedgerTransactions, getRecentTransactions } from "../domain/ledger";
 import { computeBudgetData } from "../domain/budgets";
+import { computeCashFlowBudgetData } from "../domain/cash-flow-budget";
 import { getUpcomingBills } from "../domain/bills";
 import { hasClosingTransactions } from "../domain/closing";
 import { formatMonth } from "../shared/dates";
@@ -255,6 +256,7 @@ function getFullDashboardData(): DashboardData {
   const upcomingBills = getUpcomingBills(ctx);
   const ledgerTransactions = getLedgerTransactions(ctx);
   const budgetData = computeBudgetData(ctx);
+  const cashFlowBudgetData = computeCashFlowBudgetData(ctx);
   const currentNetWorth = computeCurrentNetWorth(ctx);
 
   const now = new Date();
@@ -314,6 +316,7 @@ function getFullDashboardData(): DashboardData {
     currentMonthExpenses: currentExpenses,
     savingsRate,
     budgetData,
+    cashFlowBudgetData,
     ledgerTransactions,
     commodities: ctx.commodities.map((c) => ({
       guid: c.guid,
