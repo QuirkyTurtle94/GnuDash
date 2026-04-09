@@ -219,13 +219,25 @@ export class GnuCashWorkerClient {
     });
   }
 
-  // ── Mutations ──────────────────────────────────────────────────
+  // ── Currency selection ──────────────────────────────────────────
 
   /**
-   * Create a transaction and return fully refreshed dashboard data.
-   * The accounting engine validates all invariants (balance, denoms, etc.)
-   * before committing atomically.
+   * Switch the display currency and return fully refreshed dashboard data.
+   * Rebuilds all computations with the new base currency.
    */
+  async setCurrency(currencyGuid: string): Promise<DashboardData> {
+    const id = String(++this.idCounter);
+    return new Promise<DashboardData>((resolve, reject) => {
+      this.pending.set(id, {
+        resolve: resolve as (data: unknown) => void,
+        reject,
+      });
+      this.send({ type: "set-currency", id, currencyGuid });
+    });
+  }
+
+  // ── Mutations ──────────────────────────────────────────────────
+
   /**
    * Export the current database as a raw SQLite ArrayBuffer.
    * The result is a valid .gnucash file that opens in GNUCash desktop.

@@ -38,6 +38,7 @@ interface DashboardContextType {
   deleteAccountWithReallocation: (payload: DeleteAccountPayload) => Promise<void>;
   createCommodity: (payload: CreateCommodityPayload) => Promise<void>;
   exportFile: () => Promise<void>;
+  setCurrency: (currencyGuid: string) => Promise<void>;
 }
 
 const DashboardContext = createContext<DashboardContextType | null>(null);
@@ -240,6 +241,12 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
     setData(await client.createCommodity(payload));
   }
 
+  async function setCurrencyFn(currencyGuid: string) {
+    const client = getClient();
+    const dashboardData = await client.setCurrency(currencyGuid);
+    setData(dashboardData);
+  }
+
   async function exportFile() {
     const client = getClient();
     const buffer = await client.exportDatabase();
@@ -254,7 +261,7 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
 
   return (
     <DashboardContext.Provider
-      value={{ data, isLoading, error, uploadedAt, isWritable, isXmlSource, toggleWritable, uploadFile, loadDemo, clearData, createTransaction, deleteTransaction: deleteTransactionFn, editTransaction, createAccount: createAccountFn, updateAccount: updateAccountFn, deleteAccountWithReallocation: deleteAccountWithReallocationFn, createCommodity: createCommodityFn, exportFile }}
+      value={{ data, isLoading, error, uploadedAt, isWritable, isXmlSource, toggleWritable, uploadFile, loadDemo, clearData, createTransaction, deleteTransaction: deleteTransactionFn, editTransaction, createAccount: createAccountFn, updateAccount: updateAccountFn, deleteAccountWithReallocation: deleteAccountWithReallocationFn, createCommodity: createCommodityFn, exportFile, setCurrency: setCurrencyFn }}
     >
       {children}
     </DashboardContext.Provider>

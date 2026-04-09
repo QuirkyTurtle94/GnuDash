@@ -322,6 +322,7 @@ function getFullDashboardData(): DashboardData {
       fullname: c.fullname,
       fraction: c.fraction,
     })),
+    availableCurrencies: ctx.availableCurrencies,
     hasClosingTransactions: hasClosing,
     cashFlowSeriesExcludingClosing,
     expenseBreakdownExcludingClosing,
@@ -579,6 +580,19 @@ self.onmessage = async (e: MessageEvent<WorkerRequest>) => {
           default:
             throw new Error(`Unknown mutation action: ${msg.action}`);
         }
+        post({ type: "result", id: msg.id, data });
+      } catch (err) {
+        post({ type: "error", id: msg.id, message: (err as Error).message });
+      }
+      break;
+    }
+
+    case "set-currency": {
+      try {
+        if (!ctx) throw new Error("No database loaded");
+        // Rebuild parse context with the new base currency, reusing existing db adapter
+        ctx = buildParseContext(ctx.db, msg.currencyGuid);
+        const data = getFullDashboardData();
         post({ type: "result", id: msg.id, data });
       } catch (err) {
         post({ type: "error", id: msg.id, message: (err as Error).message });
