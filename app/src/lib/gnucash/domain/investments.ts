@@ -2,6 +2,11 @@ import type { InvestmentHolding, MonthlyInvestmentValue } from "@/lib/types/gnuc
 import type { ParseContext } from "../context";
 import { parseGnuCashDate, sqlMonth } from "../shared/dates";
 
+/**
+ * Compute current investment holdings for all STOCK and MUTUAL accounts.
+ * Calculates cost basis (sum of buy-side split values), market value
+ * (shares × latest price), gain/loss, and 12-month performance.
+ */
 export function computeInvestments(ctx: ParseContext): InvestmentHolding[] {
   const { db, commodityMap, prices, latestPrices } = ctx;
 
@@ -64,6 +69,12 @@ export function computeInvestments(ctx: ParseContext): InvestmentHolding[] {
   });
 }
 
+/**
+ * Compute monthly portfolio value time series for each investment ticker.
+ * For each month, calculates cumulative shares held and multiplies by the
+ * best available price at that month (carrying forward the last known price).
+ * Also tracks cumulative cost basis for gain/loss comparison over time.
+ */
 export function computeInvestmentValueSeries(ctx: ParseContext): MonthlyInvestmentValue[] {
   const { db, commodityMap } = ctx;
 

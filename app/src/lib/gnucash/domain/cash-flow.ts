@@ -3,6 +3,14 @@ import type { ParseContext } from "../context";
 import { sqlMonth } from "../shared/dates";
 import { EXCLUDE_CLOSING_JOIN, EXCLUDE_CLOSING_WHERE } from "./closing";
 
+/**
+ * Compute monthly income vs expense totals from INCOME and EXPENSE account splits.
+ * Income splits are negated (GNUCash stores them as negative values).
+ * Note: this is income/expense flow, not true cash flow — it does not track
+ * movements through bank accounts or include liability/asset transfers.
+ *
+ * @param excludeClosing - If true, exclude year-end book-closing transactions.
+ */
 export function computeCashFlowSeries(ctx: ParseContext, excludeClosing = false): MonthlyCashFlow[] {
   const closingJoin = excludeClosing ? EXCLUDE_CLOSING_JOIN : "";
   const closingWhere = excludeClosing ? `AND ${EXCLUDE_CLOSING_WHERE}` : "";

@@ -4,6 +4,14 @@ import { getAccountPath } from "../shared/accounts";
 import { parseGnuCashDate, formatISODate, sqlMonth } from "../shared/dates";
 import { EXCLUDE_CLOSING_JOIN, EXCLUDE_CLOSING_WHERE } from "./closing";
 
+/**
+ * Compute income breakdown from INCOME account splits.
+ * Returns flat monthly rows per leaf account (for drill-down charts) and
+ * a stable colour map keyed by top-level income category name.
+ * Amounts are negated to positive (GNUCash stores income as negative values).
+ *
+ * @param excludeClosing - If true, exclude year-end book-closing transactions.
+ */
 export function computeIncomeBreakdown(
   ctx: ParseContext,
   excludeClosing = false,
@@ -56,6 +64,10 @@ export function computeIncomeBreakdown(
   return { monthly, colors: colorMap };
 }
 
+/**
+ * Get all individual income transactions for the income table view.
+ * Amounts are negated to positive (GNUCash stores income as negative values).
+ */
 export function getIncomeTransactions(ctx: ParseContext): ExpenseTransaction[] {
   const { db, accountMap, rootAccount, topIncomeGuids } = ctx;
 

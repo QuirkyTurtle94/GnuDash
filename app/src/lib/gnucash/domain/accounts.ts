@@ -2,6 +2,12 @@ import type { AccountNode } from "@/lib/types/gnucash";
 import type { ParseContext } from "../context";
 import { buildFullPath } from "../shared/accounts";
 
+/**
+ * Build a hierarchical account tree from the flat accounts table.
+ * Each node includes a balance in base currency (own splits + all descendants).
+ * Investment accounts (STOCK/MUTUAL) are valued at latest market price.
+ * Foreign currency accounts are converted via FX rates.
+ */
 export function buildAccountTree(ctx: ParseContext): AccountNode[] {
   const { db, accounts, accountMap, commodityMap, baseCurrencyGuid, fxRates, latestPrices, rootAccount } = ctx;
 

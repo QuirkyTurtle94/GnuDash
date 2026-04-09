@@ -35,7 +35,7 @@ export function MonthlyExpenseBarCard({
   selectedBarColor = "#4A7A6B",
   fadedBarColor = "#D5F0E4",
 }: MonthlyExpenseBarCardProps) {
-  const { period, customRange, selectedCategory, excluded, selectedMonth, setSelectedMonth } = useSpendingFilter();
+  const { period, customRange, selectedCategory, selectedAccount, excluded, selectedMonth, setSelectedMonth } = useSpendingFilter();
 
   const handleBarClick = useCallback((data: { month: string }) => {
     // Toggle: click same month again to deselect
@@ -59,6 +59,12 @@ export function MonthlyExpenseBarCard({
     for (const row of monthlyExpenses) {
       if (!validSet.has(row.month)) continue;
       if (!row.pathParts) continue;
+
+      // Apply leaf account filter
+      if (selectedAccount) {
+        const rowPath = row.pathParts.join(":");
+        if (rowPath !== selectedAccount && !rowPath.startsWith(selectedAccount + ":")) continue;
+      }
 
       // Apply category filter
       if (selectedCategory) {
@@ -93,7 +99,7 @@ export function MonthlyExpenseBarCard({
         amount: totals.get(month) ?? 0,
       };
     });
-  }, [monthlyExpenses, period, customRange, selectedCategory, excluded]);
+  }, [monthlyExpenses, period, customRange, selectedCategory, selectedAccount, excluded]);
 
   const maxAmount = useMemo(
     () => Math.max(...barData.map((d) => d.amount), 0),
@@ -111,9 +117,9 @@ export function MonthlyExpenseBarCard({
       <CardHeader className="pb-2">
         <CardTitle className="text-lg font-semibold text-[#1A1D1F]">
           {title}
-          {selectedCategory && (
+          {(selectedAccount || selectedCategory) && (
             <span className="ml-2 text-sm font-normal" style={{ color: barColor }} data-l>
-              {selectedCategory.split(":").slice(-1)[0]}
+              {(selectedAccount ?? selectedCategory)!.split(":").slice(-1)[0]}
             </span>
           )}
         </CardTitle>

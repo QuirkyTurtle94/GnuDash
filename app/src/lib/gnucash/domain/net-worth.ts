@@ -2,6 +2,16 @@ import type { MonthlyNetWorth } from "@/lib/types/gnucash";
 import type { ParseContext } from "../context";
 import { sqlMonth } from "../shared/dates";
 
+/**
+ * Compute monthly net worth time series.
+ * Tracks three separate components that are summed into net worth:
+ * 1. Non-investment assets (ASSET, BANK, CASH, RECEIVABLE) — cumulative balance with FX conversion
+ * 2. Liabilities (LIABILITY, CREDIT, PAYABLE) — cumulative balance with FX conversion
+ * 3. Investments (STOCK, MUTUAL) — shares held × price at each month (mark-to-market)
+ *
+ * Uses quantity (not value) for non-investment accounts to correctly handle
+ * multi-currency accounts. Investment values fluctuate with price history.
+ */
 export function computeNetWorthSeries(ctx: ParseContext): MonthlyNetWorth[] {
   const { db, baseCurrencyGuid, fxRates, commodityMap } = ctx;
 
@@ -138,6 +148,12 @@ export function computeNetWorthSeries(ctx: ParseContext): MonthlyNetWorth[] {
   });
 }
 
+/**
+ * Compute the current total net worth as a single number.
+ * Sums all non-investment account balances (with FX conversion) plus
+ * investment market values (shares × latest price). Excludes ROOT,
+ * INCOME, EXPENSE, EQUITY, and TRADING account types.
+ */
 export function computeCurrentNetWorth(ctx: ParseContext): number {
   const { db, commodityMap, baseCurrencyGuid, fxRates } = ctx;
 
