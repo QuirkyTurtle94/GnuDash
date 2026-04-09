@@ -2,6 +2,19 @@ import type { BudgetData, BudgetDataForBudget, BudgetInfo, BudgetCategoryRow } f
 import type { ParseContext } from "../context";
 import { sqlYear, sqlMonthNum } from "../shared/dates";
 
+/**
+ * Compute budget vs actual data for all budgets in the GNUCash file.
+ * Queries the budgets and budget_amounts tables, then computes actual
+ * spending/income from EXPENSE and INCOME account splits.
+ *
+ * Builds a hierarchical category tree where:
+ * - Accounts with explicit budget entries are included directly
+ * - Ancestor accounts are synthesised when children are budgeted but parents aren't
+ * - "Unbudgeted" rows are generated for the gap between parent and child budgets
+ * - Imbalance detection flags when a parent's budget doesn't match its children's total
+ *
+ * Returns null if no budgets table exists or no budgets are defined.
+ */
 export function computeBudgetData(ctx: ParseContext): BudgetData | null {
   const { db, accounts, accountMap, rootAccount, topExpenseGuids, topIncomeGuids } = ctx;
 

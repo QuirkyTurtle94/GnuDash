@@ -4,6 +4,18 @@ import { getAccountPath } from "../shared/accounts";
 import { parseGnuCashDate, formatISODate, sqlMonth } from "../shared/dates";
 import { EXCLUDE_CLOSING_JOIN, EXCLUDE_CLOSING_WHERE } from "./closing";
 
+/**
+ * Compute expense breakdown from EXPENSE account splits.
+ * Returns three outputs:
+ * - `categories`: hierarchical tree for nested pie charts
+ * - `monthly`: flat rows per leaf account per month (used for drill-down pie/bar charts)
+ * - `colors`: stable colour map keyed by top-level expense category name
+ *
+ * Uses quantity (native commodity) with FX conversion, not value, for accurate
+ * multi-currency support. Amounts are always positive.
+ *
+ * @param excludeClosing - If true, exclude year-end book-closing transactions.
+ */
 export function computeExpenseBreakdown(
   ctx: ParseContext,
   excludeClosing = false,
@@ -65,6 +77,11 @@ export function computeExpenseBreakdown(
   return { categories, monthly, colors: colorMap };
 }
 
+/**
+ * Get all individual expense transactions for the expense table view.
+ * Each row represents one split on an EXPENSE account, with the full
+ * category path and amount in base currency.
+ */
 export function getExpenseTransactions(ctx: ParseContext): ExpenseTransaction[] {
   const { db, accountMap, rootAccount, topExpenseGuids } = ctx;
 

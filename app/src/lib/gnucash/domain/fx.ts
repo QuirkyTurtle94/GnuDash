@@ -7,6 +7,12 @@ export interface FxRateMap {
   rate(commodityGuid: string): number;
 }
 
+/**
+ * Build a foreign exchange rate lookup from the prices table.
+ * Uses the most recent price for each currency pair, supporting both
+ * direct rates (commodity → base) and inverse rates (base → commodity).
+ * Returns an FxRateMap with `toBase()` and `rate()` methods.
+ */
 export function buildFxRateMap(
   db: DbAdapter,
   baseCurrencyGuid: string
