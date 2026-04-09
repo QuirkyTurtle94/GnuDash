@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { PeriodSelector } from "@/components/ui/period-selector";
 import { DepthSlider, CategoryFilter } from "@/components/sankey/sankey-controls";
 import { useDashboard } from "@/lib/dashboard-context";
-import { ExcludeClosingToggle } from "@/components/ui/exclude-closing-toggle";
+import { useClosing } from "@/lib/closing-context";
 import { type CustomRange, getDataRange } from "@/lib/period-utils";
 import {
   buildSankeyData,
@@ -31,11 +31,11 @@ function ChartSkeleton() {
 
 export default function SankeyPage() {
   const { data } = useDashboard();
+  const { excludeClosing } = useClosing();
 
   const [period, setPeriod] = useState<SankeyPeriod>("last-6m");
   const [customRange, setCustomRange] = useState<CustomRange | null>(null);
   const [depth, setDepth] = useState(1);
-  const [excludeClosing, setExcludeClosing] = useState(!!data?.hasClosingTransactions);
 
   const activeIncome = excludeClosing && data?.monthlyIncomeByCategoryExcludingClosing
     ? data.monthlyIncomeByCategoryExcludingClosing : data?.monthlyIncomeByCategory ?? [];
@@ -150,12 +150,7 @@ export default function SankeyPage() {
               data={echartsData}
               currency={data.currency}
               bottomBarLeft={
-                <div className="flex items-center gap-3">
-                  {data.hasClosingTransactions && (
-                    <ExcludeClosingToggle checked={excludeClosing} onChange={setExcludeClosing} />
-                  )}
-                  <DepthSlider depth={depth} onChange={setDepth} />
-                </div>
+                <DepthSlider depth={depth} onChange={setDepth} />
               }
             />
           )}

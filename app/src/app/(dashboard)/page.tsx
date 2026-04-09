@@ -2,6 +2,7 @@
 
 import { useState, useMemo } from "react";
 import { useDashboard } from "@/lib/dashboard-context";
+import { useClosing } from "@/lib/closing-context";
 import { type CustomRange, getDataRange } from "@/lib/period-utils";
 import { NetWorthChart } from "@/components/dashboard/charts/net-worth-chart";
 import { CashFlowChart } from "@/components/dashboard/charts/cash-flow-chart";
@@ -25,6 +26,7 @@ const LIABILITY_COLORS = [
 
 export default function DashboardPage() {
   const { data } = useDashboard();
+  const { excludeClosing } = useClosing();
   const [selectedAssetType, setSelectedAssetType] = useState<string | null>(null);
   const [period, setPeriod] = useState<string>("last-6m");
   const [customRange, setCustomRange] = useState<CustomRange | null>(null);
@@ -37,6 +39,16 @@ export default function DashboardPage() {
   if (!data) return null;
 
   const c = data.currency;
+  const activeIncome = excludeClosing && data.monthlyIncomeByCategoryExcludingClosing
+    ? data.monthlyIncomeByCategoryExcludingClosing : data.monthlyIncomeByCategory;
+  const activeIncomeColors = excludeClosing && data.incomeCategoryColorsExcludingClosing
+    ? data.incomeCategoryColorsExcludingClosing : data.incomeCategoryColors;
+  const activeExpenses = excludeClosing && data.monthlyExpensesByCategoryExcludingClosing
+    ? data.monthlyExpensesByCategoryExcludingClosing : data.monthlyExpensesByCategory;
+  const activeExpenseColors = excludeClosing && data.expenseCategoryColorsExcludingClosing
+    ? data.expenseCategoryColorsExcludingClosing : data.expenseCategoryColors;
+  const activeCashFlow = excludeClosing && data.cashFlowSeriesExcludingClosing
+    ? data.cashFlowSeriesExcludingClosing : data.cashFlowSeries;
   const assetBalances = data.topBalances?.filter((b) => ASSET_TYPES.has(b.type)) ?? [];
   const liabilityBalances = data.topBalances?.filter((b) => LIABILITY_TYPES.has(b.type)) ?? [];
 
@@ -52,8 +64,8 @@ export default function DashboardPage() {
       {/* Row 2: Income Overview + Spending Overview (synced period) */}
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-5">
         <IncomeOverview
-          monthlyIncome={data.monthlyIncomeByCategory}
-          categoryColors={data.incomeCategoryColors}
+          monthlyIncome={activeIncome}
+          categoryColors={activeIncomeColors}
           currency={c}
           linkTo="/income"
           externalPeriod={period}
@@ -63,8 +75,8 @@ export default function DashboardPage() {
           externalDataRange={dataRange}
         />
         <SpendingOverview
-          monthlyExpenses={data.monthlyExpensesByCategory}
-          categoryColors={data.expenseCategoryColors}
+          monthlyExpenses={activeExpenses}
+          categoryColors={activeExpenseColors}
           currency={c}
           linkTo="/spending"
           externalPeriod={period}
@@ -77,7 +89,7 @@ export default function DashboardPage() {
 
       {/* Row 3: Net Income */}
       <CashFlowChart
-        series={data.cashFlowSeries}
+        series={activeCashFlow}
         currentIncome={data.currentMonthIncome}
         currentExpenses={data.currentMonthExpenses}
         currency={c}
@@ -86,7 +98,6 @@ export default function DashboardPage() {
         onExternalPeriodChange={setPeriod}
         onExternalCustomRangeChange={setCustomRange}
         externalDataRange={dataRange}
-        seriesExcludingClosing={data.cashFlowSeriesExcludingClosing}
       />
 
       {/* Row 4: Assets + Liabilities */}

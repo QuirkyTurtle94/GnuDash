@@ -1,15 +1,17 @@
 "use client";
 
 import { useState } from "react";
-import { Menu, Eye, EyeOff, Pencil, Lock } from "lucide-react";
+import { Menu, Eye, EyeOff, Pencil, Lock, BookX } from "lucide-react";
 import { useDashboard } from "@/lib/dashboard-context";
 import { PrivacyProvider, usePrivacy } from "@/lib/privacy-context";
+import { ClosingProvider, useClosing } from "@/lib/closing-context";
 import { FileUpload } from "@/components/upload/file-upload";
 import { Sidebar } from "@/components/dashboard/sidebar";
 
 function DashboardInner({ children }: { children: React.ReactNode }) {
   const { data, isWritable, isXmlSource, toggleWritable } = useDashboard();
   const { hideValues, toggleHideValues } = usePrivacy();
+  const { excludeClosing, toggleExcludeClosing } = useClosing();
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   if (!data) {
@@ -77,6 +79,20 @@ function DashboardInner({ children }: { children: React.ReactNode }) {
                 <span className="hidden sm:inline">Read-only</span>
               </button>
             )}
+            {data?.hasClosingTransactions && (
+              <button
+                onClick={toggleExcludeClosing}
+                className={`flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors ${
+                  excludeClosing
+                    ? "border-[#6C9B8B] bg-[#6C9B8B]/10 text-[#6C9B8B]"
+                    : "border-[#EFEFEF] text-[#6F767E] hover:bg-[#F4F5F7]"
+                }`}
+                title={excludeClosing ? "Show closing transactions" : "Exclude closing transactions"}
+              >
+                <BookX className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline">{excludeClosing ? "Closing excluded" : "Exclude closing"}</span>
+              </button>
+            )}
             <button
               onClick={toggleHideValues}
               className={`flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors ${
@@ -107,8 +123,10 @@ export default function DashboardLayout({
   children: React.ReactNode;
 }) {
   return (
-    <PrivacyProvider>
-      <DashboardInner>{children}</DashboardInner>
-    </PrivacyProvider>
+    <ClosingProvider>
+      <PrivacyProvider>
+        <DashboardInner>{children}</DashboardInner>
+      </PrivacyProvider>
+    </ClosingProvider>
   );
 }
