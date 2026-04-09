@@ -90,7 +90,7 @@ export function CashFlowChart({ series, currency, externalPeriod, externalCustom
     <Card className="shadow-sm border-[#EFEFEF] h-full">
       <CardHeader className="flex flex-row items-center justify-between pb-2">
         <CardTitle className="text-lg font-semibold text-[#1A1D1F]">
-          Cash Flow
+          Net Income
         </CardTitle>
         <div className="flex items-center gap-3">
           {seriesExcludingClosing && (
@@ -122,7 +122,7 @@ export function CashFlowChart({ series, currency, externalPeriod, externalCustom
           <span className="text-3xl font-bold tracking-tight text-[#1A1D1F]" data-v>
             {formatCurrency(totalNet, currency)}
           </span>
-          <p className="mt-0.5 text-xs text-[#9A9FA5]">Net cash flow</p>
+          <p className="mt-0.5 text-xs text-[#9A9FA5]">Net income</p>
         </div>
 
         <div className="mb-4 flex items-center gap-5">

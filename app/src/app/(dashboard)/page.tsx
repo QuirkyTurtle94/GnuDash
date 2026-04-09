@@ -75,7 +75,7 @@ export default function DashboardPage() {
         />
       </div>
 
-      {/* Row 3: Cash Flow */}
+      {/* Row 3: Net Income */}
       <CashFlowChart
         series={data.cashFlowSeries}
         currentIncome={data.currentMonthIncome}
