@@ -22,11 +22,11 @@ export function PortfolioSummary({ holdings, currency }: PortfolioSummaryProps) 
   }, [holdings]);
 
   const cards = [
-    { label: "Market Value", value: formatCurrency(stats.totalMarketValue, currency, { decimals: 0 }) },
-    { label: "Cost Basis", value: formatCurrency(stats.totalCostBasis, currency, { decimals: 0 }) },
+    { label: "Market Value", value: formatCurrency(stats.totalMarketValue, currency) },
+    { label: "Cost Basis", value: formatCurrency(stats.totalCostBasis, currency) },
     {
       label: "Total Gain/Loss",
-      value: formatCurrency(stats.totalGainLoss, currency, { decimals: 0 }),
+      value: formatCurrency(stats.totalGainLoss, currency),
       color: stats.totalGainLoss >= 0 ? "#6C9B8B" : "#F87171",
     },
     {

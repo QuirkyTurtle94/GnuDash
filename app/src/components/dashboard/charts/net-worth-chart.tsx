@@ -169,7 +169,7 @@ export function NetWorthChart({ series, currentNetWorth, currency, externalPerio
       <CardContent>
         <div className="mb-1">
           <span className="text-3xl font-bold tracking-tight text-[#1A1D1F]" data-v>
-            {formatCurrency(currentNetWorth, currency, { decimals: 0 })}
+            {formatCurrency(currentNetWorth, currency)}
           </span>
         </div>
         {pctChange !== null && (
@@ -239,19 +239,19 @@ export function NetWorthChart({ series, currentNetWorth, currency, externalPerio
                           <span className="flex items-center gap-1.5 text-[#3B6B8A]">
                             <span className="inline-block h-2 w-2 rounded-full bg-[#3B6B8A]" />Assets
                           </span>
-                          <span className="font-medium text-[#1A1D1F]">{formatCurrency(data.assets, currency, { decimals: 0 })}</span>
+                          <span className="font-medium text-[#1A1D1F]">{formatCurrency(data.assets, currency)}</span>
                         </div>
                         <div className="flex items-center justify-between gap-4">
                           <span className="flex items-center gap-1.5 text-[#F87171]">
                             <span className="inline-block h-2 w-2 rounded-full bg-[#F87171]" />Liabilities
                           </span>
-                          <span className="font-medium text-[#1A1D1F]">{formatCurrency(data.liabilities, currency, { decimals: 0 })}</span>
+                          <span className="font-medium text-[#1A1D1F]">{formatCurrency(data.liabilities, currency)}</span>
                         </div>
                         <div className="mt-0.5 flex items-center justify-between gap-4 border-t border-[#EFEFEF] pt-1">
                           <span className="flex items-center gap-1.5 text-[#6C9B8B]">
                             <span className="inline-block h-2 w-2 rounded-full bg-[#6C9B8B]" />Net Worth
                           </span>
-                          <span className="font-semibold text-[#1A1D1F]">{formatCurrency(data.netWorth, currency, { decimals: 0 })}</span>
+                          <span className="font-semibold text-[#1A1D1F]">{formatCurrency(data.netWorth, currency)}</span>
                         </div>
                       </div>
                     </div>

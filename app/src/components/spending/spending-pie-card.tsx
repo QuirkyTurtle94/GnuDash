@@ -169,7 +169,7 @@ export function SpendingPieCard({ monthlyExpenses, categoryColors, currency, tit
               )}
               <div className="mb-2 text-center">
                 <span className="text-2xl font-bold text-[#1A1D1F]" data-v>
-                  {formatCurrency(showAverage ? activeTotal / monthCount : activeTotal, currency, { decimals: 0 })}
+                  {formatCurrency(showAverage ? activeTotal / monthCount : activeTotal, currency)}
                 </span>
                 <p className="text-[11px] text-[#9A9FA5]" data-l>
                   {showAverage ? "Monthly average" : selectedCategory ? selectedCategory.split(":").slice(-1)[0] : `Total ${title.toLowerCase().replace("breakdown", "").trim()}`}
