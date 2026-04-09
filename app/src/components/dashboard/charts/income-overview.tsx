@@ -222,7 +222,7 @@ export function IncomeOverview({ monthlyIncome, categoryColors, currency, linkTo
               )}
               <div className="mb-2 text-center">
                 <span className="text-2xl font-bold text-[#1A1D1F]" data-v>
-                  {formatCurrency(activeTotal, currency, { decimals: 0 })}
+                  {formatCurrency(activeTotal, currency)}
                 </span>
                 <p className="text-[11px] text-[#9A9FA5]" data-l>
                   {drillPath ? drillPath.split(":").slice(-1)[0] : "Total income"}

@@ -45,14 +45,14 @@ export function TopBalances({ balances, currency, filterType }: TopBalancesProps
           <div>
             <span className="text-xs text-[#9A9FA5]">Assets </span>
             <span className="text-sm font-semibold text-[#6C9B8B]" data-v>
-              {formatCurrency(totalAssets, currency, { decimals: 0 })}
+              {formatCurrency(totalAssets, currency)}
             </span>
           </div>
           {totalLiabilities !== 0 && (
             <div>
               <span className="text-xs text-[#9A9FA5]">Liabilities </span>
               <span className="text-sm font-semibold text-[#F87171]" data-v>
-                {formatCurrency(Math.abs(totalLiabilities), currency, { decimals: 0 })}
+                {formatCurrency(Math.abs(totalLiabilities), currency)}
               </span>
             </div>
           )}

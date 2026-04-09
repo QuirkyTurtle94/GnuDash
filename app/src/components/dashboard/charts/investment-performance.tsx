@@ -89,19 +89,19 @@ export function InvestmentPerformance({ investments, currency }: InvestmentPerfo
           <div>
             <p className="text-xs text-[#9A9FA5]">Market Value</p>
             <p className="text-2xl font-bold tracking-tight text-[#1A1D1F]" data-v>
-              {formatCurrency(totalMarketValue, currency, { decimals: 0 })}
+              {formatCurrency(totalMarketValue, currency)}
             </p>
           </div>
           <div>
             <p className="text-xs text-[#9A9FA5]">Cost Basis</p>
             <p className="text-2xl font-bold tracking-tight text-[#6F767E]" data-v>
-              {formatCurrency(totalCostBasis, currency, { decimals: 0 })}
+              {formatCurrency(totalCostBasis, currency)}
             </p>
           </div>
           <div>
             <p className="text-xs text-[#9A9FA5]">Gain / Loss</p>
             <p className={`text-2xl font-bold tracking-tight ${totalGainLoss >= 0 ? "text-[#6C9B8B]" : "text-[#F87171]"}`} data-v>
-              {totalGainLoss >= 0 ? "+" : ""}{formatCurrency(totalGainLoss, currency, { decimals: 0 })}
+              {totalGainLoss >= 0 ? "+" : ""}{formatCurrency(totalGainLoss, currency)}
             </p>
           </div>
         </div>

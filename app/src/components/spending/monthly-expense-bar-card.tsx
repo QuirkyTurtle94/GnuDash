@@ -161,7 +161,7 @@ export function MonthlyExpenseBarCard({
                     strokeDasharray="6 4"
                     strokeWidth={1.5}
                     label={{
-                      value: `Avg: ${formatCurrency(average, currency, { decimals: 0 })}`,
+                      value: `Avg: ${formatCurrency(average, currency)}`,
                       position: "right",
                       fill: barColor,
                       fontSize: 11,
