@@ -6,6 +6,18 @@ const nextConfig: NextConfig = {
     unoptimized: true,
   },
   turbopack: {},
+  // Exclude test directories from webpack's file watcher to reduce open file
+  // descriptors during development (helps avoid EMFILE on Linux with low ulimits).
+  // Note: Turbopack does not currently support watch exclusions — if you hit
+  // "Too many open files" with Turbopack, increase your OS file descriptor
+  // limit instead (see docs/deployment.md).
+  webpack: (config) => {
+    config.watchOptions = {
+      ...config.watchOptions,
+      ignored: ["**/__tests__/**", "**/__snapshots__/**", "**/fixtures/**"],
+    };
+    return config;
+  },
   // Active during `npm run dev`; ignored during static export
   headers: async () => [
     {
