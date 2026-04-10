@@ -28,6 +28,35 @@ npm run dev
 
 Open [http://localhost:3000](http://localhost:3000). The dev server sets the required headers automatically via `next.config.ts`.
 
+### Linux: "Too many open files" error
+
+On Linux (e.g. Ubuntu), you may see this crash when running `npm run dev`:
+
+```
+FATAL: An unexpected Turbopack error occurred.
+Error [TurbopackInternalError]: Too many open files (os error 24)
+```
+
+This happens because the Next.js dev server (Turbopack) opens file watchers across the project tree, and Linux distributions often ship with a low default limit on open file descriptors (typically 1024). Between the source files, `node_modules`, and Turbopack's internal bookkeeping, the dev server can exceed that limit.
+
+**Quick fix** — raise the limit for your current shell session:
+
+```bash
+ulimit -n 65536
+npm run dev
+```
+
+**Permanent fix** — add these lines to `/etc/security/limits.conf` (requires sudo) so the change persists across reboots:
+
+```
+* soft nofile 65536
+* hard nofile 65536
+```
+
+Then log out and back in (or reboot) for the new limits to take effect. You can verify with `ulimit -n`.
+
+> **Why this isn't needed on macOS or Docker:** macOS sets a much higher default limit (tens of thousands), and the Docker images used for production builds don't run a file watcher at all — they just serve the static build output via nginx.
+
 ---
 
 ## Static Build
