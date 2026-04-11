@@ -15,6 +15,8 @@ import { computeInvestments, computeInvestmentValueSeries } from "../domain/inve
 import { computeTopBalances } from "../domain/balances";
 import { getLedgerTransactions, getRecentTransactions } from "../domain/ledger";
 import { computeBudgetData } from "../domain/budgets";
+import { computeCashFlowBudgetData } from "../domain/cash-flow-budget";
+import { computeCashFlowByCategory } from "../domain/cash-flow-by-category";
 import { getUpcomingBills } from "../domain/bills";
 import { hasClosingTransactions } from "../domain/closing";
 import { formatMonth } from "../shared/dates";
@@ -255,6 +257,8 @@ function getFullDashboardData(): DashboardData {
   const upcomingBills = getUpcomingBills(ctx);
   const ledgerTransactions = getLedgerTransactions(ctx);
   const budgetData = computeBudgetData(ctx);
+  const cashFlowBudgetData = computeCashFlowBudgetData(ctx);
+  const { inflow: monthlyCashInflowByCategory, outflow: monthlyCashOutflowByCategory, inflowColors: cashInflowCategoryColors, outflowColors: cashOutflowCategoryColors } = computeCashFlowByCategory(ctx);
   const currentNetWorth = computeCurrentNetWorth(ctx);
 
   const now = new Date();
@@ -276,6 +280,10 @@ function getFullDashboardData(): DashboardData {
   let expenseCategoryColorsExcludingClosing: typeof expenseCategoryColors | undefined;
   let monthlyIncomeByCategoryExcludingClosing: typeof monthlyIncomeByCategory | undefined;
   let incomeCategoryColorsExcludingClosing: typeof incomeCategoryColors | undefined;
+  let monthlyCashInflowByCategoryExcludingClosing: typeof monthlyCashInflowByCategory | undefined;
+  let monthlyCashOutflowByCategoryExcludingClosing: typeof monthlyCashOutflowByCategory | undefined;
+  let cashInflowCategoryColorsExcludingClosing: typeof cashInflowCategoryColors | undefined;
+  let cashOutflowCategoryColorsExcludingClosing: typeof cashOutflowCategoryColors | undefined;
 
   if (hasClosing) {
     cashFlowSeriesExcludingClosing = computeCashFlowSeries(ctx, true);
@@ -286,6 +294,11 @@ function getFullDashboardData(): DashboardData {
     const excIncome = computeIncomeBreakdown(ctx, true);
     monthlyIncomeByCategoryExcludingClosing = excIncome.monthly;
     incomeCategoryColorsExcludingClosing = excIncome.colors;
+    const excCashFlow = computeCashFlowByCategory(ctx, true);
+    monthlyCashInflowByCategoryExcludingClosing = excCashFlow.inflow;
+    monthlyCashOutflowByCategoryExcludingClosing = excCashFlow.outflow;
+    cashInflowCategoryColorsExcludingClosing = excCashFlow.inflowColors;
+    cashOutflowCategoryColorsExcludingClosing = excCashFlow.outflowColors;
   }
 
   const baseCommodity = ctx.commodityMap.get(ctx.baseCurrencyGuid);
@@ -314,6 +327,7 @@ function getFullDashboardData(): DashboardData {
     currentMonthExpenses: currentExpenses,
     savingsRate,
     budgetData,
+    cashFlowBudgetData,
     ledgerTransactions,
     commodities: ctx.commodities.map((c) => ({
       guid: c.guid,
@@ -330,6 +344,14 @@ function getFullDashboardData(): DashboardData {
     expenseCategoryColorsExcludingClosing,
     monthlyIncomeByCategoryExcludingClosing,
     incomeCategoryColorsExcludingClosing,
+    monthlyCashInflowByCategory,
+    monthlyCashOutflowByCategory,
+    cashInflowCategoryColors,
+    cashOutflowCategoryColors,
+    monthlyCashInflowByCategoryExcludingClosing,
+    monthlyCashOutflowByCategoryExcludingClosing,
+    cashInflowCategoryColorsExcludingClosing,
+    cashOutflowCategoryColorsExcludingClosing,
   };
 }
 

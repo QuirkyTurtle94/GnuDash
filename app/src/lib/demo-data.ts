@@ -464,8 +464,13 @@ export function generateDemoData(): DashboardData {
     currentMonthExpenses,
     savingsRate,
     budgetData,
+    cashFlowBudgetData: null,
     ledgerTransactions,
     hasClosingTransactions: false,
+    monthlyCashInflowByCategory: [],
+    monthlyCashOutflowByCategory: [],
+    cashInflowCategoryColors: {},
+    cashOutflowCategoryColors: {},
   };
 }
 

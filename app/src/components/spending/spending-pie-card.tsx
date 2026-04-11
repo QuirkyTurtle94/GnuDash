@@ -114,14 +114,11 @@ export function SpendingPieCard({ monthlyExpenses, categoryColors, currency, tit
 
   const handleSliceClick = useCallback((data: { fullPath: string }) => {
     if (!data.fullPath) return;
-    if (canDrill(data.fullPath)) {
-      setSelectedCategory(data.fullPath);
-      setSelectedAccount(null);
-    } else {
-      // Leaf account: toggle table filter
-      setSelectedAccount(selectedAccount === data.fullPath ? null : data.fullPath);
-    }
-  }, [canDrill, setSelectedCategory, setSelectedAccount, selectedAccount]);
+    // Always drill/filter via selectedCategory — works for both parent and leaf categories.
+    // For parents: pie shows sub-categories. For leaves: pie shows single entry + table filters.
+    setSelectedCategory(data.fullPath);
+    setSelectedAccount(null);
+  }, [setSelectedCategory, setSelectedAccount]);
 
   return (
     <Card className="shadow-sm border-[#EFEFEF] h-full">

@@ -26,16 +26,62 @@ interface SpendingFilterState {
 
 const SpendingFilterContext = createContext<SpendingFilterState | null>(null);
 
-export function SpendingFilterProvider({ children }: { children: ReactNode }) {
-  const [period, setPeriod] = useState<TimePeriod>("last-12m");
-  const [customRange, setCustomRange] = useState<CustomRange | null>(null);
-  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
-  const [selectedMonth, setSelectedMonth] = useState<string | null>(null);
-  const [selectedAccount, setSelectedAccount] = useState<string | null>(null);
-  const [excluded, setExcluded] = useState<Set<string>>(new Set());
+interface SpendingFilterProviderProps {
+  children: ReactNode;
+  /** When provided, the period is controlled externally instead of internally. */
+  externalPeriod?: TimePeriod;
+  externalSetPeriod?: (p: TimePeriod) => void;
+  externalCustomRange?: CustomRange | null;
+  externalSetCustomRange?: (r: CustomRange) => void;
+  /** When provided, selection state is controlled externally. */
+  externalSelectedCategory?: string | null;
+  externalSetSelectedCategory?: (path: string | null) => void;
+  externalSelectedMonth?: string | null;
+  externalSetSelectedMonth?: (month: string | null) => void;
+  externalSelectedAccount?: string | null;
+  externalSetSelectedAccount?: (path: string | null) => void;
+  externalExcluded?: Set<string>;
+  externalToggleExcluded?: (fullPath: string) => void;
+  externalClearExcluded?: () => void;
+}
 
-  const toggleExcluded = useCallback((fullPath: string) => {
-    setExcluded((prev) => {
+export function SpendingFilterProvider({
+  children,
+  externalPeriod,
+  externalSetPeriod,
+  externalCustomRange,
+  externalSetCustomRange,
+  externalSelectedCategory,
+  externalSetSelectedCategory,
+  externalSelectedMonth,
+  externalSetSelectedMonth,
+  externalSelectedAccount,
+  externalSetSelectedAccount,
+  externalExcluded,
+  externalToggleExcluded,
+  externalClearExcluded,
+}: SpendingFilterProviderProps) {
+  const [internalPeriod, setInternalPeriod] = useState<TimePeriod>("last-12m");
+  const [internalCustomRange, setInternalCustomRange] = useState<CustomRange | null>(null);
+
+  const period = externalPeriod ?? internalPeriod;
+  const setPeriod = externalSetPeriod ?? setInternalPeriod;
+  const customRange = externalCustomRange ?? internalCustomRange;
+  const setCustomRange = externalSetCustomRange ?? setInternalCustomRange;
+  const [internalSelectedCategory, setInternalSelectedCategory] = useState<string | null>(null);
+  const [internalSelectedMonth, setInternalSelectedMonth] = useState<string | null>(null);
+  const [internalSelectedAccount, setInternalSelectedAccount] = useState<string | null>(null);
+
+  const selectedCategory = externalSelectedCategory !== undefined ? externalSelectedCategory : internalSelectedCategory;
+  const setSelectedCategory = externalSetSelectedCategory ?? setInternalSelectedCategory;
+  const selectedMonth = externalSelectedMonth !== undefined ? externalSelectedMonth : internalSelectedMonth;
+  const setSelectedMonth = externalSetSelectedMonth ?? setInternalSelectedMonth;
+  const selectedAccount = externalSelectedAccount !== undefined ? externalSelectedAccount : internalSelectedAccount;
+  const setSelectedAccount = externalSetSelectedAccount ?? setInternalSelectedAccount;
+  const [internalExcluded, setInternalExcluded] = useState<Set<string>>(new Set());
+
+  const internalToggleExcluded = useCallback((fullPath: string) => {
+    setInternalExcluded((prev) => {
       const next = new Set(prev);
       if (next.has(fullPath)) {
         next.delete(fullPath);
@@ -46,7 +92,11 @@ export function SpendingFilterProvider({ children }: { children: ReactNode }) {
     });
   }, []);
 
-  const clearExcluded = useCallback(() => setExcluded(new Set()), []);
+  const internalClearExcluded = useCallback(() => setInternalExcluded(new Set()), []);
+
+  const excluded = externalExcluded ?? internalExcluded;
+  const toggleExcluded = externalToggleExcluded ?? internalToggleExcluded;
+  const clearExcluded = externalClearExcluded ?? internalClearExcluded;
 
   return (
     <SpendingFilterContext.Provider

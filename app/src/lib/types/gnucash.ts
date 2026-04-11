@@ -381,6 +381,17 @@ export interface BudgetData {
   availableYears: number[];
 }
 
+export interface CashFlowBudgetForBudget {
+  outflowCategories: BudgetCategoryRow[];
+  inflowCategories: BudgetCategoryRow[];
+}
+
+export interface CashFlowBudgetData {
+  budgets: BudgetInfo[];
+  categoriesByBudget: Record<string, CashFlowBudgetForBudget>;
+  availableYears: number[];
+}
+
 /**
  * The complete data model passed from the worker to the UI.
  * Computed once when a GNUCash file is loaded and cached in React context.
@@ -433,6 +444,7 @@ export interface DashboardData {
   savingsRate: number;
   /** Budget data (null if no budgets exist in the GNUCash file) */
   budgetData: BudgetData | null;
+  cashFlowBudgetData: CashFlowBudgetData | null;
   /** All transactions with full split details for the ledger view */
   ledgerTransactions: LedgerTransaction[];
   /** All commodities/currencies in the file */
@@ -453,4 +465,24 @@ export interface DashboardData {
   monthlyIncomeByCategoryExcludingClosing?: MonthlyExpenseByCategory[];
   /** Income category colors with closing transactions excluded. */
   incomeCategoryColorsExcludingClosing?: Record<string, string>;
+  /** Monthly cash inflow rows grouped by counterparty category (for cash flow Sankey).
+   *  Unlike monthlyIncomeByCategory (which tracks all INCOME splits), this only includes
+   *  cash that actually entered BANK/CASH accounts, attributed to the counterparty category. */
+  monthlyCashInflowByCategory: MonthlyExpenseByCategory[];
+  /** Monthly cash outflow rows grouped by counterparty category (for cash flow Sankey).
+   *  Unlike monthlyExpensesByCategory (which tracks all EXPENSE splits), this only includes
+   *  cash that actually left BANK/CASH accounts, attributed to the counterparty category. */
+  monthlyCashOutflowByCategory: MonthlyExpenseByCategory[];
+  /** Stable colour assignments for top-level cash inflow categories */
+  cashInflowCategoryColors: Record<string, string>;
+  /** Stable colour assignments for top-level cash outflow categories */
+  cashOutflowCategoryColors: Record<string, string>;
+  /** Cash inflow by category with closing transactions excluded. */
+  monthlyCashInflowByCategoryExcludingClosing?: MonthlyExpenseByCategory[];
+  /** Cash outflow by category with closing transactions excluded. */
+  monthlyCashOutflowByCategoryExcludingClosing?: MonthlyExpenseByCategory[];
+  /** Cash inflow category colors with closing transactions excluded. */
+  cashInflowCategoryColorsExcludingClosing?: Record<string, string>;
+  /** Cash outflow category colors with closing transactions excluded. */
+  cashOutflowCategoryColorsExcludingClosing?: Record<string, string>;
 }

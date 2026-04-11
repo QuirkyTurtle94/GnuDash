@@ -67,7 +67,7 @@ export default function DashboardPage() {
           monthlyIncome={activeIncome}
           categoryColors={activeIncomeColors}
           currency={c}
-          linkTo="/income"
+          linkTo="/income-expenses"
           externalPeriod={period}
           externalCustomRange={customRange}
           onExternalPeriodChange={setPeriod}
@@ -78,7 +78,7 @@ export default function DashboardPage() {
           monthlyExpenses={activeExpenses}
           categoryColors={activeExpenseColors}
           currency={c}
-          linkTo="/spending"
+          linkTo="/income-expenses"
           externalPeriod={period}
           externalCustomRange={customRange}
           onExternalPeriodChange={setPeriod}

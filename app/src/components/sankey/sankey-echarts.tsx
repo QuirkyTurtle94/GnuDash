@@ -93,11 +93,12 @@ export function SankeyECharts({ data, currency, bottomBarLeft }: SankeyEChartsPr
     [],
   );
 
-  // Attach non-passive wheel listener so we can preventDefault and capture scroll
+  // Zoom on Shift+scroll only — normal scroll passes through to the page
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
     function onWheel(e: WheelEvent) {
+      if (!e.shiftKey) return; // let normal scroll pass through
       e.preventDefault();
       setZoom((prev) => {
         const delta = e.deltaY > 0 ? -0.005 : 0.005;
@@ -196,8 +197,8 @@ export function SankeyECharts({ data, currency, bottomBarLeft }: SankeyEChartsPr
             {zoom !== 1
               ? `${Math.round(effectiveScale * 100)}%`
               : autoScale < 1
-                ? `Fit ${Math.round(autoScale * 100)}% · Scroll to zoom`
-                : "Scroll to zoom"}
+                ? `Fit ${Math.round(autoScale * 100)}% · Shift + scroll to zoom`
+                : "Shift + scroll to zoom"}
           </span>
           {zoom !== 1 && (
             <button

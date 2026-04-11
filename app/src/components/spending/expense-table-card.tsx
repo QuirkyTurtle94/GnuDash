@@ -40,7 +40,7 @@ function compareTx(a: ExpenseTransaction, b: ExpenseTransaction, field: SortFiel
 export function ExpenseTableCard({ transactions, currency, title = "Expenses" }: ExpenseTableCardProps) {
   const { period, customRange, selectedCategory, selectedMonth, selectedAccount, excluded } = useSpendingFilter();
   const [page, setPage] = useState(0);
-  const [sortField, setSortField] = useState<SortField>("amount");
+  const [sortField, setSortField] = useState<SortField>("date");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
 
   function handleSort(field: SortField) {

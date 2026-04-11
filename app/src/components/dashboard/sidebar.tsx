@@ -8,10 +8,8 @@ import {
   BookOpen,
   List,
   Receipt,
-  CreditCard,
   TrendingUp,
-  Target,
-  GitFork,
+  Banknote,
   LogOut,
   Download,
 } from "lucide-react";
@@ -21,11 +19,9 @@ const mainNav = [
   { icon: Home, label: "Dashboard", href: "/" },
   { icon: List, label: "Accounts", href: "/accounts" },
   { icon: BookOpen, label: "Transactions", href: "/transactions" },
-  { icon: Receipt, label: "Income", href: "/income" },
-  { icon: CreditCard, label: "Spending", href: "/spending" },
+  { icon: Receipt, label: "Income / Expenses", href: "/income-expenses" },
+  { icon: Banknote, label: "Cash Flow", href: "/cash-flow" },
   { icon: TrendingUp, label: "Investment", href: "/investment" },
-  { icon: Target, label: "Budget", href: "/budget" },
-  { icon: GitFork, label: "Sankey", href: "/sankey" },
 ];
 
 
