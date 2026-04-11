@@ -1793,6 +1793,733 @@ exports[`parseGnuCashFile > snapshot: full DashboardData 1`] = `
       },
     ],
   },
+  "cashFlowBudgetData": {
+    "availableYears": [
+      2025,
+    ],
+    "budgets": [
+      {
+        "description": "Annual household budget",
+        "guid": "00000034000000340000003400000034",
+        "name": "2025 Budget",
+        "numPeriods": 12,
+      },
+    ],
+    "categoriesByBudget": {
+      "00000034000000340000003400000034": {
+        "inflowCategories": [
+          {
+            "accountGuid": "0000000d0000000d0000000d0000000d",
+            "accountName": "Income",
+            "actual": 0,
+            "budgeted": 9000,
+            "childBudgetTotal": 9000,
+            "depth": 0,
+            "fullPath": "",
+            "hasChildren": true,
+            "hasExplicitBudget": false,
+            "imbalance": 0,
+            "parentAccountGuid": null,
+            "periods": [
+              {
+                "actual": {
+                  "2025": 3000,
+                },
+                "budgeted": 3000,
+                "period": 0,
+              },
+              {
+                "actual": {
+                  "2025": 3500,
+                },
+                "budgeted": 3000,
+                "period": 1,
+              },
+              {
+                "actual": {
+                  "2025": 3000,
+                },
+                "budgeted": 3000,
+                "period": 2,
+              },
+              {
+                "actual": {
+                  "2025": 0,
+                },
+                "budgeted": 0,
+                "period": 3,
+              },
+              {
+                "actual": {
+                  "2025": 0,
+                },
+                "budgeted": 0,
+                "period": 4,
+              },
+              {
+                "actual": {
+                  "2025": 0,
+                },
+                "budgeted": 0,
+                "period": 5,
+              },
+              {
+                "actual": {
+                  "2025": 0,
+                },
+                "budgeted": 0,
+                "period": 6,
+              },
+              {
+                "actual": {
+                  "2025": 0,
+                },
+                "budgeted": 0,
+                "period": 7,
+              },
+              {
+                "actual": {
+                  "2025": 0,
+                },
+                "budgeted": 0,
+                "period": 8,
+              },
+              {
+                "actual": {
+                  "2025": 0,
+                },
+                "budgeted": 0,
+                "period": 9,
+              },
+              {
+                "actual": {
+                  "2025": 0,
+                },
+                "budgeted": 0,
+                "period": 10,
+              },
+              {
+                "actual": {
+                  "2025": 0,
+                },
+                "budgeted": 0,
+                "period": 11,
+              },
+            ],
+            "variance": 9000,
+            "variancePct": 100,
+          },
+          {
+            "accountGuid": "0000000e0000000e0000000e0000000e",
+            "accountName": "Salary",
+            "actual": 0,
+            "budgeted": 9000,
+            "childBudgetTotal": 0,
+            "depth": 1,
+            "fullPath": "Salary",
+            "hasChildren": false,
+            "hasExplicitBudget": true,
+            "imbalance": 0,
+            "parentAccountGuid": "0000000d0000000d0000000d0000000d",
+            "periods": [
+              {
+                "actual": {
+                  "2025": 3000,
+                },
+                "budgeted": 3000,
+                "period": 0,
+              },
+              {
+                "actual": {
+                  "2025": 3000,
+                },
+                "budgeted": 3000,
+                "period": 1,
+              },
+              {
+                "actual": {
+                  "2025": 3000,
+                },
+                "budgeted": 3000,
+                "period": 2,
+              },
+              {
+                "actual": {
+                  "2025": 0,
+                },
+                "budgeted": 0,
+                "period": 3,
+              },
+              {
+                "actual": {
+                  "2025": 0,
+                },
+                "budgeted": 0,
+                "period": 4,
+              },
+              {
+                "actual": {
+                  "2025": 0,
+                },
+                "budgeted": 0,
+                "period": 5,
+              },
+              {
+                "actual": {
+                  "2025": 0,
+                },
+                "budgeted": 0,
+                "period": 6,
+              },
+              {
+                "actual": {
+                  "2025": 0,
+                },
+                "budgeted": 0,
+                "period": 7,
+              },
+              {
+                "actual": {
+                  "2025": 0,
+                },
+                "budgeted": 0,
+                "period": 8,
+              },
+              {
+                "actual": {
+                  "2025": 0,
+                },
+                "budgeted": 0,
+                "period": 9,
+              },
+              {
+                "actual": {
+                  "2025": 0,
+                },
+                "budgeted": 0,
+                "period": 10,
+              },
+              {
+                "actual": {
+                  "2025": 0,
+                },
+                "budgeted": 0,
+                "period": 11,
+              },
+            ],
+            "variance": 9000,
+            "variancePct": 100,
+          },
+          {
+            "accountGuid": "00000010000000100000001000000010",
+            "accountName": "Expenses",
+            "actual": 0,
+            "budgeted": 1050,
+            "childBudgetTotal": 1050,
+            "depth": 0,
+            "fullPath": "",
+            "hasChildren": true,
+            "hasExplicitBudget": false,
+            "imbalance": 0,
+            "parentAccountGuid": null,
+            "periods": [
+              {
+                "actual": {
+                  "2025": 285,
+                },
+                "budgeted": 350,
+                "period": 0,
+              },
+              {
+                "actual": {
+                  "2025": 270,
+                },
+                "budgeted": 350,
+                "period": 1,
+              },
+              {
+                "actual": {
+                  "2025": 40,
+                },
+                "budgeted": 350,
+                "period": 2,
+              },
+              {
+                "actual": {
+                  "2025": 0,
+                },
+                "budgeted": 0,
+                "period": 3,
+              },
+              {
+                "actual": {
+                  "2025": 0,
+                },
+                "budgeted": 0,
+                "period": 4,
+              },
+              {
+                "actual": {
+                  "2025": 0,
+                },
+                "budgeted": 0,
+                "period": 5,
+              },
+              {
+                "actual": {
+                  "2025": 0,
+                },
+                "budgeted": 0,
+                "period": 6,
+              },
+              {
+                "actual": {
+                  "2025": 0,
+                },
+                "budgeted": 0,
+                "period": 7,
+              },
+              {
+                "actual": {
+                  "2025": 0,
+                },
+                "budgeted": 0,
+                "period": 8,
+              },
+              {
+                "actual": {
+                  "2025": 0,
+                },
+                "budgeted": 0,
+                "period": 9,
+              },
+              {
+                "actual": {
+                  "2025": 0,
+                },
+                "budgeted": 0,
+                "period": 10,
+              },
+              {
+                "actual": {
+                  "2025": 0,
+                },
+                "budgeted": 0,
+                "period": 11,
+              },
+            ],
+            "variance": 1050,
+            "variancePct": 100,
+          },
+          {
+            "accountGuid": "00000011000000110000001100000011",
+            "accountName": "Food",
+            "actual": 0,
+            "budgeted": 750,
+            "childBudgetTotal": 750,
+            "depth": 1,
+            "fullPath": "Food",
+            "hasChildren": true,
+            "hasExplicitBudget": false,
+            "imbalance": 0,
+            "parentAccountGuid": "00000010000000100000001000000010",
+            "periods": [
+              {
+                "actual": {
+                  "2025": 200,
+                },
+                "budgeted": 250,
+                "period": 0,
+              },
+              {
+                "actual": {
+                  "2025": 180,
+                },
+                "budgeted": 250,
+                "period": 1,
+              },
+              {
+                "actual": {
+                  "2025": 0,
+                },
+                "budgeted": 250,
+                "period": 2,
+              },
+              {
+                "actual": {
+                  "2025": 0,
+                },
+                "budgeted": 0,
+                "period": 3,
+              },
+              {
+                "actual": {
+                  "2025": 0,
+                },
+                "budgeted": 0,
+                "period": 4,
+              },
+              {
+                "actual": {
+                  "2025": 0,
+                },
+                "budgeted": 0,
+                "period": 5,
+              },
+              {
+                "actual": {
+                  "2025": 0,
+                },
+                "budgeted": 0,
+                "period": 6,
+              },
+              {
+                "actual": {
+                  "2025": 0,
+                },
+                "budgeted": 0,
+                "period": 7,
+              },
+              {
+                "actual": {
+                  "2025": 0,
+                },
+                "budgeted": 0,
+                "period": 8,
+              },
+              {
+                "actual": {
+                  "2025": 0,
+                },
+                "budgeted": 0,
+                "period": 9,
+              },
+              {
+                "actual": {
+                  "2025": 0,
+                },
+                "budgeted": 0,
+                "period": 10,
+              },
+              {
+                "actual": {
+                  "2025": 0,
+                },
+                "budgeted": 0,
+                "period": 11,
+              },
+            ],
+            "variance": 750,
+            "variancePct": 100,
+          },
+          {
+            "accountGuid": "00000012000000120000001200000012",
+            "accountName": "Groceries",
+            "actual": 0,
+            "budgeted": 750,
+            "childBudgetTotal": 0,
+            "depth": 2,
+            "fullPath": "Food:Groceries",
+            "hasChildren": false,
+            "hasExplicitBudget": true,
+            "imbalance": 0,
+            "parentAccountGuid": "00000011000000110000001100000011",
+            "periods": [
+              {
+                "actual": {
+                  "2025": 200,
+                },
+                "budgeted": 250,
+                "period": 0,
+              },
+              {
+                "actual": {
+                  "2025": 180,
+                },
+                "budgeted": 250,
+                "period": 1,
+              },
+              {
+                "actual": {
+                  "2025": 0,
+                },
+                "budgeted": 250,
+                "period": 2,
+              },
+              {
+                "actual": {
+                  "2025": 0,
+                },
+                "budgeted": 0,
+                "period": 3,
+              },
+              {
+                "actual": {
+                  "2025": 0,
+                },
+                "budgeted": 0,
+                "period": 4,
+              },
+              {
+                "actual": {
+                  "2025": 0,
+                },
+                "budgeted": 0,
+                "period": 5,
+              },
+              {
+                "actual": {
+                  "2025": 0,
+                },
+                "budgeted": 0,
+                "period": 6,
+              },
+              {
+                "actual": {
+                  "2025": 0,
+                },
+                "budgeted": 0,
+                "period": 7,
+              },
+              {
+                "actual": {
+                  "2025": 0,
+                },
+                "budgeted": 0,
+                "period": 8,
+              },
+              {
+                "actual": {
+                  "2025": 0,
+                },
+                "budgeted": 0,
+                "period": 9,
+              },
+              {
+                "actual": {
+                  "2025": 0,
+                },
+                "budgeted": 0,
+                "period": 10,
+              },
+              {
+                "actual": {
+                  "2025": 0,
+                },
+                "budgeted": 0,
+                "period": 11,
+              },
+            ],
+            "variance": 750,
+            "variancePct": 100,
+          },
+          {
+            "accountGuid": "00000014000000140000001400000014",
+            "accountName": "Utilities",
+            "actual": 0,
+            "budgeted": 300,
+            "childBudgetTotal": 300,
+            "depth": 1,
+            "fullPath": "Utilities",
+            "hasChildren": true,
+            "hasExplicitBudget": false,
+            "imbalance": 0,
+            "parentAccountGuid": "00000010000000100000001000000010",
+            "periods": [
+              {
+                "actual": {
+                  "2025": 85,
+                },
+                "budgeted": 100,
+                "period": 0,
+              },
+              {
+                "actual": {
+                  "2025": 90,
+                },
+                "budgeted": 100,
+                "period": 1,
+              },
+              {
+                "actual": {
+                  "2025": 40,
+                },
+                "budgeted": 100,
+                "period": 2,
+              },
+              {
+                "actual": {
+                  "2025": 0,
+                },
+                "budgeted": 0,
+                "period": 3,
+              },
+              {
+                "actual": {
+                  "2025": 0,
+                },
+                "budgeted": 0,
+                "period": 4,
+              },
+              {
+                "actual": {
+                  "2025": 0,
+                },
+                "budgeted": 0,
+                "period": 5,
+              },
+              {
+                "actual": {
+                  "2025": 0,
+                },
+                "budgeted": 0,
+                "period": 6,
+              },
+              {
+                "actual": {
+                  "2025": 0,
+                },
+                "budgeted": 0,
+                "period": 7,
+              },
+              {
+                "actual": {
+                  "2025": 0,
+                },
+                "budgeted": 0,
+                "period": 8,
+              },
+              {
+                "actual": {
+                  "2025": 0,
+                },
+                "budgeted": 0,
+                "period": 9,
+              },
+              {
+                "actual": {
+                  "2025": 0,
+                },
+                "budgeted": 0,
+                "period": 10,
+              },
+              {
+                "actual": {
+                  "2025": 0,
+                },
+                "budgeted": 0,
+                "period": 11,
+              },
+            ],
+            "variance": 300,
+            "variancePct": 100,
+          },
+          {
+            "accountGuid": "00000015000000150000001500000015",
+            "accountName": "Electric",
+            "actual": 0,
+            "budgeted": 300,
+            "childBudgetTotal": 0,
+            "depth": 2,
+            "fullPath": "Utilities:Electric",
+            "hasChildren": false,
+            "hasExplicitBudget": true,
+            "imbalance": 0,
+            "parentAccountGuid": "00000014000000140000001400000014",
+            "periods": [
+              {
+                "actual": {
+                  "2025": 85,
+                },
+                "budgeted": 100,
+                "period": 0,
+              },
+              {
+                "actual": {
+                  "2025": 90,
+                },
+                "budgeted": 100,
+                "period": 1,
+              },
+              {
+                "actual": {
+                  "2025": 0,
+                },
+                "budgeted": 100,
+                "period": 2,
+              },
+              {
+                "actual": {
+                  "2025": 0,
+                },
+                "budgeted": 0,
+                "period": 3,
+              },
+              {
+                "actual": {
+                  "2025": 0,
+                },
+                "budgeted": 0,
+                "period": 4,
+              },
+              {
+                "actual": {
+                  "2025": 0,
+                },
+                "budgeted": 0,
+                "period": 5,
+              },
+              {
+                "actual": {
+                  "2025": 0,
+                },
+                "budgeted": 0,
+                "period": 6,
+              },
+              {
+                "actual": {
+                  "2025": 0,
+                },
+                "budgeted": 0,
+                "period": 7,
+              },
+              {
+                "actual": {
+                  "2025": 0,
+                },
+                "budgeted": 0,
+                "period": 8,
+              },
+              {
+                "actual": {
+                  "2025": 0,
+                },
+                "budgeted": 0,
+                "period": 9,
+              },
+              {
+                "actual": {
+                  "2025": 0,
+                },
+                "budgeted": 0,
+                "period": 10,
+              },
+              {
+                "actual": {
+                  "2025": 0,
+                },
+                "budgeted": 0,
+                "period": 11,
+              },
+            ],
+            "variance": 300,
+            "variancePct": 100,
+          },
+        ],
+        "outflowCategories": [],
+      },
+    },
+  },
   "cashFlowSeries": [
     {
       "expenses": 330,
@@ -1814,6 +2541,16 @@ exports[`parseGnuCashFile > snapshot: full DashboardData 1`] = `
     },
   ],
   "cashFlowSeriesExcludingClosing": undefined,
+  "cashInflowCategoryColors": {
+    "Income": "#3B6B8A",
+  },
+  "cashInflowCategoryColorsExcludingClosing": undefined,
+  "cashOutflowCategoryColors": {
+    "Assets": "#4A7A6B",
+    "Expenses": "#5C8C7C",
+    "Liabilities": "#6C9B8B",
+  },
+  "cashOutflowCategoryColorsExcludingClosing": undefined,
   "commodities": [
     {
       "fraction": 100,
@@ -2524,6 +3261,139 @@ exports[`parseGnuCashFile > snapshot: full DashboardData 1`] = `
       ],
     },
   ],
+  "monthlyCashInflowByCategory": [
+    {
+      "amount": 3000,
+      "category": "Salary",
+      "fullPath": "Income:Salary",
+      "month": "2025-01",
+      "pathParts": [
+        "Income",
+        "Salary",
+      ],
+    },
+    {
+      "amount": 3000,
+      "category": "Salary",
+      "fullPath": "Income:Salary",
+      "month": "2025-02",
+      "pathParts": [
+        "Income",
+        "Salary",
+      ],
+    },
+    {
+      "amount": 3000,
+      "category": "Salary",
+      "fullPath": "Income:Salary",
+      "month": "2025-03",
+      "pathParts": [
+        "Income",
+        "Salary",
+      ],
+    },
+    {
+      "amount": 500,
+      "category": "Freelance",
+      "fullPath": "Income:Freelance",
+      "month": "2025-02",
+      "pathParts": [
+        "Income",
+        "Freelance",
+      ],
+    },
+  ],
+  "monthlyCashInflowByCategoryExcludingClosing": undefined,
+  "monthlyCashOutflowByCategory": [
+    {
+      "amount": 200,
+      "category": "Groceries",
+      "fullPath": "Expenses:Food:Groceries",
+      "month": "2025-01",
+      "pathParts": [
+        "Expenses",
+        "Food",
+        "Groceries",
+      ],
+    },
+    {
+      "amount": 180,
+      "category": "Groceries",
+      "fullPath": "Expenses:Food:Groceries",
+      "month": "2025-02",
+      "pathParts": [
+        "Expenses",
+        "Food",
+        "Groceries",
+      ],
+    },
+    {
+      "amount": 85,
+      "category": "Electric",
+      "fullPath": "Expenses:Utilities:Electric",
+      "month": "2025-01",
+      "pathParts": [
+        "Expenses",
+        "Utilities",
+        "Electric",
+      ],
+    },
+    {
+      "amount": 90,
+      "category": "Electric",
+      "fullPath": "Expenses:Utilities:Electric",
+      "month": "2025-02",
+      "pathParts": [
+        "Expenses",
+        "Utilities",
+        "Electric",
+      ],
+    },
+    {
+      "amount": 40,
+      "category": "Water",
+      "fullPath": "Expenses:Utilities:Water",
+      "month": "2025-03",
+      "pathParts": [
+        "Expenses",
+        "Utilities",
+        "Water",
+      ],
+    },
+    {
+      "amount": 45,
+      "category": "Credit Card",
+      "fullPath": "Liabilities:Credit Card",
+      "month": "2025-02",
+      "pathParts": [
+        "Liabilities",
+        "Credit Card",
+      ],
+    },
+    {
+      "amount": 1200,
+      "category": "AAPL",
+      "fullPath": "Assets:Investments:AAPL",
+      "month": "2025-01",
+      "pathParts": [
+        "Assets",
+        "Investments",
+        "AAPL",
+      ],
+    },
+    {
+      "amount": 4000,
+      "category": "VWRL",
+      "fullPath": "Assets:Investments:VWRL",
+      "month": "2025-02",
+      "pathParts": [
+        "Assets",
+        "Investments",
+        "VWRL",
+      ],
+    },
+  ],
+  "monthlyCashOutflowByCategoryExcludingClosing": undefined,
   "monthlyExpensesByCategory": [
     {
       "amount": 200,
