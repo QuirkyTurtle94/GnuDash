@@ -10,9 +10,19 @@ export function FileUpload() {
   const [isDragging, setIsDragging] = useState(false);
   const [writable, setWritable] = useState(false);
 
+  const MAX_FILE_SIZE = 200 * 1024 * 1024; // 200 MB
+  const [fileSizeError, setFileSizeError] = useState<string | null>(null);
+
   const handleFile = useCallback(
     (file: File) => {
+      setFileSizeError(null);
       if (!file.name.endsWith(".gnucash")) {
+        return;
+      }
+      if (file.size > MAX_FILE_SIZE) {
+        setFileSizeError(
+          `File is too large (${(file.size / 1024 / 1024).toFixed(0)} MB). Maximum supported size is 200 MB.`
+        );
         return;
       }
       uploadFile(file, writable);
@@ -132,9 +142,9 @@ export function FileUpload() {
           Try with demo data
         </button>
 
-        {error && (
+        {(error || fileSizeError) && (
           <div className="mt-4 rounded-xl bg-red-50 p-4 text-center">
-            <p className="text-sm text-red-600">{error}</p>
+            <p className="text-sm text-red-600">{fileSizeError || error}</p>
           </div>
         )}
 
