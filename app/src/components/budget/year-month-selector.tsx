@@ -22,7 +22,7 @@ export function YearMonthSelector({
   const months = MONTH_LABELS.slice(0, numPeriods);
   return (
     <div className="flex flex-wrap items-center gap-2">
-      <div className="flex gap-1">
+      <div className="flex flex-wrap gap-1">
         {availableYears.map((year) => (
           <button
             key={year}

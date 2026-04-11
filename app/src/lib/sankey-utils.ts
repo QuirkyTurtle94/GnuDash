@@ -42,7 +42,7 @@ export const SANKEY_PERIOD_LABELS: Record<SankeyPeriod, string> = {
  * cashFlowSeries array — the same approach the Cash Flow chart uses.
  * This ensures the Sankey always matches the dashboard totals.
  */
-function getMonthsForPeriod(
+export function getMonthsForPeriod(
   cashFlowSeries: MonthlyCashFlow[],
   period: SankeyPeriod,
   customRange?: CustomRange,
@@ -310,6 +310,98 @@ export function toEChartsFormat(
       lineStyle: { color: resolveLinkColor(l, linkColorMode, greyColor) },
     })),
   };
+}
+
+// ── Build Cash Flow Sankey (Inflow → Outflow) ────────────────────────
+
+interface CashFlowBuildOptions {
+  inflowByCategory: MonthlyExpenseByCategory[];
+  outflowByCategory: MonthlyExpenseByCategory[];
+  cashFlowSeries: MonthlyCashFlow[];
+  inflowCategoryColors: Record<string, string>;
+  outflowCategoryColors: Record<string, string>;
+  period: SankeyPeriod;
+  depth: number;
+  selectedInflowCategories: Set<string> | null;
+  selectedOutflowCategories: Set<string> | null;
+  customRange?: CustomRange;
+}
+
+export function buildCashFlowSankeyData(opts: CashFlowBuildOptions): SankeyData {
+  const { period, depth, inflowCategoryColors, outflowCategoryColors } = opts;
+  const months = getMonthsForPeriod(opts.cashFlowSeries, period, opts.customRange);
+
+  const inflowAll = aggregateByDepth(opts.inflowByCategory, months, depth, null);
+  const outflowAll = aggregateByDepth(opts.outflowByCategory, months, depth, null);
+
+  const totalInflow = Array.from(inflowAll.selected.values()).reduce((a, b) => a + b, 0);
+  const totalOutflow = Array.from(outflowAll.selected.values()).reduce((a, b) => a + b, 0);
+  const netCashFlow = totalInflow - totalOutflow;
+
+  const inflowResult = aggregateByDepth(opts.inflowByCategory, months, depth, opts.selectedInflowCategories);
+  const outflowResult = aggregateByDepth(opts.outflowByCategory, months, depth, opts.selectedOutflowCategories);
+
+  const categoryInflowTotal = Array.from(inflowResult.selected.values()).reduce((a, b) => a + b, 0);
+  const categoryOutflowTotal = Array.from(outflowResult.selected.values()).reduce((a, b) => a + b, 0);
+  const inflowRemainder = totalInflow - categoryInflowTotal;
+  const outflowRemainder = totalOutflow - categoryOutflowTotal;
+
+  const nodes: SankeyNode[] = [];
+  const links: SankeyLink[] = [];
+
+  // Inflow category nodes → "Total Inflow"
+  for (const [category, amount] of inflowResult.selected) {
+    if (amount <= 0) continue;
+    const topLevel = category.split(":")[0];
+    const color = inflowCategoryColors[topLevel] ?? INCOME_NODE_COLOR;
+    const nodeId = `inflow:${category}`;
+    nodes.push({ id: nodeId, label: category.split(":").pop()!, color });
+    links.push({ source: nodeId, target: "total-inflow", value: amount, sourceColor: color });
+  }
+
+  if (inflowRemainder > 0) {
+    nodes.push({ id: "inflow:__other__", label: "Other Inflows", color: FILTERED_OUT_COLOR });
+    links.push({ source: "inflow:__other__", target: "total-inflow", value: inflowRemainder, sourceColor: FILTERED_OUT_COLOR });
+  }
+
+  nodes.push({ id: "total-inflow", label: "Total Inflow", color: TOTAL_INCOME_COLOR, depth: 1 });
+  nodes.push({ id: "total-outflow", label: "Total Outflow", color: TOTAL_EXPENSE_COLOR, depth: 2 });
+
+  // "Total Outflow" → outflow category nodes
+  for (const [category, amount] of outflowResult.selected) {
+    if (amount <= 0) continue;
+    const topLevel = category.split(":")[0];
+    const color = outflowCategoryColors[topLevel] ?? EXPENSE_NODE_COLOR;
+    const nodeId = `outflow:${category}`;
+    nodes.push({ id: nodeId, label: category.split(":").pop()!, color });
+    links.push({ source: "total-outflow", target: nodeId, value: amount, sourceColor: TOTAL_EXPENSE_COLOR });
+  }
+
+  if (outflowRemainder > 0) {
+    nodes.push({ id: "outflow:__other__", label: "Other Outflows", color: FILTERED_OUT_COLOR });
+    links.push({ source: "total-outflow", target: "outflow:__other__", value: outflowRemainder, sourceColor: FILTERED_OUT_COLOR });
+  }
+
+  // Main flow: Total Inflow → Total Outflow
+  if (totalOutflow > 0 && totalInflow > 0) {
+    links.push({
+      source: "total-inflow",
+      target: "total-outflow",
+      value: Math.min(totalInflow, totalOutflow),
+      sourceColor: TOTAL_INCOME_COLOR,
+    });
+  }
+
+  // Net cash flow balance node
+  if (netCashFlow > 0) {
+    nodes.push({ id: "net-cashflow", label: "Cash Surplus", color: POSITIVE_CASHFLOW_COLOR, depth: 2 });
+    links.push({ source: "total-inflow", target: "net-cashflow", value: netCashFlow, sourceColor: POSITIVE_CASHFLOW_COLOR });
+  } else if (netCashFlow < 0) {
+    nodes.push({ id: "net-cashflow", label: "Cash Deficit", color: NEGATIVE_CASHFLOW_COLOR, depth: 1 });
+    links.push({ source: "net-cashflow", target: "total-outflow", value: Math.abs(netCashFlow), sourceColor: NEGATIVE_CASHFLOW_COLOR });
+  }
+
+  return { nodes, links };
 }
 
 // ── Extract unique top-level categories ───────────────────────────────

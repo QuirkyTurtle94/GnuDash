@@ -11,6 +11,7 @@ import { computeTopBalances } from "./domain/balances";
 import { getLedgerTransactions, getRecentTransactions } from "./domain/ledger";
 import { computeBudgetData } from "./domain/budgets";
 import { computeCashFlowBudgetData } from "./domain/cash-flow-budget";
+import { computeCashFlowByCategory } from "./domain/cash-flow-by-category";
 import { getUpcomingBills } from "./domain/bills";
 import { hasClosingTransactions } from "./domain/closing";
 import { formatMonth } from "./shared/dates";
@@ -36,6 +37,7 @@ export function parseGnuCashFile(filePath: string, overrideBaseCurrencyGuid?: st
     const ledgerTransactions = getLedgerTransactions(ctx);
     const budgetData = computeBudgetData(ctx);
     const cashFlowBudgetData = computeCashFlowBudgetData(ctx);
+    const { inflow: monthlyCashInflowByCategory, outflow: monthlyCashOutflowByCategory, inflowColors: cashInflowCategoryColors, outflowColors: cashOutflowCategoryColors } = computeCashFlowByCategory(ctx);
     const currentNetWorth = computeCurrentNetWorth(ctx);
 
     const now = new Date();
@@ -57,6 +59,10 @@ export function parseGnuCashFile(filePath: string, overrideBaseCurrencyGuid?: st
     let expenseCategoryColorsExcludingClosing: typeof expenseCategoryColors | undefined;
     let monthlyIncomeByCategoryExcludingClosing: typeof monthlyIncomeByCategory | undefined;
     let incomeCategoryColorsExcludingClosing: typeof incomeCategoryColors | undefined;
+    let monthlyCashInflowByCategoryExcludingClosing: typeof monthlyCashInflowByCategory | undefined;
+    let monthlyCashOutflowByCategoryExcludingClosing: typeof monthlyCashOutflowByCategory | undefined;
+    let cashInflowCategoryColorsExcludingClosing: typeof cashInflowCategoryColors | undefined;
+    let cashOutflowCategoryColorsExcludingClosing: typeof cashOutflowCategoryColors | undefined;
 
     if (hasClosing) {
       cashFlowSeriesExcludingClosing = computeCashFlowSeries(ctx, true);
@@ -67,6 +73,11 @@ export function parseGnuCashFile(filePath: string, overrideBaseCurrencyGuid?: st
       const excIncome = computeIncomeBreakdown(ctx, true);
       monthlyIncomeByCategoryExcludingClosing = excIncome.monthly;
       incomeCategoryColorsExcludingClosing = excIncome.colors;
+      const excCashFlow = computeCashFlowByCategory(ctx, true);
+      monthlyCashInflowByCategoryExcludingClosing = excCashFlow.inflow;
+      monthlyCashOutflowByCategoryExcludingClosing = excCashFlow.outflow;
+      cashInflowCategoryColorsExcludingClosing = excCashFlow.inflowColors;
+      cashOutflowCategoryColorsExcludingClosing = excCashFlow.outflowColors;
     }
 
     const baseCommodity = ctx.commodityMap.get(ctx.baseCurrencyGuid);
@@ -112,6 +123,14 @@ export function parseGnuCashFile(filePath: string, overrideBaseCurrencyGuid?: st
       expenseCategoryColorsExcludingClosing,
       monthlyIncomeByCategoryExcludingClosing,
       incomeCategoryColorsExcludingClosing,
+      monthlyCashInflowByCategory,
+      monthlyCashOutflowByCategory,
+      cashInflowCategoryColors,
+      cashOutflowCategoryColors,
+      monthlyCashInflowByCategoryExcludingClosing,
+      monthlyCashOutflowByCategoryExcludingClosing,
+      cashInflowCategoryColorsExcludingClosing,
+      cashOutflowCategoryColorsExcludingClosing,
     };
   } finally {
     db.close();

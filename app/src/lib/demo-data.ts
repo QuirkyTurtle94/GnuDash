@@ -467,6 +467,10 @@ export function generateDemoData(): DashboardData {
     cashFlowBudgetData: null,
     ledgerTransactions,
     hasClosingTransactions: false,
+    monthlyCashInflowByCategory: [],
+    monthlyCashOutflowByCategory: [],
+    cashInflowCategoryColors: {},
+    cashOutflowCategoryColors: {},
   };
 }
 

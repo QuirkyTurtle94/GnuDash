@@ -87,12 +87,12 @@ export function PeriodSelector<T extends string>({
       <div ref={containerRef} className="relative">
         <button
           onClick={() => setOpen(!open)}
-          className="flex items-center gap-1.5 rounded-lg border border-[#EFEFEF] px-3 py-1.5 transition-colors hover:bg-[#F4F5F7]"
+          className="flex items-center gap-1.5 rounded-lg border border-[#D0D5DD] bg-white px-3 py-1.5 shadow-sm transition-colors hover:bg-[#F4F5F7]"
         >
-          <span className="text-xs font-medium text-[#6F767E] whitespace-nowrap">
+          <span className="text-xs font-medium text-[#1A1D1F] whitespace-nowrap">
             {isCustom ? "Custom" : displayLabel}
           </span>
-          <svg className="h-3.5 w-3.5 text-[#9A9FA5]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <svg className="h-3.5 w-3.5 text-[#6F767E]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
           </svg>
         </button>

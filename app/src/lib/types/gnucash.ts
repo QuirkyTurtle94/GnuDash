@@ -465,4 +465,20 @@ export interface DashboardData {
   monthlyIncomeByCategoryExcludingClosing?: MonthlyExpenseByCategory[];
   /** Income category colors with closing transactions excluded. */
   incomeCategoryColorsExcludingClosing?: Record<string, string>;
+  /** Monthly cash inflow rows grouped by counterparty category (for cash flow Sankey) */
+  monthlyCashInflowByCategory: MonthlyExpenseByCategory[];
+  /** Monthly cash outflow rows grouped by counterparty category (for cash flow Sankey) */
+  monthlyCashOutflowByCategory: MonthlyExpenseByCategory[];
+  /** Stable colour assignments for top-level cash inflow categories */
+  cashInflowCategoryColors: Record<string, string>;
+  /** Stable colour assignments for top-level cash outflow categories */
+  cashOutflowCategoryColors: Record<string, string>;
+  /** Cash inflow by category with closing transactions excluded. */
+  monthlyCashInflowByCategoryExcludingClosing?: MonthlyExpenseByCategory[];
+  /** Cash outflow by category with closing transactions excluded. */
+  monthlyCashOutflowByCategoryExcludingClosing?: MonthlyExpenseByCategory[];
+  /** Cash inflow category colors with closing transactions excluded. */
+  cashInflowCategoryColorsExcludingClosing?: Record<string, string>;
+  /** Cash outflow category colors with closing transactions excluded. */
+  cashOutflowCategoryColorsExcludingClosing?: Record<string, string>;
 }
