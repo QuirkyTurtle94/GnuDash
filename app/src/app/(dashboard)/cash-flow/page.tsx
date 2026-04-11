@@ -324,6 +324,11 @@ function CashFlowBarChart({ filters }: { filters: SankeyFilterState }) {
 const BANK_CASH = new Set(["BANK", "CASH"]);
 const TX_PAGE_SIZE = 25;
 
+/**
+ * Transaction table filtered by the Sankey's period and category selections.
+ * Shows transactions that involve a BANK/CASH split where a counterparty
+ * matches the selected inflow/outflow categories.
+ */
 function CashFlowTransactions({ filters }: { filters: SankeyFilterState }) {
   const { data } = useDashboard();
   const { excludeClosing } = useClosing();
@@ -461,13 +466,13 @@ function formatTxDate(dateStr: string): string {
 
 // ── Existing Cash Flow Budget Content ───────────────────────────────
 
-const CASH_ACCOUNT_TYPES = new Set(["BANK", "CASH"]);
 
+/** When `include` is false, remove budget rows whose account is a BANK/CASH type (inter-cash transfers). */
 function filterTransfers(categories: BudgetCategoryRow[], accountMap: Map<string, { account_type: string }>, include: boolean): BudgetCategoryRow[] {
   if (include) return categories;
   return categories.filter((cat) => {
     const acc = accountMap.get(cat.accountGuid);
-    return !acc || !CASH_ACCOUNT_TYPES.has(acc.account_type);
+    return !acc || !BANK_CASH.has(acc.account_type);
   });
 }
 

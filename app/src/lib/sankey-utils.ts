@@ -327,6 +327,13 @@ interface CashFlowBuildOptions {
   customRange?: CustomRange;
 }
 
+/**
+ * Build Sankey data for cash flow (inflow → outflow) visualization.
+ * Unlike `buildSankeyData` which shows income→expenses, this shows actual
+ * cash movements through BANK/CASH accounts grouped by counterparty category.
+ * Structure: inflow sources → "Total Inflow" → "Total Outflow" → outflow destinations,
+ * with a surplus/deficit node for the balance.
+ */
 export function buildCashFlowSankeyData(opts: CashFlowBuildOptions): SankeyData {
   const { period, depth, inflowCategoryColors, outflowCategoryColors } = opts;
   const months = getMonthsForPeriod(opts.cashFlowSeries, period, opts.customRange);

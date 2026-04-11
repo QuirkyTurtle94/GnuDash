@@ -465,9 +465,13 @@ export interface DashboardData {
   monthlyIncomeByCategoryExcludingClosing?: MonthlyExpenseByCategory[];
   /** Income category colors with closing transactions excluded. */
   incomeCategoryColorsExcludingClosing?: Record<string, string>;
-  /** Monthly cash inflow rows grouped by counterparty category (for cash flow Sankey) */
+  /** Monthly cash inflow rows grouped by counterparty category (for cash flow Sankey).
+   *  Unlike monthlyIncomeByCategory (which tracks all INCOME splits), this only includes
+   *  cash that actually entered BANK/CASH accounts, attributed to the counterparty category. */
   monthlyCashInflowByCategory: MonthlyExpenseByCategory[];
-  /** Monthly cash outflow rows grouped by counterparty category (for cash flow Sankey) */
+  /** Monthly cash outflow rows grouped by counterparty category (for cash flow Sankey).
+   *  Unlike monthlyExpensesByCategory (which tracks all EXPENSE splits), this only includes
+   *  cash that actually left BANK/CASH accounts, attributed to the counterparty category. */
   monthlyCashOutflowByCategory: MonthlyExpenseByCategory[];
   /** Stable colour assignments for top-level cash inflow categories */
   cashInflowCategoryColors: Record<string, string>;
