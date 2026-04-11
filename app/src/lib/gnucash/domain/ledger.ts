@@ -3,6 +3,12 @@ import type { ParseContext } from "../context";
 import { buildFullPath } from "../shared/accounts";
 import { parseGnuCashDate, formatISODate } from "../shared/dates";
 
+/**
+ * Get all transactions with full split details for the ledger view.
+ * Returns every transaction in the database, grouped by transaction GUID,
+ * with each split's amount (in transaction currency) and quantity (in account commodity).
+ * Ordered by post_date descending.
+ */
 export function getLedgerTransactions(ctx: ParseContext): LedgerTransaction[] {
   const { db, accountMap, commodityMap } = ctx;
 
@@ -81,6 +87,12 @@ export function getLedgerTransactions(ctx: ParseContext): LedgerTransaction[] {
   return transactions;
 }
 
+/**
+ * Get the 50 most recent transactions from BANK, CASH, ASSET, CREDIT, and
+ * LIABILITY accounts. Each row includes the counter-account name (the other
+ * side of the split) for categorisation. Used by the dashboard's recent
+ * transactions widget.
+ */
 export function getRecentTransactions(ctx: ParseContext): RecentTransaction[] {
   const { db, accountMap } = ctx;
 

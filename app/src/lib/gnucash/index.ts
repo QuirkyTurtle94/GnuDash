@@ -15,11 +15,11 @@ import { getUpcomingBills } from "./domain/bills";
 import { hasClosingTransactions } from "./domain/closing";
 import { formatMonth } from "./shared/dates";
 
-export function parseGnuCashFile(filePath: string): DashboardData {
+export function parseGnuCashFile(filePath: string, overrideBaseCurrencyGuid?: string): DashboardData {
   const db = openAndValidate(filePath);
 
   try {
-    const ctx = buildParseContext(db);
+    const ctx = buildParseContext(db, overrideBaseCurrencyGuid);
 
     const accountTree = buildAccountTree(ctx);
     const netWorthSeries = computeNetWorthSeries(ctx);
@@ -104,6 +104,7 @@ export function parseGnuCashFile(filePath: string): DashboardData {
         fullname: c.fullname,
         fraction: c.fraction,
       })),
+      availableCurrencies: ctx.availableCurrencies,
       hasClosingTransactions: hasClosing,
       cashFlowSeriesExcludingClosing,
       expenseBreakdownExcludingClosing,

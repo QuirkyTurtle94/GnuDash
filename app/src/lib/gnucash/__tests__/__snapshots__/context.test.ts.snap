@@ -512,6 +512,18 @@ exports[`buildParseContext > snapshot: full context shape (excluding db) 1`] = `
       "placeholder": 1,
     },
   ],
+  "availableCurrencies": [
+    {
+      "fullname": "British Pound",
+      "guid": "00000001000000010000000100000001",
+      "mnemonic": "GBP",
+    },
+    {
+      "fullname": "US Dollar",
+      "guid": "00000002000000020000000200000002",
+      "mnemonic": "USD",
+    },
+  ],
   "baseCurrencyGuid": "00000001000000010000000100000001",
   "baseCurrencyMnemonic": "GBP",
   "commodities": [
@@ -580,6 +592,20 @@ exports[`buildParseContext > snapshot: full context shape (excluding db) 1`] = `
       "guid": "00000004000000040000000400000004",
       "mnemonic": "VWRL",
       "namespace": "LSE",
+    },
+  },
+  "latestPriceInfo": Map {
+    "00000003000000030000000300000003" => {
+      "currencyGuid": "00000001000000010000000100000001",
+      "rawPrice": 135,
+    },
+    "00000004000000040000000400000004" => {
+      "currencyGuid": "00000001000000010000000100000001",
+      "rawPrice": 85,
+    },
+    "00000002000000020000000200000002" => {
+      "currencyGuid": "00000001000000010000000100000001",
+      "rawPrice": 0.79,
     },
   },
   "latestPrices": {

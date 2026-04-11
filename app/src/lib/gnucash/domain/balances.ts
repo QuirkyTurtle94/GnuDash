@@ -2,6 +2,12 @@ import type { TopBalance } from "@/lib/types/gnucash";
 import type { ParseContext } from "../context";
 import { buildFullPath } from "../shared/accounts";
 
+/**
+ * Compute current balances for all non-placeholder accounts, converted to base currency.
+ * Investment accounts (STOCK/MUTUAL) are valued at their latest market price.
+ * Foreign currency accounts are converted via FX rates.
+ * Results are sorted: positive balances first (by descending value), then negative.
+ */
 export function computeTopBalances(ctx: ParseContext): TopBalance[] {
   const { db, accountMap, commodityMap, baseCurrencyGuid, fxRates, latestPrices } = ctx;
 

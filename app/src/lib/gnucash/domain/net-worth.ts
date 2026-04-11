@@ -2,6 +2,16 @@ import type { MonthlyNetWorth } from "@/lib/types/gnucash";
 import type { ParseContext } from "../context";
 import { sqlMonth } from "../shared/dates";
 
+/**
+ * Compute monthly net worth time series.
+ * Tracks three separate components that are summed into net worth:
+ * 1. Non-investment assets (ASSET, BANK, CASH, RECEIVABLE) — cumulative balance with FX conversion
+ * 2. Liabilities (LIABILITY, CREDIT, PAYABLE) — cumulative balance with FX conversion
+ * 3. Investments (STOCK, MUTUAL) — shares held × price at each month (mark-to-market, FX-converted)
+ *
+ * Uses quantity (not value) for non-investment accounts to correctly handle
+ * multi-currency accounts. Investment values fluctuate with price history.
+ */
 export function computeNetWorthSeries(ctx: ParseContext): MonthlyNetWorth[] {
   const { db, baseCurrencyGuid, fxRates, commodityMap } = ctx;
 
@@ -72,29 +82,31 @@ export function computeNetWorthSeries(ctx: ParseContext): MonthlyNetWorth[] {
     sharesMap.get(row.account_guid)!.set(row.month, running);
   }
 
-  // Price lookup by commodity by month
+  // Price lookup by commodity by month (with currency_guid for FX conversion)
   const allPrices = db
     .prepare(
-      `SELECT commodity_guid, date, CAST(value_num AS REAL) / value_denom AS price
+      `SELECT commodity_guid, currency_guid, date, CAST(value_num AS REAL) / value_denom AS price
        FROM prices ORDER BY date`
     )
-    .all() as { commodity_guid: string; date: string; price: number }[];
+    .all() as { commodity_guid: string; currency_guid: string; date: string; price: number }[];
 
-  const pricesByMonth = new Map<string, Map<string, number>>();
+  const pricesByMonth = new Map<string, Map<string, { price: number; currencyGuid: string }>>();
   for (const p of allPrices) {
     const pMonth = p.date.substring(0, 7);
     if (!pricesByMonth.has(p.commodity_guid)) pricesByMonth.set(p.commodity_guid, new Map());
-    pricesByMonth.get(p.commodity_guid)!.set(pMonth, p.price);
+    pricesByMonth.get(p.commodity_guid)!.set(pMonth, { price: p.price, currencyGuid: p.currency_guid });
   }
 
   function getPriceAtMonth(commodityGuid: string, month: string): number {
     const prices = pricesByMonth.get(commodityGuid);
     if (!prices) return 0;
-    let lastPrice = 0;
-    for (const [m, price] of prices) {
-      if (m <= month) lastPrice = price;
+    let lastEntry: { price: number; currencyGuid: string } | null = null;
+    for (const [m, entry] of prices) {
+      if (m <= month) lastEntry = entry;
     }
-    return lastPrice;
+    if (!lastEntry) return 0;
+    // Convert price from its denomination currency to base
+    return fxRates.toBase(lastEntry.currencyGuid, lastEntry.price);
   }
 
   function getSharesAtMonth(accountGuid: string, month: string): number {
@@ -138,6 +150,12 @@ export function computeNetWorthSeries(ctx: ParseContext): MonthlyNetWorth[] {
   });
 }
 
+/**
+ * Compute the current total net worth as a single number.
+ * Sums all non-investment account balances (with FX conversion) plus
+ * investment market values (shares × latest price). Excludes ROOT,
+ * INCOME, EXPENSE, EQUITY, and TRADING account types.
+ */
 export function computeCurrentNetWorth(ctx: ParseContext): number {
   const { db, commodityMap, baseCurrencyGuid, fxRates } = ctx;
 
@@ -164,7 +182,7 @@ export function computeCurrentNetWorth(ctx: ParseContext): number {
     }
   }
 
-  // Investment market value from context's latestPrices
+  // Investment market value from context's latestPrices (already normalized to base)
   const invRows = db
     .prepare(
       `SELECT a.commodity_guid,

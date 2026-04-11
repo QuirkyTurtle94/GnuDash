@@ -2,6 +2,12 @@ import type { UpcomingBill } from "@/lib/types/gnucash";
 import type { ParseContext } from "../context";
 import { parseGnuCashDate } from "../shared/dates";
 
+/**
+ * Get upcoming scheduled transactions (bills) from the GNUCash schedxactions table.
+ * Estimates the next occurrence date from the recurrence rules and extracts
+ * the expected amount from the template transaction splits.
+ * Returns an empty array if the schedxactions table doesn't exist.
+ */
 export function getUpcomingBills(ctx: ParseContext): UpcomingBill[] {
   const { db } = ctx;
 

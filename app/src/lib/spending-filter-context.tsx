@@ -15,7 +15,7 @@ interface SpendingFilterState {
   /** Selected month from bar chart (e.g. "2025-03"), null = all months in period */
   selectedMonth: string | null;
   setSelectedMonth: (month: string | null) => void;
-  /** Leaf account selected in pie chart sidebar — filters table only, not the pie */
+  /** Leaf account selected in pie chart sidebar — filters table and bar chart */
   selectedAccount: string | null;
   setSelectedAccount: (path: string | null) => void;
   /** Categories excluded from charts */
