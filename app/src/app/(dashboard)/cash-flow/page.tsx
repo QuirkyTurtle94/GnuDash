@@ -148,12 +148,11 @@ function CashFlowContent({ data }: { data: NonNullable<ReturnType<typeof useDash
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h2 className="text-lg font-semibold text-[#1A1D1F] sm:text-xl">Cash Flow</h2>
         <div className="flex items-center gap-2">
-          <label className="flex items-center gap-1.5 cursor-pointer select-none" title="Include transfers between bank/cash accounts">
+          <label className="flex items-center gap-1.5 cursor-pointer select-none" title="Include transfers between bank/cash accounts" onClick={() => setIncludeTransfers((v) => !v)}>
             <div
               role="switch"
               aria-checked={includeTransfers}
-              onClick={() => setIncludeTransfers(!includeTransfers)}
-              onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setIncludeTransfers(!includeTransfers); } }}
+              onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setIncludeTransfers((v) => !v); } }}
               tabIndex={0}
               className={`relative h-4 w-7 rounded-full transition-colors ${
                 includeTransfers ? "bg-[#6C9B8B]" : "bg-[#D0D5DD]"
