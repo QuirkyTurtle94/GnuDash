@@ -449,6 +449,8 @@ export interface DashboardData {
   ledgerTransactions: LedgerTransaction[];
   /** All commodities/currencies in the file */
   commodities: CommodityInfo[];
+  /** All price entries from the prices table, ordered by date descending */
+  prices: GnuCashPrice[];
   /** Currencies available for the display currency selector (CURRENCY namespace only) */
   availableCurrencies: { guid: string; mnemonic: string; fullname: string }[];
   /** True if the file contains book-closing transactions (year-end entries that zero out income/expense) */

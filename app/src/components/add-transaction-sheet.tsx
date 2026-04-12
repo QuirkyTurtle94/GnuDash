@@ -14,16 +14,7 @@ import { Plus, Trash2, AlertCircle, Check, Search } from "lucide-react";
 import type { AccountNode, LedgerTransaction } from "@/lib/types/gnucash";
 import type { CreateTransactionPayload, EditTransactionPayload } from "@/lib/gnucash/worker/messages";
 import { formatCurrency } from "@/lib/format";
-
-// ── Types ───────────────────────────────────────────────────────
-
-type FlatAccount = {
-  guid: string;
-  name: string;
-  fullPath: string;
-  type: string;
-  commodityMnemonic: string;
-};
+import { type FlatAccount, flattenAccounts, fuzzyMatch, isInvestmentType, ACCOUNT_TYPE_LABELS } from "@/lib/transaction-helpers";
 
 interface SplitRow {
   id: number;
@@ -31,23 +22,16 @@ interface SplitRow {
   accountPath: string;
   accountType: string;
   commodityMnemonic: string;
-  // Currency splits
   debit: string;
   credit: string;
-  // Investment splits (STOCK/MUTUAL)
   shares: string;
   price: string;
   total: string;
-  isBuy: boolean; // true = debit (buying), false = credit (selling)
+  isBuy: boolean;
   memo: string;
 }
 
-/** Which of the 3 investment fields was last edited by the user */
 type InvestmentField = "shares" | "price" | "total";
-
-function isInvestmentType(type: string): boolean {
-  return type === "STOCK" || type === "MUTUAL";
-}
 
 function emptyRow(id: number): SplitRow {
   return {
@@ -55,51 +39,6 @@ function emptyRow(id: number): SplitRow {
     debit: "", credit: "", shares: "", price: "", total: "", isBuy: true, memo: "",
   };
 }
-
-// ── Helpers ─────────────────────────────────────────────────────
-
-function flattenAccounts(nodes: AccountNode[], path: string[] = []): FlatAccount[] {
-  const results: FlatAccount[] = [];
-  for (const node of nodes) {
-    const currentPath = [...path, node.name];
-    if (node.type !== "ROOT" && !node.placeholder) {
-      results.push({
-        guid: node.guid,
-        name: node.name,
-        fullPath: currentPath.join(":"),
-        type: node.type,
-        commodityMnemonic: node.commodityMnemonic,
-      });
-    }
-    if (node.children.length > 0) {
-      results.push(...flattenAccounts(node.children, currentPath));
-    }
-  }
-  return results;
-}
-
-function fuzzyMatch(query: string, target: string): { match: boolean; score: number } {
-  const q = query.toLowerCase();
-  const t = target.toLowerCase();
-  if (t.includes(q)) {
-    return { match: true, score: 1000 - t.indexOf(q) };
-  }
-  let qi = 0;
-  let consecutive = 0;
-  let maxConsecutive = 0;
-  for (let ti = 0; ti < t.length && qi < q.length; ti++) {
-    if (t[ti] === q[qi]) { qi++; consecutive++; maxConsecutive = Math.max(maxConsecutive, consecutive); }
-    else { consecutive = 0; }
-  }
-  if (qi === q.length) return { match: true, score: maxConsecutive * 10 };
-  return { match: false, score: 0 };
-}
-
-const ACCOUNT_TYPE_LABELS: Record<string, string> = {
-  BANK: "Bank", CASH: "Cash", ASSET: "Assets", STOCK: "Stocks", MUTUAL: "Funds",
-  INCOME: "Income", EXPENSE: "Expenses", EQUITY: "Equity", LIABILITY: "Liabilities",
-  CREDIT: "Credit", RECEIVABLE: "Receivable", PAYABLE: "Payable", TRADING: "Trading",
-};
 
 const NUM_INPUT_CLASS = "h-8 w-full rounded-md border border-[#EFEFEF] bg-white px-2 text-right text-xs text-[#1A1D1F] placeholder:text-[#D4DAE0] focus:border-[#3B6B8A] focus:outline-none focus:ring-1 focus:ring-[#3B6B8A] [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none";
 
@@ -516,10 +455,13 @@ export function AddTransactionSheet({
   open,
   onOpenChange,
   editingTransaction,
+  defaultAccountGuid,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   editingTransaction?: LedgerTransaction | null;
+  /** When provided, the first split row is pre-filled with this account (used from account register tabs). */
+  defaultAccountGuid?: string;
 }) {
   const { data, createTransaction, editTransaction } = useDashboard();
   const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
@@ -586,6 +528,29 @@ export function AddTransactionSheet({
     }
   }, [editingTransaction, open, accounts]);
 
+  // Pre-fill first split when opening a new transaction from a register tab
+  useEffect(() => {
+    if (open && !editingTransaction && defaultAccountGuid && accounts.length > 0) {
+      const acct = accounts.find((a) => a.guid === defaultAccountGuid);
+      if (acct) {
+        setSplits((prev) => {
+          // Only pre-fill if the first row is still empty (untouched)
+          if (prev[0] && !prev[0].accountGuid) {
+            const row1: SplitRow = {
+              ...prev[0],
+              accountGuid: acct.guid,
+              accountPath: acct.fullPath,
+              accountType: acct.type,
+              commodityMnemonic: acct.commodityMnemonic,
+            };
+            return [row1, ...prev.slice(1)];
+          }
+          return prev;
+        });
+      }
+    }
+  }, [open, editingTransaction, defaultAccountGuid, accounts]);
+
   // ── Balance computation ─────────────────────────────────────
 
   const { totalDebit, totalCredit, isBalanced } = useMemo(() => {
@@ -639,7 +604,24 @@ export function AddTransactionSheet({
     setDate(new Date().toISOString().slice(0, 10));
     setDescription("");
     setNum("");
-    setSplits([emptyRow(1), emptyRow(2)]);
+    // Pre-fill first split if a default account is provided (from register tab)
+    if (defaultAccountGuid && !editingTransaction) {
+      const acct = accounts.find((a) => a.guid === defaultAccountGuid);
+      if (acct) {
+        const row1: SplitRow = {
+          ...emptyRow(1),
+          accountGuid: acct.guid,
+          accountPath: acct.fullPath,
+          accountType: acct.type,
+          commodityMnemonic: acct.commodityMnemonic,
+        };
+        setSplits([row1, emptyRow(2)]);
+      } else {
+        setSplits([emptyRow(1), emptyRow(2)]);
+      }
+    } else {
+      setSplits([emptyRow(1), emptyRow(2)]);
+    }
     nextId.current = 3;
     setSaveError(null);
   }

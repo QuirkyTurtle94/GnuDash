@@ -17,7 +17,7 @@ import type {
   BudgetData,
   DashboardData,
 } from "@/lib/types/gnucash";
-import type { WorkerRequest, WorkerResponse, DomainFunction, MutationAction, CreateTransactionPayload, DeleteTransactionPayload, EditTransactionPayload, CreateAccountPayload, UpdateAccountPayload, DeleteAccountPayload, CreateCommodityPayload } from "./messages";
+import type { WorkerRequest, WorkerResponse, DomainFunction, MutationAction, CreateTransactionPayload, DeleteTransactionPayload, EditTransactionPayload, CreateAccountPayload, UpdateAccountPayload, DeleteAccountPayload, CreateCommodityPayload, AddPricePayload, EditPricePayload, DeletePricePayload } from "./messages";
 import { parseGnuCashXml } from "../xml/parser";
 
 type PendingRequest = {
@@ -287,6 +287,21 @@ export class GnuCashWorkerClient {
 
   async createCommodity(payload: CreateCommodityPayload): Promise<DashboardData> {
     return this.mutate("createCommodity", payload);
+  }
+
+  /** Add a new price entry to the prices table. */
+  async addPrice(payload: AddPricePayload): Promise<DashboardData> {
+    return this.mutate("addPrice", payload);
+  }
+
+  /** Edit an existing price entry (delete old + create new). */
+  async editPrice(payload: EditPricePayload): Promise<DashboardData> {
+    return this.mutate("editPrice", payload);
+  }
+
+  /** Delete a price entry from the prices table. */
+  async deletePrice(payload: DeletePricePayload): Promise<DashboardData> {
+    return this.mutate("deletePrice", payload);
   }
 
   // ── Domain queries ─────────────────────────────────────────────

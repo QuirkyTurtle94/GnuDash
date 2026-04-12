@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
+import Image from "next/image";
 import { Menu, Eye, EyeOff, Pencil, Lock, BookX, ChevronDown } from "lucide-react";
 import { useDashboard } from "@/lib/dashboard-context";
 import { PrivacyProvider, usePrivacy } from "@/lib/privacy-context";
@@ -61,6 +62,7 @@ function DashboardInner({ children }: { children: React.ReactNode }) {
   const { hideValues, toggleHideValues } = usePrivacy();
   const { excludeClosing, toggleExcludeClosing } = useClosing();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [sidebarHovered, setSidebarHovered] = useState(false);
 
   if (!data) {
     return <FileUpload />;
@@ -76,26 +78,38 @@ function DashboardInner({ children }: { children: React.ReactNode }) {
         />
       )}
 
-      {/* Sidebar */}
+      {/* Sidebar - collapsed by default, expands on hover */}
       <div
         className={`fixed inset-y-0 left-0 z-40 transition-transform duration-200 md:static md:translate-x-0 ${
           sidebarOpen ? "translate-x-0" : "-translate-x-full"
         }`}
+        onMouseEnter={() => setSidebarHovered(true)}
+        onMouseLeave={() => setSidebarHovered(false)}
       >
-        <Sidebar onNavigate={() => setSidebarOpen(false)} />
+        <Sidebar
+          onNavigate={() => setSidebarOpen(false)}
+          expanded={sidebarHovered}
+        />
       </div>
 
       <main className="flex flex-1 flex-col overflow-hidden">
         {/* Top bar */}
-        <header className="flex h-14 shrink-0 items-center justify-between border-b border-[#EFEFEF] bg-white px-4 sm:h-16 sm:px-8">
-          <div className="flex items-center gap-3">
+        <header className="flex h-[68px] shrink-0 items-center justify-between border-b border-[#EFEFEF] bg-white px-4 sm:px-8">
+          <div className="flex items-center gap-3 -ml-6">
             <button
               onClick={() => setSidebarOpen(true)}
               className="rounded-lg p-1.5 text-[#6F767E] transition-colors hover:bg-[#F4F5F7] md:hidden"
             >
               <Menu className="h-5 w-5" />
             </button>
-            <h1 className="text-sm font-medium text-[#1A1D1F] sm:text-[15px]">Home page</h1>
+            <Image
+              src="/logo.png"
+              alt="GnuDash"
+              width={360}
+              height={96}
+              className="rounded-lg"
+              style={{ width: "auto", height: "88px" }}
+            />
           </div>
           <div className="flex items-center gap-2 sm:gap-3">
             {isXmlSource && data && (

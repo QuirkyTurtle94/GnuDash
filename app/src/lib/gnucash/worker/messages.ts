@@ -36,7 +36,8 @@ export type DomainFunction =
 export type MutationAction =
   | "createTransaction" | "deleteTransaction" | "editTransaction"
   | "createAccount" | "updateAccount" | "deleteAccount"
-  | "createCommodity";
+  | "createCommodity"
+  | "addPrice" | "editPrice" | "deletePrice";
 
 /**
  * Payload for creating a transaction via the worker.
@@ -116,6 +117,36 @@ export interface CreateCommodityPayload {
   fullname: string;
   fraction: number;
   cusip?: string;
+}
+
+/** Payload for adding a price entry. */
+export interface AddPricePayload {
+  commodityGuid: string;
+  currencyGuid: string;
+  date: string; // YYYY-MM-DD
+  /** Price as a decimal number (e.g. 135.50) */
+  value: number;
+  /** Source identifier (e.g. "user:price-editor", "user:xfer-dialog", "Finance::Quote") */
+  source?: string;
+  /** Price type (e.g. "last", "nav", "transaction") */
+  type?: string;
+}
+
+/** Payload for editing an existing price entry (delete old + add new). */
+export interface EditPricePayload {
+  /** GUID of the price to replace */
+  originalGuid: string;
+  commodityGuid: string;
+  currencyGuid: string;
+  date: string;
+  value: number;
+  source?: string;
+  type?: string;
+}
+
+/** Payload for deleting a price entry. */
+export interface DeletePricePayload {
+  priceGuid: string;
 }
 
 export type WorkerResponse =
