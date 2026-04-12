@@ -50,25 +50,28 @@ export function getMonthsForPeriod(
   if (cashFlowSeries.length === 0) return new Set();
 
   let slice: MonthlyCashFlow[];
+  const now = new Date();
+  const nowYear = now.getFullYear();
+  const nowMonth = now.getMonth();
+
+  const monthAtOffset = (offset: number): string => {
+    const d = new Date(nowYear, nowMonth + offset, 1);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+  };
+
   switch (period) {
     case "this-month":
-      slice = cashFlowSeries.slice(-1);
-      break;
+      return new Set([monthAtOffset(0)]);
     case "last-month":
-      slice = cashFlowSeries.slice(-2, -1);
-      break;
+      return new Set([monthAtOffset(-1)]);
     case "last-3m":
-      slice = cashFlowSeries.slice(-3);
-      break;
+      return new Set(Array.from({ length: 3 }, (_, i) => monthAtOffset(i - 2)));
     case "last-6m":
-      slice = cashFlowSeries.slice(-6);
-      break;
+      return new Set(Array.from({ length: 6 }, (_, i) => monthAtOffset(i - 5)));
     case "last-12m":
-      slice = cashFlowSeries.slice(-12);
-      break;
+      return new Set(Array.from({ length: 12 }, (_, i) => monthAtOffset(i - 11)));
     case "all-time":
-      slice = cashFlowSeries;
-      break;
+      return new Set(cashFlowSeries.map((s) => s.month));
     case "custom":
       if (!customRange) return new Set();
       slice = cashFlowSeries.filter(
@@ -76,8 +79,6 @@ export function getMonthsForPeriod(
       );
       break;
   }
-
-  return new Set(slice.map((s) => s.month));
 }
 
 // ── Colour constants ──────────────────────────────────────────────────
