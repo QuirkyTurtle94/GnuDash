@@ -6,6 +6,7 @@ import { PortfolioSummary } from "@/components/investment/portfolio-summary";
 import { AllocationPie } from "@/components/investment/allocation-pie";
 import { HoldingsTable } from "@/components/investment/holdings-table";
 import { ValueOverTimeChart } from "@/components/investment/value-over-time-chart";
+import { PricesTable } from "@/components/investment/prices-table";
 import type { InvestmentHolding } from "@/lib/types/gnucash";
 
 export interface GroupedHolding {
@@ -141,6 +142,9 @@ export default function InvestmentPage() {
               grouped={grouped}
             />
           </div>
+
+          {/* Price database */}
+          <PricesTable currency={c} selectedTicker={selectedTicker} />
         </>
       )}
     </div>

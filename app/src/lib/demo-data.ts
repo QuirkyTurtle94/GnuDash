@@ -443,6 +443,7 @@ export function generateDemoData(): DashboardData {
     currencyGuid: "",
     currencyFraction: 100,
     commodities: [],
+    prices: [],
     availableCurrencies: [{ guid: "", mnemonic: "GBP", fullname: "British Pound Sterling" }],
     accounts,
     netWorthSeries,

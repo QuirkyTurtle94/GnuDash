@@ -10,7 +10,7 @@ import {
 } from "react";
 import type { DashboardData } from "@/lib/types/gnucash";
 import { GnuCashWorkerClient } from "@/lib/gnucash/worker/client";
-import type { CreateTransactionPayload, DeleteTransactionPayload, EditTransactionPayload, CreateAccountPayload, UpdateAccountPayload, DeleteAccountPayload, CreateCommodityPayload } from "@/lib/gnucash/worker/messages";
+import type { CreateTransactionPayload, DeleteTransactionPayload, EditTransactionPayload, CreateAccountPayload, UpdateAccountPayload, DeleteAccountPayload, CreateCommodityPayload, AddPricePayload, EditPricePayload, DeletePricePayload } from "@/lib/gnucash/worker/messages";
 import { generateDemoData } from "@/lib/demo-data";
 
 const STORAGE_KEY = "gnucash-dashboard-data";
@@ -37,6 +37,9 @@ interface DashboardContextType {
   updateAccount: (payload: UpdateAccountPayload) => Promise<void>;
   deleteAccountWithReallocation: (payload: DeleteAccountPayload) => Promise<void>;
   createCommodity: (payload: CreateCommodityPayload) => Promise<void>;
+  addPrice: (payload: AddPricePayload) => Promise<void>;
+  editPrice: (payload: EditPricePayload) => Promise<void>;
+  deletePrice: (payload: DeletePricePayload) => Promise<void>;
   exportFile: () => Promise<void>;
   setCurrency: (currencyGuid: string) => Promise<void>;
 }
@@ -241,6 +244,24 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
     setData(await client.createCommodity(payload));
   }
 
+  async function addPriceFn(payload: AddPricePayload) {
+    if (!isWritable) throw new Error("Database is not open in read-write mode");
+    const client = getClient();
+    setData(await client.addPrice(payload));
+  }
+
+  async function editPriceFn(payload: EditPricePayload) {
+    if (!isWritable) throw new Error("Database is not open in read-write mode");
+    const client = getClient();
+    setData(await client.editPrice(payload));
+  }
+
+  async function deletePriceFn(payload: DeletePricePayload) {
+    if (!isWritable) throw new Error("Database is not open in read-write mode");
+    const client = getClient();
+    setData(await client.deletePrice(payload));
+  }
+
   async function setCurrencyFn(currencyGuid: string) {
     const client = getClient();
     const dashboardData = await client.setCurrency(currencyGuid);
@@ -261,7 +282,7 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
 
   return (
     <DashboardContext.Provider
-      value={{ data, isLoading, error, uploadedAt, isWritable, isXmlSource, toggleWritable, uploadFile, loadDemo, clearData, createTransaction, deleteTransaction: deleteTransactionFn, editTransaction, createAccount: createAccountFn, updateAccount: updateAccountFn, deleteAccountWithReallocation: deleteAccountWithReallocationFn, createCommodity: createCommodityFn, exportFile, setCurrency: setCurrencyFn }}
+      value={{ data, isLoading, error, uploadedAt, isWritable, isXmlSource, toggleWritable, uploadFile, loadDemo, clearData, createTransaction, deleteTransaction: deleteTransactionFn, editTransaction, createAccount: createAccountFn, updateAccount: updateAccountFn, deleteAccountWithReallocation: deleteAccountWithReallocationFn, createCommodity: createCommodityFn, addPrice: addPriceFn, editPrice: editPriceFn, deletePrice: deletePriceFn, exportFile, setCurrency: setCurrencyFn }}
     >
       {children}
     </DashboardContext.Provider>

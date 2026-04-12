@@ -29,8 +29,9 @@ import { deleteTransaction } from "../engine/operations/transaction-ops";
 import { AccountBuilder } from "../engine/builders/account-builder";
 import { updateAccount, deleteAccountWithReallocation } from "../engine/operations/account-ops";
 import { createCommodity } from "../engine/operations/commodity-ops";
+import { addPrice, deletePrice } from "../engine/operations/price-ops";
 import type { AccountType } from "../engine/types";
-import type { WorkerRequest, WorkerResponse, DomainFunction, CreateTransactionPayload, DeleteTransactionPayload, EditTransactionPayload, CreateAccountPayload, UpdateAccountPayload, DeleteAccountPayload, CreateCommodityPayload } from "./messages";
+import type { WorkerRequest, WorkerResponse, DomainFunction, CreateTransactionPayload, DeleteTransactionPayload, EditTransactionPayload, CreateAccountPayload, UpdateAccountPayload, DeleteAccountPayload, CreateCommodityPayload, AddPricePayload, EditPricePayload, DeletePricePayload } from "./messages";
 import type { GnuCashXmlData } from "../xml/types";
 import { GNUCASH_SCHEMA_DDL } from "../xml/schema";
 
@@ -336,6 +337,7 @@ function getFullDashboardData(): DashboardData {
       fullname: c.fullname,
       fraction: c.fraction,
     })),
+    prices: ctx.prices,
     availableCurrencies: ctx.availableCurrencies,
     hasClosingTransactions: hasClosing,
     cashFlowSeriesExcludingClosing,
@@ -353,6 +355,47 @@ function getFullDashboardData(): DashboardData {
     cashInflowCategoryColorsExcludingClosing,
     cashOutflowCategoryColorsExcludingClosing,
   };
+}
+
+/**
+ * After committing a transaction, record implied prices for stock buys/sells
+ * and FX conversions in the prices table.
+ *
+ * A price is implied when a split's value (in tx currency) differs from its
+ * quantity (in the account's commodity). Price = value / quantity.
+ */
+function recordImpliedPrices(
+  adapter: WritableDbAdapter,
+  context: ParseContext,
+  payload: CreateTransactionPayload,
+): void {
+  const txDate = new Date(payload.postDate + "T12:00:00");
+
+  for (const split of payload.splits) {
+    const account = context.accountMap.get(split.accountGuid);
+    if (!account) continue;
+
+    // Skip if the account's commodity IS the transaction currency (no conversion)
+    if (account.commodity_guid === payload.currencyGuid) continue;
+
+    const valueAbs = Math.abs(split.valueNum / split.valueDenom);
+    const quantityAbs = Math.abs(split.quantityNum / split.quantityDenom);
+    if (quantityAbs === 0 || valueAbs === 0) continue;
+
+    // Price = value / quantity (e.g., 1 share of AAPL = 135.50 GBP)
+    const priceDenom = 1000000;
+    const priceNum = Math.round((valueAbs / quantityAbs) * priceDenom);
+
+    addPrice(
+      adapter,
+      account.commodity_guid,     // commodity being priced (stock or foreign currency)
+      payload.currencyGuid,       // priced in transaction currency
+      txDate,
+      new GncNumeric(priceNum, priceDenom),
+      "user:xfer-dialog",         // GnuCash uses this source for transaction-implied prices
+      "transaction",
+    );
+  }
 }
 
 /**
@@ -383,7 +426,10 @@ function handleCreateTransaction(payload: CreateTransactionPayload): DashboardDa
 
   builder.commit();
 
-  // Rebuild context to pick up the new transaction
+  // Record implied prices for stock/FX transactions
+  recordImpliedPrices(writableAdapter, ctx, payload);
+
+  // Rebuild context to pick up the new transaction and prices
   ctx = buildParseContext(writableAdapter);
 
   // Return fully refreshed dashboard data
@@ -437,6 +483,10 @@ function handleEditTransaction(payload: EditTransactionPayload): DashboardData {
   }
 
   builder.commit();
+
+  // Record implied prices for stock/FX transactions
+  recordImpliedPrices(writableAdapter, ctx, payload);
+
   ctx = buildParseContext(writableAdapter);
   return getFullDashboardData();
 }
@@ -499,6 +549,63 @@ function handleCreateCommodity(payload: CreateCommodityPayload): DashboardData {
     fraction: payload.fraction,
     cusip: payload.cusip,
   });
+
+  ctx = buildParseContext(writableAdapter);
+  return getFullDashboardData();
+}
+
+/** Handle adding a new price entry. */
+function handleAddPrice(payload: AddPricePayload): DashboardData {
+  if (!ctx) throw new Error("No database loaded");
+  if (!writableAdapter) throw new Error("Database is not open in read-write mode");
+
+  const priceDenom = 1000000;
+  const priceNum = Math.round(payload.value * priceDenom);
+
+  addPrice(
+    writableAdapter,
+    payload.commodityGuid,
+    payload.currencyGuid,
+    new Date(payload.date + "T12:00:00"),
+    new GncNumeric(priceNum, priceDenom),
+    payload.source ?? "user:price-editor",
+    payload.type ?? "last",
+  );
+
+  ctx = buildParseContext(writableAdapter);
+  return getFullDashboardData();
+}
+
+/** Handle editing an existing price (delete + recreate). */
+function handleEditPrice(payload: EditPricePayload): DashboardData {
+  if (!ctx) throw new Error("No database loaded");
+  if (!writableAdapter) throw new Error("Database is not open in read-write mode");
+
+  deletePrice(writableAdapter, payload.originalGuid);
+
+  const priceDenom = 1000000;
+  const priceNum = Math.round(payload.value * priceDenom);
+
+  addPrice(
+    writableAdapter,
+    payload.commodityGuid,
+    payload.currencyGuid,
+    new Date(payload.date + "T12:00:00"),
+    new GncNumeric(priceNum, priceDenom),
+    payload.source ?? "user:price-editor",
+    payload.type ?? "last",
+  );
+
+  ctx = buildParseContext(writableAdapter);
+  return getFullDashboardData();
+}
+
+/** Handle deleting a price entry. */
+function handleDeletePrice(payload: DeletePricePayload): DashboardData {
+  if (!ctx) throw new Error("No database loaded");
+  if (!writableAdapter) throw new Error("Database is not open in read-write mode");
+
+  deletePrice(writableAdapter, payload.priceGuid);
 
   ctx = buildParseContext(writableAdapter);
   return getFullDashboardData();
@@ -598,6 +705,15 @@ self.onmessage = async (e: MessageEvent<WorkerRequest>) => {
             break;
           case "createCommodity":
             data = handleCreateCommodity(msg.payload as CreateCommodityPayload);
+            break;
+          case "addPrice":
+            data = handleAddPrice(msg.payload as AddPricePayload);
+            break;
+          case "editPrice":
+            data = handleEditPrice(msg.payload as EditPricePayload);
+            break;
+          case "deletePrice":
+            data = handleDeletePrice(msg.payload as DeletePricePayload);
             break;
           default:
             throw new Error(`Unknown mutation action: ${msg.action}`);

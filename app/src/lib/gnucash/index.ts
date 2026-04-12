@@ -115,6 +115,7 @@ export function parseGnuCashFile(filePath: string, overrideBaseCurrencyGuid?: st
         fullname: c.fullname,
         fraction: c.fraction,
       })),
+      prices: ctx.prices,
       availableCurrencies: ctx.availableCurrencies,
       hasClosingTransactions: hasClosing,
       cashFlowSeriesExcludingClosing,

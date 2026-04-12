@@ -167,7 +167,7 @@ export default function AccountsPage() {
       {/* ── Tab Bar ─────────────────────────────────────── */}
       <div
         ref={tabBarRef}
-        className="flex items-end gap-0 overflow-x-auto border-b border-[#EFEFEF] bg-white -mx-4 sm:-mx-6 md:-mx-8 px-4 sm:px-6 md:px-8 scrollbar-thin"
+        className="flex items-end gap-0 overflow-x-auto border-b border-[#EFEFEF] bg-white -mx-4 sm:-mx-6 md:-mx-8 -mt-4 sm:-mt-6 md:-mt-8 px-4 sm:px-6 md:px-8 scrollbar-thin"
       >
         {/* Accounts tab (always first, cannot be closed) */}
         <button
@@ -224,11 +224,33 @@ export default function AccountsPage() {
 
       {/* ── Tab Content ────────────────────────────────── */}
       <div className="pt-4 sm:pt-6">
+        {/* Experimental banner */}
+        <div className="mb-4 flex items-start gap-3 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+          <svg className="mt-0.5 h-5 w-5 shrink-0 text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          <p>
+            This page is experimental and hasn&apos;t been fully tested. Please{" "}
+            <a
+              href="https://github.com/QuirkyTurtle94/GnuDash/issues"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="font-medium underline hover:text-amber-900"
+            >
+              raise an issue on GitHub
+            </a>{" "}
+            with any feedback or requests.
+          </p>
+        </div>
+
         {resolvedActiveTab === "accounts" ? (
           /* ── Chart of Accounts ─────────────────────── */
           <div className="flex flex-col gap-4 sm:gap-6">
             <div className="flex items-center justify-between gap-3">
-              <h2 className="text-lg font-semibold text-[#1A1D1F] sm:text-xl">Chart of Accounts</h2>
+              <div className="flex items-center gap-3">
+                <h2 className="text-lg font-semibold text-[#1A1D1F] sm:text-xl">Chart of Accounts</h2>
+                <span className="text-xs text-[#9A9FA5] hidden sm:inline">Double-click to open register</span>
+              </div>
               <div className="flex items-center gap-2">
                 <button
                   onClick={allExpanded ? collapseAll : expandAll}
@@ -283,10 +305,6 @@ export default function AccountsPage() {
                 </div>
               </CardContent>
             </Card>
-
-            <p className="text-center text-xs text-[#9A9FA5]">
-              Double-click an account to open its register
-            </p>
 
             {isWritable && (
               <AccountEditorSheet
