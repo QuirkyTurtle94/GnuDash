@@ -10,7 +10,7 @@ import {
 } from "react";
 import type { DashboardData } from "@/lib/types/gnucash";
 import { GnuCashWorkerClient } from "@/lib/gnucash/worker/client";
-import type { CreateTransactionPayload, DeleteTransactionPayload, EditTransactionPayload, CreateAccountPayload, UpdateAccountPayload, DeleteAccountPayload, CreateCommodityPayload, AddPricePayload, EditPricePayload, DeletePricePayload } from "@/lib/gnucash/worker/messages";
+import type { CreateTransactionPayload, DeleteTransactionPayload, EditTransactionPayload, BulkEditTransactionsPayload, CreateAccountPayload, UpdateAccountPayload, DeleteAccountPayload, CreateCommodityPayload, AddPricePayload, EditPricePayload, DeletePricePayload } from "@/lib/gnucash/worker/messages";
 import { generateDemoData } from "@/lib/demo-data";
 
 const STORAGE_KEY = "gnucash-dashboard-data";
@@ -33,6 +33,7 @@ interface DashboardContextType {
   createTransaction: (payload: CreateTransactionPayload) => Promise<void>;
   deleteTransaction: (payload: DeleteTransactionPayload) => Promise<void>;
   editTransaction: (payload: EditTransactionPayload) => Promise<void>;
+  bulkEditTransactions: (payload: BulkEditTransactionsPayload) => Promise<void>;
   createAccount: (payload: CreateAccountPayload) => Promise<void>;
   updateAccount: (payload: UpdateAccountPayload) => Promise<void>;
   deleteAccountWithReallocation: (payload: DeleteAccountPayload) => Promise<void>;
@@ -220,6 +221,14 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
     setData(dashboardData);
   }
 
+  async function bulkEditTransactionsFn(payload: BulkEditTransactionsPayload) {
+    if (!isWritable) throw new Error("Database is not open in read-write mode");
+
+    const client = getClient();
+    const dashboardData = await client.bulkEditTransactions(payload);
+    setData(dashboardData);
+  }
+
   async function createAccountFn(payload: CreateAccountPayload) {
     if (!isWritable) throw new Error("Database is not open in read-write mode");
     const client = getClient();
@@ -282,7 +291,7 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
 
   return (
     <DashboardContext.Provider
-      value={{ data, isLoading, error, uploadedAt, isWritable, isXmlSource, toggleWritable, uploadFile, loadDemo, clearData, createTransaction, deleteTransaction: deleteTransactionFn, editTransaction, createAccount: createAccountFn, updateAccount: updateAccountFn, deleteAccountWithReallocation: deleteAccountWithReallocationFn, createCommodity: createCommodityFn, addPrice: addPriceFn, editPrice: editPriceFn, deletePrice: deletePriceFn, exportFile, setCurrency: setCurrencyFn }}
+      value={{ data, isLoading, error, uploadedAt, isWritable, isXmlSource, toggleWritable, uploadFile, loadDemo, clearData, createTransaction, deleteTransaction: deleteTransactionFn, editTransaction, bulkEditTransactions: bulkEditTransactionsFn, createAccount: createAccountFn, updateAccount: updateAccountFn, deleteAccountWithReallocation: deleteAccountWithReallocationFn, createCommodity: createCommodityFn, addPrice: addPriceFn, editPrice: editPriceFn, deletePrice: deletePriceFn, exportFile, setCurrency: setCurrencyFn }}
     >
       {children}
     </DashboardContext.Provider>
