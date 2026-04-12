@@ -49,35 +49,44 @@ export function getMonthsForPeriod(
 ): Set<string> {
   if (cashFlowSeries.length === 0) return new Set();
 
-  let slice: MonthlyCashFlow[];
+  // Anchor relative periods to the current calendar month, not the latest
+  // month in the dataset. This prevents future-dated transactions from
+  // shifting "This Month" to a future period. (Fixes #42)
+  const now = new Date();
+  const currentYear = now.getFullYear();
+  const currentMonth = now.getMonth(); // 0-based
+
+  /** Build a YYYY-MM string offset from the current month. */
+  const monthAtOffset = (offset: number): string => {
+    const d = new Date(currentYear, currentMonth + offset, 1);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+  };
+
+  /** Build a Set of YYYY-MM strings for a range of month offsets. */
+  const monthRange = (count: number): Set<string> =>
+    new Set(Array.from({ length: count }, (_, i) => monthAtOffset(i - count + 1)));
+
   switch (period) {
     case "this-month":
-      slice = cashFlowSeries.slice(-1);
-      break;
+      return new Set([monthAtOffset(0)]);
     case "last-month":
-      slice = cashFlowSeries.slice(-2, -1);
-      break;
+      return new Set([monthAtOffset(-1)]);
     case "last-3m":
-      slice = cashFlowSeries.slice(-3);
-      break;
+      return monthRange(3);
     case "last-6m":
-      slice = cashFlowSeries.slice(-6);
-      break;
+      return monthRange(6);
     case "last-12m":
-      slice = cashFlowSeries.slice(-12);
-      break;
+      return monthRange(12);
     case "all-time":
-      slice = cashFlowSeries;
-      break;
+      return new Set(cashFlowSeries.map((s) => s.month));
     case "custom":
       if (!customRange) return new Set();
-      slice = cashFlowSeries.filter(
-        (s) => s.month >= dateToMonth(customRange.start) && s.month <= dateToMonth(customRange.end),
+      return new Set(
+        cashFlowSeries
+          .filter((s) => s.month >= dateToMonth(customRange.start) && s.month <= dateToMonth(customRange.end))
+          .map((s) => s.month),
       );
-      break;
   }
-
-  return new Set(slice.map((s) => s.month));
 }
 
 // ── Colour constants ──────────────────────────────────────────────────

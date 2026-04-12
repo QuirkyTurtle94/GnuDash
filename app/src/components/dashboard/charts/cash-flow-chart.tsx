@@ -30,13 +30,29 @@ const PERIOD_LABELS: Record<string, string> = {
 };
 
 function getSlice(series: MonthlyCashFlow[], period: string, customRange?: CustomRange | null): MonthlyCashFlow[] {
+  // Anchor relative periods to the current calendar month, not the latest
+  // month in the dataset. Prevents future-dated transactions from shifting
+  // period selection. (Fixes #42)
+  const now = new Date();
+  const y = now.getFullYear();
+  const m = now.getMonth();
+  const monthStr = (offset: number) => {
+    const d = new Date(y, m + offset, 1);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+  };
+  const monthSet = (count: number) => {
+    const s = new Set<string>();
+    for (let i = 0; i < count; i++) s.add(monthStr(i - count + 1));
+    return s;
+  };
+
   switch (period) {
-    case "this-month": return series.slice(-1);
-    case "last-month": return series.slice(-2, -1);
-    case "last-6m": return series.slice(-6);
-    case "last-12m": return series.slice(-12);
+    case "this-month": return series.filter((s) => s.month === monthStr(0));
+    case "last-month": return series.filter((s) => s.month === monthStr(-1));
+    case "last-6m": { const ms = monthSet(6); return series.filter((s) => ms.has(s.month)); }
+    case "last-12m": { const ms = monthSet(12); return series.filter((s) => ms.has(s.month)); }
     case "this-year": {
-      const year = String(new Date().getFullYear());
+      const year = String(y);
       return series.filter((s) => s.month.startsWith(year));
     }
     case "all-time": return series;

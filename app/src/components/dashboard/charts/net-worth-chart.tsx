@@ -72,17 +72,30 @@ export function NetWorthChart({ series, currentNetWorth, currency, externalPerio
 
   const dataRange = useMemo(() => getDataRange(series) ?? { min: "2020-01", max: "2026-01" }, [series]);
   const filtered = useMemo(() => {
+    // Anchor relative periods to the current calendar month (fixes #42)
+    const now = new Date();
+    const y = now.getFullYear();
+    const m = now.getMonth();
+    const monthStr = (offset: number) => {
+      const d = new Date(y, m + offset, 1);
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+    };
+    const monthSet = (count: number) => {
+      const s = new Set<string>();
+      for (let i = 0; i < count; i++) s.add(monthStr(i - count + 1));
+      return s;
+    };
+
     switch (period) {
-      case "last-6m": return series.slice(-6);
-      case "last-12m": return series.slice(-12);
+      case "last-6m": { const ms = monthSet(6); return series.filter((s) => ms.has(s.month)); }
+      case "last-12m": { const ms = monthSet(12); return series.filter((s) => ms.has(s.month)); }
       case "all-time": return series;
       case "custom":
         if (!customRange) return series;
         return series.filter((s) => s.month >= dateToMonth(customRange.start) && s.month <= dateToMonth(customRange.end));
       default: {
-        // Handle periods from the dashboard selector (this-month, last-month)
-        if (period === "this-month") return series.slice(-1);
-        if (period === "last-month") return series.slice(-2, -1);
+        if (period === "this-month") return series.filter((s) => s.month === monthStr(0));
+        if (period === "last-month") return series.filter((s) => s.month === monthStr(-1));
         return series;
       }
     }
