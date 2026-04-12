@@ -240,6 +240,36 @@ describe("account-ops", () => {
       const errors = builder.validate();
       expect(errors.some(e => e.code === "DUPLICATE_NAME")).toBe(true);
     });
+
+    // Regression for issue #57: real GnuCash schemas declare commodity_scu
+    // NOT NULL. The builder must populate it from the commodity's fraction
+    // rather than rely on a default.
+    it("sets commodity_scu to the commodity's fraction (issue #57)", () => {
+      const gbpAccount = new AccountBuilder(db, ctx)
+        .name("Hair cuts")
+        .type("EXPENSE")
+        .commodity("gbp00000000000000000000000000001") // fraction = 100
+        .parent("root0000000000000000000000000001")
+        .commit();
+
+      const gbpRow = db
+        .prepare(`SELECT commodity_scu, non_std_scu FROM accounts WHERE guid = ?`)
+        .get(gbpAccount.accountGuid) as { commodity_scu: number; non_std_scu: number };
+      expect(gbpRow.commodity_scu).toBe(100);
+      expect(gbpRow.non_std_scu).toBe(0);
+
+      const aaplAccount = new AccountBuilder(db, ctx)
+        .name("AAPL Holdings")
+        .type("STOCK")
+        .commodity("aapl0000000000000000000000000003") // fraction = 10000
+        .parent("root0000000000000000000000000001")
+        .commit();
+
+      const aaplRow = db
+        .prepare(`SELECT commodity_scu FROM accounts WHERE guid = ?`)
+        .get(aaplAccount.accountGuid) as { commodity_scu: number };
+      expect(aaplRow.commodity_scu).toBe(10000);
+    });
   });
 
   describe("renameAccount", () => {

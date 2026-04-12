@@ -107,6 +107,8 @@ export function createWritableMemoryDb(): WritableDbAdapter {
       name TEXT NOT NULL,
       account_type TEXT NOT NULL,
       commodity_guid TEXT NOT NULL,
+      commodity_scu INTEGER NOT NULL DEFAULT 100,
+      non_std_scu INTEGER NOT NULL DEFAULT 0,
       parent_guid TEXT,
       code TEXT DEFAULT '',
       description TEXT DEFAULT '',

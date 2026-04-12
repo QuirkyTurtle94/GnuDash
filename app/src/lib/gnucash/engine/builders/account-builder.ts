@@ -100,15 +100,26 @@ export class AccountBuilder {
 
     const accountGuid = generateGuid();
 
+    // Look up the commodity's fraction so we can populate commodity_scu,
+    // which is NOT NULL in real GnuCash schemas. Default to 100 if the
+    // commodity row is missing or has no fraction (should be rare — the
+    // validate() pass above already confirmed the commodity exists).
+    const commodityRow = this.db
+      .prepare(`SELECT fraction FROM commodities WHERE guid = ?`)
+      .get(this._commodityGuid) as { fraction: number } | undefined;
+    const commodityScu = commodityRow?.fraction ?? 100;
+
     this.db.transaction(() => {
       this.db.run(
-        `INSERT INTO accounts (guid, name, account_type, commodity_guid, parent_guid,
-                               code, description, hidden, placeholder)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO accounts (guid, name, account_type, commodity_guid, commodity_scu,
+                               non_std_scu, parent_guid, code, description, hidden, placeholder)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         accountGuid,
         this._name,
         this._accountType,
         this._commodityGuid,
+        commodityScu,
+        0,
         this._parentGuid,
         this._code,
         this._description,
