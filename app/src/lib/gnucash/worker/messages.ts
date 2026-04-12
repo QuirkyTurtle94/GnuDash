@@ -35,6 +35,7 @@ export type DomainFunction =
 
 export type MutationAction =
   | "createTransaction" | "deleteTransaction" | "editTransaction"
+  | "bulkEditTransactions"
   | "createAccount" | "updateAccount" | "deleteAccount"
   | "createCommodity"
   | "addPrice" | "editPrice" | "deletePrice";
@@ -81,6 +82,22 @@ export interface EditTransactionPayload {
     quantityDenom: number;
     memo?: string;
   }[];
+}
+
+/**
+ * Payload for a grouped bulk edit across multiple single-split transactions.
+ * Applies any combination of: description rename, from-account reassign,
+ * to-account reassign. All changes commit atomically in one DB transaction.
+ */
+export interface BulkEditTransactionsPayload {
+  /** GUIDs of the transactions to edit. Must all be 2-split transactions. */
+  transactionGuids: string[];
+  /** If set, every transaction's description is replaced with this value. */
+  newDescription?: string;
+  /** If set, the negative-value (source) split is moved to this account. */
+  newFromAccountGuid?: string;
+  /** If set, the positive-value (destination) split is moved to this account. */
+  newToAccountGuid?: string;
 }
 
 export interface CreateAccountPayload {

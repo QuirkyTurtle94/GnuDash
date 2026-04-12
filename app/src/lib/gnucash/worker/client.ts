@@ -17,7 +17,7 @@ import type {
   BudgetData,
   DashboardData,
 } from "@/lib/types/gnucash";
-import type { WorkerRequest, WorkerResponse, DomainFunction, MutationAction, CreateTransactionPayload, DeleteTransactionPayload, EditTransactionPayload, CreateAccountPayload, UpdateAccountPayload, DeleteAccountPayload, CreateCommodityPayload, AddPricePayload, EditPricePayload, DeletePricePayload } from "./messages";
+import type { WorkerRequest, WorkerResponse, DomainFunction, MutationAction, CreateTransactionPayload, DeleteTransactionPayload, EditTransactionPayload, BulkEditTransactionsPayload, CreateAccountPayload, UpdateAccountPayload, DeleteAccountPayload, CreateCommodityPayload, AddPricePayload, EditPricePayload, DeletePricePayload } from "./messages";
 import { parseGnuCashXml } from "../xml/parser";
 
 type PendingRequest = {
@@ -271,6 +271,14 @@ export class GnuCashWorkerClient {
    */
   async editTransaction(payload: EditTransactionPayload): Promise<DashboardData> {
     return this.mutate("editTransaction", payload);
+  }
+
+  /**
+   * Bulk edit: apply a rename and/or account reassignment across many
+   * single-split transactions atomically. Returns refreshed dashboard data.
+   */
+  async bulkEditTransactions(payload: BulkEditTransactionsPayload): Promise<DashboardData> {
+    return this.mutate("bulkEditTransactions", payload);
   }
 
   async createAccount(payload: CreateAccountPayload): Promise<DashboardData> {

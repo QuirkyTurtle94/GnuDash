@@ -14,6 +14,7 @@ import {
   deleteAccount,
 } from "../../engine/operations/account-ops";
 import { addPrice, deletePrice } from "../../engine/operations/price-ops";
+import { bulkEditTransactions } from "../../engine/operations/bulk-ops";
 import {
   createLot,
   assignSplitToLot,
@@ -407,5 +408,188 @@ describe("lot-ops", () => {
 
     const lotRow = db.prepare(`SELECT is_closed FROM lots WHERE guid = ?`).get(lot.lotGuid) as { is_closed: number };
     expect(lotRow.is_closed).toBe(1);
+  });
+});
+
+// ── Bulk transaction operations ─────────────────────────────────
+
+describe("bulk-ops", () => {
+  const GBP = "gbp00000000000000000000000000001";
+  const BANK = "bank0000000000000000000000000001";
+  const GROCERIES = "exp00000000000000000000000000001";
+  const ENTERTAINMENT = "exp00000000000000000000000000002";
+  const SAVINGS = "bank0000000000000000000000000002";
+  const AAPL_ACCOUNT = "stck0000000000000000000000000001";
+
+  function seedExtraAccounts() {
+    db.run(
+      `INSERT INTO accounts (guid, name, account_type, commodity_guid, parent_guid, placeholder) VALUES (?, ?, ?, ?, ?, ?)`,
+      ENTERTAINMENT, "Entertainment", "EXPENSE", GBP, "root0000000000000000000000000001", 0,
+    );
+    db.run(
+      `INSERT INTO accounts (guid, name, account_type, commodity_guid, parent_guid, placeholder) VALUES (?, ?, ?, ?, ?, ?)`,
+      SAVINGS, "Savings Account", "BANK", GBP, "root0000000000000000000000000001", 0,
+    );
+  }
+
+  function createGbpTx(desc: string, expenseGuid = GROCERIES, bankGuid = BANK): string {
+    const result = new TransactionBuilder(db, ctx)
+      .currency(GBP)
+      .postDate(new Date(2025, 0, 15))
+      .description(desc)
+      .addSimpleSplit(expenseGuid, new GncNumeric(4550, 100))
+      .addSimpleSplit(bankGuid, new GncNumeric(-4550, 100))
+      .commit();
+    return result.transactionGuid;
+  }
+
+  it("renames description across all transactions in a group", () => {
+    const a = createGbpTx("TESCO STORES 4412");
+    const b = createGbpTx("TESCO STORES 4412");
+    const c = createGbpTx("TESCO STORES 4412");
+
+    const result = bulkEditTransactions(db, {
+      transactionGuids: [a, b, c],
+      newDescription: "Tesco",
+    });
+
+    expect(result.descriptionsUpdated).toBe(3);
+    const rows = db.prepare(
+      `SELECT description FROM transactions WHERE guid IN (?, ?, ?)`,
+    ).all(a, b, c) as { description: string }[];
+    expect(rows.every((r) => r.description === "Tesco")).toBe(true);
+  });
+
+  it("reassigns the 'from' (source) account on all transactions", () => {
+    seedExtraAccounts();
+    const a = createGbpTx("Lunch");
+    const b = createGbpTx("Lunch");
+
+    bulkEditTransactions(db, {
+      transactionGuids: [a, b],
+      newFromAccountGuid: SAVINGS,
+    });
+
+    // The negative-value split on each tx should now point at SAVINGS
+    const fromSplits = db.prepare(
+      `SELECT account_guid FROM splits WHERE tx_guid IN (?, ?) AND value_num < 0`,
+    ).all(a, b) as { account_guid: string }[];
+    expect(fromSplits).toHaveLength(2);
+    expect(fromSplits.every((s) => s.account_guid === SAVINGS)).toBe(true);
+
+    // The positive-value (destination) split should still point at GROCERIES
+    const toSplits = db.prepare(
+      `SELECT account_guid FROM splits WHERE tx_guid IN (?, ?) AND value_num > 0`,
+    ).all(a, b) as { account_guid: string }[];
+    expect(toSplits.every((s) => s.account_guid === GROCERIES)).toBe(true);
+  });
+
+  it("reassigns the 'to' (destination) account on all transactions", () => {
+    seedExtraAccounts();
+    const a = createGbpTx("Cinema");
+    const b = createGbpTx("Cinema");
+
+    bulkEditTransactions(db, {
+      transactionGuids: [a, b],
+      newToAccountGuid: ENTERTAINMENT,
+    });
+
+    const toSplits = db.prepare(
+      `SELECT account_guid FROM splits WHERE tx_guid IN (?, ?) AND value_num > 0`,
+    ).all(a, b) as { account_guid: string }[];
+    expect(toSplits.every((s) => s.account_guid === ENTERTAINMENT)).toBe(true);
+
+    // The source split should still point at BANK
+    const fromSplits = db.prepare(
+      `SELECT account_guid FROM splits WHERE tx_guid IN (?, ?) AND value_num < 0`,
+    ).all(a, b) as { account_guid: string }[];
+    expect(fromSplits.every((s) => s.account_guid === BANK)).toBe(true);
+  });
+
+  it("rolls back and throws when a target account has mismatched commodity", () => {
+    const a = createGbpTx("Coffee");
+    const b = createGbpTx("Coffee");
+    const originalDescription = "Coffee";
+
+    // AAPL_ACCOUNT has commodity AAPL, not GBP — should refuse the batch
+    expect(() =>
+      bulkEditTransactions(db, {
+        transactionGuids: [a, b],
+        newDescription: "Starbucks",
+        newToAccountGuid: AAPL_ACCOUNT,
+      }),
+    ).toThrow(/commodity does not match/i);
+
+    // Nothing should have changed because the whole batch rolls back
+    const rows = db.prepare(
+      `SELECT description FROM transactions WHERE guid IN (?, ?)`,
+    ).all(a, b) as { description: string }[];
+    expect(rows.every((r) => r.description === originalDescription)).toBe(true);
+  });
+
+  it("rolls back and throws when any transaction has more than 2 splits", () => {
+    // Create a simple 2-split transaction
+    const simple = createGbpTx("Snack");
+
+    // Create a 3-split transaction (one bank, two expense categories)
+    const multi = new TransactionBuilder(db, ctx)
+      .currency(GBP)
+      .postDate(new Date(2025, 1, 3))
+      .description("Big shop")
+      .addSimpleSplit(GROCERIES, new GncNumeric(3000, 100))
+      .addSimpleSplit(GROCERIES, new GncNumeric(2000, 100))
+      .addSimpleSplit(BANK, new GncNumeric(-5000, 100))
+      .commit()
+      .transactionGuid;
+
+    expect(() =>
+      bulkEditTransactions(db, {
+        transactionGuids: [simple, multi],
+        newDescription: "Anything",
+      }),
+    ).toThrow(/requires exactly 2/);
+
+    // Nothing changed — both descriptions are as originally created
+    const rows = db.prepare(
+      `SELECT description FROM transactions WHERE guid IN (?, ?) ORDER BY description`,
+    ).all(simple, multi) as { description: string }[];
+    expect(rows.map((r) => r.description).sort()).toEqual(["Big shop", "Snack"]);
+  });
+
+  it("rejects empty input and no-op input", () => {
+    expect(() => bulkEditTransactions(db, { transactionGuids: [] })).toThrow(/empty/);
+    const a = createGbpTx("x");
+    expect(() => bulkEditTransactions(db, { transactionGuids: [a] })).toThrow(/no changes/);
+  });
+
+  it("applies rename and both account reassignments in one call", () => {
+    seedExtraAccounts();
+    const a = createGbpTx("AMZN PURCHASE");
+    const b = createGbpTx("AMZN PURCHASE");
+
+    const result = bulkEditTransactions(db, {
+      transactionGuids: [a, b],
+      newDescription: "Amazon",
+      newFromAccountGuid: SAVINGS,
+      newToAccountGuid: ENTERTAINMENT,
+    });
+
+    expect(result.descriptionsUpdated).toBe(2);
+    expect(result.fromSplitsUpdated).toBe(2);
+    expect(result.toSplitsUpdated).toBe(2);
+
+    const descRows = db.prepare(
+      `SELECT description FROM transactions WHERE guid IN (?, ?)`,
+    ).all(a, b) as { description: string }[];
+    expect(descRows.every((r) => r.description === "Amazon")).toBe(true);
+
+    const splits = db.prepare(
+      `SELECT tx_guid, account_guid, value_num FROM splits WHERE tx_guid IN (?, ?)`,
+    ).all(a, b) as { tx_guid: string; account_guid: string; value_num: number }[];
+
+    for (const s of splits) {
+      if (s.value_num < 0) expect(s.account_guid).toBe(SAVINGS);
+      else expect(s.account_guid).toBe(ENTERTAINMENT);
+    }
   });
 });

@@ -10,6 +10,7 @@ import {
   Banknote,
   LogOut,
   Download,
+  Wand2,
 } from "lucide-react";
 import { useDashboard } from "@/lib/dashboard-context";
 
@@ -19,6 +20,7 @@ const mainNav = [
   { icon: Receipt, label: "Income / Expenses", href: "/income-expenses" },
   { icon: Banknote, label: "Cash Flow", href: "/cash-flow" },
   { icon: TrendingUp, label: "Investment", href: "/investment" },
+  { icon: Wand2, label: "Special functions", href: "/special-functions" },
 ];
 
 

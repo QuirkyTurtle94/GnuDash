@@ -26,12 +26,13 @@ import { GncNumeric } from "../engine/gnc-numeric";
 import type { WritableDbAdapter } from "../engine/db/writable-adapter";
 import type { DashboardData } from "@/lib/types/gnucash";
 import { deleteTransaction } from "../engine/operations/transaction-ops";
+import { bulkEditTransactions } from "../engine/operations/bulk-ops";
 import { AccountBuilder } from "../engine/builders/account-builder";
 import { updateAccount, deleteAccountWithReallocation } from "../engine/operations/account-ops";
 import { createCommodity } from "../engine/operations/commodity-ops";
 import { addPrice, deletePrice } from "../engine/operations/price-ops";
 import type { AccountType } from "../engine/types";
-import type { WorkerRequest, WorkerResponse, DomainFunction, CreateTransactionPayload, DeleteTransactionPayload, EditTransactionPayload, CreateAccountPayload, UpdateAccountPayload, DeleteAccountPayload, CreateCommodityPayload, AddPricePayload, EditPricePayload, DeletePricePayload } from "./messages";
+import type { WorkerRequest, WorkerResponse, DomainFunction, CreateTransactionPayload, DeleteTransactionPayload, EditTransactionPayload, BulkEditTransactionsPayload, CreateAccountPayload, UpdateAccountPayload, DeleteAccountPayload, CreateCommodityPayload, AddPricePayload, EditPricePayload, DeletePricePayload } from "./messages";
 import type { GnuCashXmlData } from "../xml/types";
 import { GNUCASH_SCHEMA_DDL } from "../xml/schema";
 
@@ -491,6 +492,25 @@ function handleEditTransaction(payload: EditTransactionPayload): DashboardData {
   return getFullDashboardData();
 }
 
+/**
+ * Handle a bulkEditTransactions mutation. Applies rename and/or account
+ * reassignment across multiple single-split transactions atomically.
+ */
+function handleBulkEditTransactions(payload: BulkEditTransactionsPayload): DashboardData {
+  if (!ctx) throw new Error("No database loaded");
+  if (!writableAdapter) throw new Error("Database is not open in read-write mode");
+
+  bulkEditTransactions(writableAdapter, {
+    transactionGuids: payload.transactionGuids,
+    newDescription: payload.newDescription,
+    newFromAccountGuid: payload.newFromAccountGuid,
+    newToAccountGuid: payload.newToAccountGuid,
+  });
+
+  ctx = buildParseContext(writableAdapter);
+  return getFullDashboardData();
+}
+
 function handleCreateAccount(payload: CreateAccountPayload): DashboardData {
   if (!ctx) throw new Error("No database loaded");
   if (!writableAdapter) throw new Error("Database is not open in read-write mode");
@@ -693,6 +713,9 @@ self.onmessage = async (e: MessageEvent<WorkerRequest>) => {
             break;
           case "editTransaction":
             data = handleEditTransaction(msg.payload as EditTransactionPayload);
+            break;
+          case "bulkEditTransactions":
+            data = handleBulkEditTransactions(msg.payload as BulkEditTransactionsPayload);
             break;
           case "createAccount":
             data = handleCreateAccount(msg.payload as CreateAccountPayload);
