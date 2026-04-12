@@ -516,10 +516,13 @@ export function AddTransactionSheet({
   open,
   onOpenChange,
   editingTransaction,
+  defaultAccountGuid,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   editingTransaction?: LedgerTransaction | null;
+  /** When provided, the first split row is pre-filled with this account (used from account register tabs). */
+  defaultAccountGuid?: string;
 }) {
   const { data, createTransaction, editTransaction } = useDashboard();
   const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
@@ -586,6 +589,29 @@ export function AddTransactionSheet({
     }
   }, [editingTransaction, open, accounts]);
 
+  // Pre-fill first split when opening a new transaction from a register tab
+  useEffect(() => {
+    if (open && !editingTransaction && defaultAccountGuid && accounts.length > 0) {
+      const acct = accounts.find((a) => a.guid === defaultAccountGuid);
+      if (acct) {
+        setSplits((prev) => {
+          // Only pre-fill if the first row is still empty (untouched)
+          if (prev[0] && !prev[0].accountGuid) {
+            const row1: SplitRow = {
+              ...prev[0],
+              accountGuid: acct.guid,
+              accountPath: acct.fullPath,
+              accountType: acct.type,
+              commodityMnemonic: acct.commodityMnemonic,
+            };
+            return [row1, ...prev.slice(1)];
+          }
+          return prev;
+        });
+      }
+    }
+  }, [open, editingTransaction, defaultAccountGuid, accounts]);
+
   // ── Balance computation ─────────────────────────────────────
 
   const { totalDebit, totalCredit, isBalanced } = useMemo(() => {
@@ -639,7 +665,24 @@ export function AddTransactionSheet({
     setDate(new Date().toISOString().slice(0, 10));
     setDescription("");
     setNum("");
-    setSplits([emptyRow(1), emptyRow(2)]);
+    // Pre-fill first split if a default account is provided (from register tab)
+    if (defaultAccountGuid && !editingTransaction) {
+      const acct = accounts.find((a) => a.guid === defaultAccountGuid);
+      if (acct) {
+        const row1: SplitRow = {
+          ...emptyRow(1),
+          accountGuid: acct.guid,
+          accountPath: acct.fullPath,
+          accountType: acct.type,
+          commodityMnemonic: acct.commodityMnemonic,
+        };
+        setSplits([row1, emptyRow(2)]);
+      } else {
+        setSplits([emptyRow(1), emptyRow(2)]);
+      }
+    } else {
+      setSplits([emptyRow(1), emptyRow(2)]);
+    }
     nextId.current = 3;
     setSaveError(null);
   }

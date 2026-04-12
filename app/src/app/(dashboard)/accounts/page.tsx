@@ -1,13 +1,25 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { formatCurrency } from "@/lib/format";
 import { useDashboard } from "@/lib/dashboard-context";
 import type { AccountNode } from "@/lib/types/gnucash";
-import { ChevronDown, ChevronRight, Plus, Pencil, Trash2 } from "lucide-react";
+import { ChevronDown, ChevronRight, Plus, Pencil, Trash2, X, List } from "lucide-react";
 import { AccountEditorSheet } from "@/components/account-editor-sheet";
 import { DeleteAccountDialog } from "@/components/delete-account-dialog";
+import { AccountLedger } from "@/components/account-ledger";
+
+// ── Types ────────────────────────────────────────────────────────
+
+interface AccountTab {
+  guid: string;
+  name: string;
+  fullPath: string;
+  account: AccountNode;
+}
+
+// ── Constants ────────────────────────────────────────────────────
 
 const ACCOUNT_TYPE_LABELS: Record<string, string> = {
   ASSET: "Asset",
@@ -41,8 +53,36 @@ const TYPE_COLORS: Record<string, string> = {
   TRADING: "bg-gray-50 text-gray-700",
 };
 
+// ── Helpers ──────────────────────────────────────────────────────
+
+/** Recursively find an AccountNode by GUID */
+function findAccount(nodes: AccountNode[], guid: string): AccountNode | null {
+  for (const n of nodes) {
+    if (n.guid === guid) return n;
+    const found = findAccount(n.children, guid);
+    if (found) return found;
+  }
+  return null;
+}
+
+/** Build full path for an account by walking up to root */
+function buildFullPath(account: AccountNode, allAccounts: AccountNode[]): string {
+  // The AccountNode already has fullPath on it from the tree builder, but it may not
+  // be set for all nodes. Use the name as fallback.
+  return account.fullPath || account.name;
+}
+
+// ── Main Component ───────────────────────────────────────────────
+
 export default function AccountsPage() {
   const { data, isWritable } = useDashboard();
+
+  // Tab state: "accounts" is the permanent first tab, then open account register tabs
+  const [openTabs, setOpenTabs] = useState<AccountTab[]>([]);
+  const [activeTab, setActiveTab] = useState<string>("accounts"); // "accounts" or account guid
+  const tabBarRef = useRef<HTMLDivElement>(null);
+
+  // Chart of accounts state
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [showEditor, setShowEditor] = useState(false);
   const [editingAccount, setEditingAccount] = useState<AccountNode | null>(null);
@@ -76,86 +116,203 @@ export default function AccountsPage() {
     setExpanded(new Set());
   }, []);
 
+  /** Open an account register tab (or switch to it if already open) */
+  const openAccountTab = useCallback((account: AccountNode) => {
+    setOpenTabs((prev) => {
+      const exists = prev.find((t) => t.guid === account.guid);
+      if (exists) return prev;
+      return [...prev, {
+        guid: account.guid,
+        name: account.name,
+        fullPath: account.fullPath || account.name,
+        account,
+      }];
+    });
+    setActiveTab(account.guid);
+  }, []);
+
+  /** Close an account register tab */
+  const closeTab = useCallback((guid: string, e?: React.MouseEvent) => {
+    e?.stopPropagation();
+    setOpenTabs((prev) => prev.filter((t) => t.guid !== guid));
+    setActiveTab((prev) => {
+      if (prev === guid) return "accounts";
+      return prev;
+    });
+  }, []);
+
+  /** Handle middle-click to close a tab */
+  const handleTabMouseDown = useCallback((guid: string, e: React.MouseEvent) => {
+    if (e.button === 1) {
+      e.preventDefault();
+      closeTab(guid);
+    }
+  }, [closeTab]);
+
   if (!data) return null;
 
   const currency = data.currency;
   const allExpanded = expanded.size > 0;
 
+  // Resolve active tab's account (may have been deleted/changed)
+  const activeTabAccount = activeTab !== "accounts"
+    ? openTabs.find((t) => t.guid === activeTab)
+    : null;
+
+  // If the active tab's account was removed, fall back to accounts
+  const resolvedActiveTab = activeTabAccount ? activeTab : (activeTab === "accounts" ? "accounts" : "accounts");
+
   return (
-    <div className="flex flex-col gap-4 sm:gap-6">
-      <div className="flex items-center justify-between gap-3">
-        <h2 className="text-lg font-semibold text-[#1A1D1F] sm:text-xl">Chart of Accounts</h2>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={allExpanded ? collapseAll : expandAll}
-            className="rounded-lg border border-[#EFEFEF] px-3 py-1.5 text-xs text-[#6F767E] transition-colors hover:bg-[#F4F5F7]"
-          >
-            {allExpanded ? "Collapse all" : "Expand all"}
-          </button>
-          {isWritable && (
-            <button
-              onClick={() => { setEditingAccount(null); setShowEditor(true); }}
-              className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#3B6B8A] text-white transition-colors hover:bg-[#2D5570]"
-              title="Add account"
-            >
-              <Plus className="h-4 w-4" />
-            </button>
+    <div className="flex flex-col gap-0">
+      {/* ── Tab Bar ─────────────────────────────────────── */}
+      <div
+        ref={tabBarRef}
+        className="flex items-end gap-0 overflow-x-auto border-b border-[#EFEFEF] bg-white -mx-4 sm:-mx-6 md:-mx-8 px-4 sm:px-6 md:px-8 scrollbar-thin"
+      >
+        {/* Accounts tab (always first, cannot be closed) */}
+        <button
+          onClick={() => setActiveTab("accounts")}
+          className={`group relative flex shrink-0 items-center gap-2 px-4 py-2.5 text-sm transition-colors ${
+            resolvedActiveTab === "accounts"
+              ? "text-[#1A1D1F] font-medium"
+              : "text-[#6F767E] hover:text-[#1A1D1F]"
+          }`}
+        >
+          <List className="h-3.5 w-3.5" />
+          <span>Accounts</span>
+          {resolvedActiveTab === "accounts" && (
+            <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#3B6B8A] rounded-full" />
           )}
-        </div>
+        </button>
+
+        {/* Account register tabs */}
+        {openTabs.map((tab) => {
+          const isActive = resolvedActiveTab === tab.guid;
+          const typeColor = TYPE_COLORS[tab.account.type];
+          return (
+            <button
+              key={tab.guid}
+              onClick={() => setActiveTab(tab.guid)}
+              onMouseDown={(e) => handleTabMouseDown(tab.guid, e)}
+              className={`group relative flex shrink-0 items-center gap-1.5 pl-3 pr-1.5 py-2.5 text-sm transition-colors max-w-[200px] ${
+                isActive
+                  ? "text-[#1A1D1F] font-medium"
+                  : "text-[#6F767E] hover:text-[#1A1D1F]"
+              }`}
+              title={tab.fullPath}
+            >
+              {typeColor && (
+                <span className={`h-2 w-2 rounded-full shrink-0 ${typeColor.split(" ")[0].replace("bg-", "bg-")}`}
+                  style={{ backgroundColor: typeColor.includes("emerald") ? "#059669" : typeColor.includes("blue") ? "#2563eb" : typeColor.includes("teal") ? "#0d9488" : typeColor.includes("amber") ? "#d97706" : typeColor.includes("red") ? "#dc2626" : typeColor.includes("purple") ? "#7c3aed" : typeColor.includes("cyan") ? "#0891b2" : "#6b7280" }}
+                />
+              )}
+              <span className="truncate">{tab.name}</span>
+              <span
+                onClick={(e) => closeTab(tab.guid, e)}
+                className="ml-1 flex h-5 w-5 shrink-0 items-center justify-center rounded transition-colors hover:bg-[#EFEFEF] text-[#9A9FA5] hover:text-[#6F767E]"
+                title="Close tab"
+              >
+                <X className="h-3 w-3" />
+              </span>
+              {isActive && (
+                <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#3B6B8A] rounded-full" />
+              )}
+            </button>
+          );
+        })}
       </div>
 
-      <Card className="shadow-sm border-[#EFEFEF]">
-        <CardContent className="pt-0 pb-0">
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-[#EFEFEF]">
-                  <th className="py-3 text-left text-xs font-medium text-[#9A9FA5]">Account</th>
-                  <th className="py-3 text-left text-xs font-medium text-[#9A9FA5] hidden sm:table-cell w-24">Type</th>
-                  <th className="py-3 text-right text-xs font-medium text-[#9A9FA5] w-32">Balance</th>
-                  {isWritable && <th className="py-3 w-16" />}
-                </tr>
-              </thead>
-              <tbody>
-                {data.accounts
-                  .filter((a) => !a.hidden)
-                  .sort((a, b) => a.name.localeCompare(b.name))
-                  .map((account) => (
-                    <AccountRow
-                      key={account.guid}
-                      account={account}
-                      depth={0}
-                      expanded={expanded}
-                      onToggle={toggle}
-                      currency={currency}
-                      isWritable={isWritable}
-                      onEdit={(a) => { setEditingAccount(a); setShowEditor(true); }}
-                      onDelete={(a) => setDeletingAccount(a)}
-                    />
-                  ))}
-              </tbody>
-            </table>
+      {/* ── Tab Content ────────────────────────────────── */}
+      <div className="pt-4 sm:pt-6">
+        {resolvedActiveTab === "accounts" ? (
+          /* ── Chart of Accounts ─────────────────────── */
+          <div className="flex flex-col gap-4 sm:gap-6">
+            <div className="flex items-center justify-between gap-3">
+              <h2 className="text-lg font-semibold text-[#1A1D1F] sm:text-xl">Chart of Accounts</h2>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={allExpanded ? collapseAll : expandAll}
+                  className="rounded-lg border border-[#EFEFEF] px-3 py-1.5 text-xs text-[#6F767E] transition-colors hover:bg-[#F4F5F7]"
+                >
+                  {allExpanded ? "Collapse all" : "Expand all"}
+                </button>
+                {isWritable && (
+                  <button
+                    onClick={() => { setEditingAccount(null); setShowEditor(true); }}
+                    className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#3B6B8A] text-white transition-colors hover:bg-[#2D5570]"
+                    title="Add account"
+                  >
+                    <Plus className="h-4 w-4" />
+                  </button>
+                )}
+              </div>
+            </div>
+
+            <Card className="shadow-sm border-[#EFEFEF]">
+              <CardContent className="pt-0 pb-0">
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead>
+                      <tr className="border-b border-[#EFEFEF]">
+                        <th className="py-3 text-left text-xs font-medium text-[#9A9FA5]">Account</th>
+                        <th className="py-3 text-left text-xs font-medium text-[#9A9FA5] hidden sm:table-cell w-24">Type</th>
+                        <th className="py-3 text-right text-xs font-medium text-[#9A9FA5] w-32">Balance</th>
+                        {isWritable && <th className="py-3 w-16" />}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {data.accounts
+                        .filter((a) => !a.hidden)
+                        .sort((a, b) => a.name.localeCompare(b.name))
+                        .map((account) => (
+                          <AccountRow
+                            key={account.guid}
+                            account={account}
+                            depth={0}
+                            expanded={expanded}
+                            onToggle={toggle}
+                            currency={currency}
+                            isWritable={isWritable}
+                            onEdit={(a) => { setEditingAccount(a); setShowEditor(true); }}
+                            onDelete={(a) => setDeletingAccount(a)}
+                            onOpenRegister={openAccountTab}
+                          />
+                        ))}
+                    </tbody>
+                  </table>
+                </div>
+              </CardContent>
+            </Card>
+
+            <p className="text-center text-xs text-[#9A9FA5]">
+              Double-click an account to open its register
+            </p>
+
+            {isWritable && (
+              <AccountEditorSheet
+                open={showEditor}
+                onOpenChange={(open) => { setShowEditor(open); if (!open) setEditingAccount(null); }}
+                editingAccount={editingAccount}
+              />
+            )}
+
+            {deletingAccount && (
+              <DeleteAccountDialog
+                account={deletingAccount}
+                onClose={() => setDeletingAccount(null)}
+              />
+            )}
           </div>
-        </CardContent>
-      </Card>
-
-      {isWritable && (
-        <AccountEditorSheet
-          open={showEditor}
-          onOpenChange={(open) => { setShowEditor(open); if (!open) setEditingAccount(null); }}
-          editingAccount={editingAccount}
-        />
-      )}
-
-      {deletingAccount && (
-        <DeleteAccountDialog
-          account={deletingAccount}
-          onClose={() => setDeletingAccount(null)}
-        />
-      )}
+        ) : activeTabAccount ? (
+          /* ── Account Register Tab ──────────────────── */
+          <AccountLedger account={activeTabAccount.account} />
+        ) : null}
+      </div>
     </div>
   );
 }
+
+// ── AccountRow ───────────────────────────────────────────────────
 
 function AccountRow({
   account,
@@ -166,6 +323,7 @@ function AccountRow({
   isWritable,
   onEdit,
   onDelete,
+  onOpenRegister,
 }: {
   account: AccountNode;
   depth: number;
@@ -175,6 +333,7 @@ function AccountRow({
   isWritable: boolean;
   onEdit: (account: AccountNode) => void;
   onDelete: (account: AccountNode) => void;
+  onOpenRegister: (account: AccountNode) => void;
 }) {
   const hasChildren = account.children.length > 0;
   const isExpanded = expanded.has(account.guid);
@@ -185,8 +344,15 @@ function AccountRow({
   return (
     <>
       <tr
-        className={`group border-b border-[#EFEFEF] transition-colors ${hasChildren ? "cursor-pointer hover:bg-[#F9FAFB]" : "hover:bg-[#F9FAFB]"} ${isTopLevel ? "bg-[#FAFBFC]" : ""}`}
+        className={`group border-b border-[#EFEFEF] transition-colors cursor-pointer hover:bg-[#F9FAFB] ${isTopLevel ? "bg-[#FAFBFC]" : ""}`}
         onClick={hasChildren ? () => onToggle(account.guid) : undefined}
+        onDoubleClick={(e) => {
+          e.stopPropagation();
+          // Don't open ROOT type accounts
+          if (account.type !== "ROOT") {
+            onOpenRegister(account);
+          }
+        }}
       >
         {/* Account name with indentation */}
         <td className="py-2.5 pr-4">
@@ -267,6 +433,7 @@ function AccountRow({
             isWritable={isWritable}
             onEdit={onEdit}
             onDelete={onDelete}
+            onOpenRegister={onOpenRegister}
           />
         ))}
     </>
