@@ -231,6 +231,45 @@ export function generateDemoData(): DashboardData {
     return { month, income, expenses, net: Math.round((income - expenses) * 100) / 100 };
   });
 
+  // --- Cash flow by category (inflow = income into bank, outflow = expenses from bank) ---
+  // Inflow: income categories flowing into BANK/CASH accounts
+  const monthlyCashInflowByCategory: MonthlyExpenseByCategory[] = monthlyIncomeByCategory.map((entry) => ({
+    month: entry.month,
+    category: entry.category,
+    fullPath: entry.fullPath,
+    pathParts: entry.pathParts,
+    amount: entry.amount,
+  }));
+
+  // Outflow: expense categories flowing out of BANK/CASH accounts
+  const monthlyCashOutflowByCategory: MonthlyExpenseByCategory[] = monthlyExpensesByCategory.map((entry) => ({
+    month: entry.month,
+    category: entry.category,
+    fullPath: entry.fullPath,
+    pathParts: entry.pathParts,
+    amount: entry.amount,
+  }));
+
+  // Color palettes matching the real cash-flow-by-category module
+  const INFLOW_PALETTE = [
+    "#2563eb", "#3b82f6", "#60a5fa", "#93c5fd", "#1d4ed8",
+    "#1e40af", "#3730a3", "#4f46e5", "#6366f1", "#818cf8",
+  ];
+  const OUTFLOW_PALETTE = [
+    "#16a34a", "#22c55e", "#4ade80", "#86efac", "#15803d",
+    "#166534", "#064e3b", "#059669", "#10b981", "#34d399",
+  ];
+
+  const cashInflowCategoryColors: Record<string, string> = {};
+  incomeAccounts.forEach((acc, i) => {
+    cashInflowCategoryColors[acc.name] = INFLOW_PALETTE[i % INFLOW_PALETTE.length];
+  });
+
+  const cashOutflowCategoryColors: Record<string, string> = {};
+  expenseAccounts.forEach((cat, i) => {
+    cashOutflowCategoryColors[cat.name] = OUTFLOW_PALETTE[i % OUTFLOW_PALETTE.length];
+  });
+
   // --- Investments ---
   const investments: InvestmentHolding[] = investmentAccounts.map((inv) => {
     const costBasis = Math.round(inv.shares * inv.costPerShare * 100) / 100;
@@ -468,10 +507,10 @@ export function generateDemoData(): DashboardData {
     cashFlowBudgetData: null,
     ledgerTransactions,
     hasClosingTransactions: false,
-    monthlyCashInflowByCategory: [],
-    monthlyCashOutflowByCategory: [],
-    cashInflowCategoryColors: {},
-    cashOutflowCategoryColors: {},
+    monthlyCashInflowByCategory,
+    monthlyCashOutflowByCategory,
+    cashInflowCategoryColors,
+    cashOutflowCategoryColors,
   };
 }
 

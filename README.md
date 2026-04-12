@@ -2,7 +2,7 @@
   <img src="app/public/logo-readme.png" alt="GnuDash" height="140">
 </p>
 
-A personal finance dashboard **for** [GNUCash](https://gnucash.org) users. Upload your `.gnucash` file (SQLite or XML), explore your finances — everything runs in your browser.
+A personal finance dashboard **for** [GNUCash](https://gnucash.org) users. Upload your `.gnucash` file (SQLite or XML), explore and edit your finances — everything runs in your browser.
 
 > GnuDash is an independent, community project and is not affiliated with or endorsed by the GNU Project or GNUCash.
 
@@ -27,52 +27,58 @@ To clear your data, use the dashboard's clear/reset option or clear your browser
 
 ## Features
 
-- **Net Worth** — Track assets minus liabilities over time
-- **Income / Expenses** — Combined page with Sankey flow, category breakdowns, monthly trends, and budget tracking
-- **Cash Flow** — Monthly inflow/outflow bars with net trend line, Sankey diagram, and budget vs actual
-- **Account Balances** — Current balances across all accounts
-- **Investment Portfolio** — Holdings, allocation, performance, and value over time
-- **Sankey Diagrams** — Interactive flow diagrams with drag-and-drop, depth control, category filters, and PNG/SVG export
-- **Budget Tracking** — Budget vs actual with expense/income tabs, YTD variance, drill-down by category
-- **Transaction Ledger** — Searchable, sortable transaction history with split details
-- **Transaction Editing** — Add, edit, and delete transactions with full double-entry enforcement
+### Dashboard & Reports
+- **Net Worth** — Track assets minus liabilities over time with trend charts
+- **Income / Expenses** — Sankey flow diagrams, category breakdowns (pie charts), monthly trend bars, and budget tracking in a single combined view
+- **Cash Flow** — Monthly inflow/outflow bars with net trend line, cash flow Sankey diagram, and budget vs actual
+- **Investment Portfolio** — Holdings table, allocation pie chart, performance metrics, price history, and portfolio value over time
+- **Budget Tracking** — Budget vs actual with expense/income tabs, YTD variance, drill-down by category, and unbudgeted spend detection
+
+### Accounts & Transactions
+- **Chart of Accounts** — Hierarchical account tree with balances, expand/collapse, and account type indicators
+- **Inline Transaction Register** — Double-click any account to open its GnuCash-style transaction register in a tab
+- **Transaction Editing** — Add, edit, and delete transactions with full double-entry enforcement — all inline, no modals
 - **Investment Transactions** — Buy/sell stocks with shares, price, and total (auto-calculates any 2 of 3)
+- **Account Management** — Create and edit accounts with type, currency, and parent assignment
+
+### Engine & Data
 - **Accounting Engine** — Rational arithmetic (no floating point), multi-currency, GNUCash-compatible writes
 - **SQLite & XML** — Supports both GNUCash file formats (including gzip-compressed); XML files open as read-only
+- **OPFS Persistence** — Your database is stored in your browser's Origin Private File System, so it persists across sessions without re-uploading
 - **Multi-Currency** — Switch display currency across all views when your file contains multiple currencies
 - **Closing Transactions** — Toggle to exclude period-end closing entries from reports
 - **Export** — Download your modified `.gnucash` file for use in GNUCash desktop
 - **Privacy Mode** — Toggle to blur sensitive numbers on screen
 - **Demo Mode** — Try the dashboard instantly with realistic sample data
 
-Charts are fully interactive — click any bar or segment to drill down into breakdowns and individual transactions. Transaction editing uses the same GNUCash SQLite schema, so exported files open seamlessly in GNUCash desktop.
+Charts are fully interactive — click any bar or segment to drill down into breakdowns and individual transactions. The accounts page uses a tabbed, GnuCash-style interface where double-clicking an account opens its transaction register in a new tab. Transaction editing uses the same GNUCash SQLite schema, so exported files open seamlessly in GNUCash desktop.
 
 ## Screenshots
 
 <table>
   <tr>
     <td><strong>Dashboard</strong></td>
-    <td><strong>Sankey</strong></td>
+    <td><strong>Income / Expense Sankey</strong></td>
   </tr>
   <tr>
     <td><img src="app/screenshots/02-dashboard.png" width="450" /></td>
-    <td><img src="app/screenshots/09-sankey.png" width="450" /></td>
+    <td><img src="app/screenshots/03-sankey.png" width="450" /></td>
   </tr>
   <tr>
-    <td><strong>Income & Spending</strong></td>
-    <td><strong>Investment</strong></td>
+    <td><strong>Spending Breakdown</strong></td>
+    <td><strong>Cash Flow</strong></td>
   </tr>
   <tr>
-    <td><img src="app/screenshots/03-spending.png" width="450" /></td>
-    <td><img src="app/screenshots/05-investment.png" width="450" /></td>
+    <td><img src="app/screenshots/04-spending.png" width="450" /></td>
+    <td><img src="app/screenshots/06-cashflow.png" width="450" /></td>
   </tr>
   <tr>
-    <td><strong>Transactions</strong></td>
-    <td><strong>Accounts</strong></td>
+    <td><strong>Investment Portfolio</strong></td>
+    <td><strong>Accounts & Transactions</strong></td>
   </tr>
   <tr>
-    <td><img src="app/screenshots/07-transactions.png" width="450" /></td>
-    <td><img src="app/screenshots/08-accounts.png" width="450" /></td>
+    <td><img src="app/screenshots/08-investment.png" width="450" /></td>
+    <td><img src="app/screenshots/09-accounts.png" width="450" /></td>
   </tr>
 </table>
 
@@ -121,10 +127,12 @@ GnuDash is a fully static site — no backend server required. See the **[Deploy
 app/
 ├── src/
 │   ├── app/              # Next.js pages
-│   │   └── (dashboard)/  # Dashboard pages (overview, income-expenses, cash-flow, etc.)
+│   │   └── (dashboard)/  # Dashboard pages (overview, accounts, income-expenses, cash-flow, investment)
 │   ├── components/       # React components
+│   │   ├── account-*/    # Account management (create, edit, tree view)
 │   │   ├── budget/       # Budget tracking components
-│   │   ├── dashboard/    # Dashboard widgets and charts
+│   │   ├── dashboard/    # Dashboard widgets, charts, and sidebar
+│   │   ├── inline-entry/ # GnuCash-style inline transaction entry
 │   │   ├── investment/   # Investment portfolio components
 │   │   ├── sankey/       # Sankey diagram components
 │   │   ├── spending/     # Spending analysis components
@@ -133,7 +141,7 @@ app/
 │   └── lib/
 │       ├── gnucash/      # GNUCash parser and domain logic
 │       │   ├── db/       # Database adapters (WASM + better-sqlite3 for tests)
-│       │   ├── domain/   # Read-only business logic modules (accounts, net-worth, etc.)
+│       │   ├── domain/   # Read-only business logic modules (accounts, net-worth, cash-flow, etc.)
 │       │   ├── engine/   # Accounting engine (write operations)
 │       │   │   ├── builders/    # TransactionBuilder, AccountBuilder
 │       │   │   ├── db/          # WritableDbAdapter (WASM + better-sqlite3)
@@ -143,6 +151,7 @@ app/
 │       │   ├── worker/   # Web Worker for client-side SQLite execution
 │       │   └── shared/   # Shared utilities (dates, account paths)
 │       └── types/        # TypeScript type definitions
+├── scripts/              # Playwright screenshot automation
 docs/
 ├── gnucash-sql-schema.md # GNUCash SQLite schema reference
 └── gnucash-sql-queries.md # SQL query reference
