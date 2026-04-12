@@ -8,7 +8,7 @@ import { useDashboard } from "@/lib/dashboard-context";
 export function FileUpload() {
   const { uploadFile, loadDemo, isLoading, error } = useDashboard();
   const [isDragging, setIsDragging] = useState(false);
-  const [writable, setWritable] = useState(false);
+  const [readOnly, setReadOnly] = useState(false);
 
   const MAX_FILE_SIZE = 200 * 1024 * 1024; // 200 MB
   const [fileSizeError, setFileSizeError] = useState<string | null>(null);
@@ -25,9 +25,9 @@ export function FileUpload() {
         );
         return;
       }
-      uploadFile(file, writable);
+      uploadFile(file, !readOnly);
     },
-    [uploadFile, writable]
+    [uploadFile, readOnly]
   );
 
   const handleDrop = useCallback(
@@ -115,14 +115,14 @@ export function FileUpload() {
         <label className="mt-4 flex items-start gap-3 rounded-xl border border-[#D4DAE0] bg-white p-3 cursor-pointer transition-all hover:border-[#6C9B8B]/50">
           <input
             type="checkbox"
-            checked={writable}
-            onChange={(e) => setWritable(e.target.checked)}
+            checked={readOnly}
+            onChange={(e) => setReadOnly(e.target.checked)}
             className="mt-0.5 h-4 w-4 rounded border-[#D4DAE0] text-[#6C9B8B] accent-[#6C9B8B]"
           />
           <div>
-            <span className="text-sm font-medium text-[#1A1D1F]">Enable editing</span>
+            <span className="text-sm font-medium text-[#1A1D1F]">Read-only mode</span>
             <p className="mt-0.5 text-xs text-[#9A9FA5]">
-              Allows adding transactions. Changes are saved to the browser copy of your file.
+              Prevents any changes. Uncheck to allow adding transactions and editing.
             </p>
           </div>
         </label>
