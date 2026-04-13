@@ -151,53 +151,71 @@ export function computeNetWorthSeries(ctx: ParseContext): MonthlyNetWorth[] {
 }
 
 /**
+ * Round to the nearest cent using half-away-from-zero, matching GnuCash's
+ * GNC_HOW_RND_ROUND_HALF_UP. JavaScript's Math.round rounds half toward +∞
+ * (Math.round(-0.5) === 0), which disagrees with GnuCash on negative values.
+ */
+function roundHalfUpCents(n: number): number {
+  return (Math.sign(n) || 1) * Math.round(Math.abs(n) * 100) / 100;
+}
+
+/**
  * Compute the current total net worth as a single number.
  * Sums all non-investment account balances (with FX conversion) plus
  * investment market values (shares × latest price). Excludes ROOT,
  * INCOME, EXPENSE, EQUITY, and TRADING account types.
+ *
+ * Groups by account (not commodity) and rounds each per-account converted
+ * balance to the base currency's smallest unit using half-up rounding,
+ * mirroring GnuCash's gnc_pricedb_convert_balance_latest_price pipeline.
+ * Without this, float accumulation + a single late rounding can disagree
+ * with GnuCash by one minor unit on multi-currency books.
  */
 export function computeCurrentNetWorth(ctx: ParseContext): number {
-  const { db, commodityMap, baseCurrencyGuid, fxRates } = ctx;
+  const { db, commodityMap, fxRates } = ctx;
 
   const nonInvRows = db
     .prepare(
       `SELECT
+        a.guid AS account_guid,
         a.commodity_guid,
         SUM(CAST(s.quantity_num AS REAL) / s.quantity_denom) AS balance
       FROM splits s
       JOIN accounts a ON s.account_guid = a.guid
       WHERE a.account_type NOT IN ('STOCK', 'MUTUAL', 'ROOT', 'INCOME', 'EXPENSE', 'EQUITY', 'TRADING')
         AND a.placeholder = 0
-      GROUP BY a.commodity_guid`
+      GROUP BY a.guid, a.commodity_guid`
     )
-    .all() as { commodity_guid: string; balance: number }[];
+    .all() as { account_guid: string; commodity_guid: string; balance: number }[];
 
   let nonInvTotal = 0;
   for (const row of nonInvRows) {
     const commodity = commodityMap.get(row.commodity_guid);
-    if (commodity?.namespace === "CURRENCY") {
-      nonInvTotal += fxRates.toBase(row.commodity_guid, row.balance);
-    } else {
-      nonInvTotal += row.balance;
-    }
+    const converted =
+      commodity?.namespace === "CURRENCY"
+        ? fxRates.toBase(row.commodity_guid, row.balance)
+        : row.balance;
+    nonInvTotal += roundHalfUpCents(converted);
   }
 
-  // Investment market value from context's latestPrices (already normalized to base)
+  // Investment market value: one row per STOCK/MUTUAL account so each
+  // shares × price product can be rounded to cents independently.
   const invRows = db
     .prepare(
-      `SELECT a.commodity_guid,
+      `SELECT a.guid AS account_guid, a.commodity_guid,
               SUM(CAST(s.quantity_num AS REAL) / s.quantity_denom) AS shares
        FROM splits s
        JOIN accounts a ON s.account_guid = a.guid
        WHERE a.account_type IN ('STOCK', 'MUTUAL')
-       GROUP BY a.commodity_guid
+       GROUP BY a.guid, a.commodity_guid
        HAVING shares != 0`
     )
-    .all() as { commodity_guid: string; shares: number }[];
+    .all() as { account_guid: string; commodity_guid: string; shares: number }[];
 
   let investmentTotal = 0;
   for (const row of invRows) {
-    investmentTotal += row.shares * (ctx.latestPrices.get(row.commodity_guid) ?? 0);
+    const marketValue = row.shares * (ctx.latestPrices.get(row.commodity_guid) ?? 0);
+    investmentTotal += roundHalfUpCents(marketValue);
   }
 
   return nonInvTotal + investmentTotal;
