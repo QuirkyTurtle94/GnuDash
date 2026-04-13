@@ -193,23 +193,12 @@ export function AccountAutocomplete({
       }
 
       if (e.key === "Tab") {
+        // Tab commits the highlighted suggestion as-is, advancing focus to the
+        // next cell. Hierarchy drill-down is handled by the ":" key instead, so
+        // typing "hob" + Down + Tab correctly commits Expenses:Fun:Hobbies
+        // rather than collapsing to the highest-order parent.
         if (highlightIndex >= 0 && highlightIndex < suggestions.length) {
-          const selected = suggestions[highlightIndex];
-          const remaining = selected.fullPath.slice(hierarchyPrefix.length);
-          const nextSegment = remaining.split(":")[0];
-          const fullAtThisLevel = hierarchyPrefix + nextSegment;
-          const hasChildren = accounts.some((a) => a.fullPath.startsWith(fullAtThisLevel + ":"));
-
-          if (hasChildren && !e.shiftKey) {
-            e.preventDefault();
-            descendInto(selected);
-            return;
-          } else {
-            const exactAccount = accounts.find((a) => a.fullPath === fullAtThisLevel) ?? selected;
-            selectAccount(exactAccount);
-            onKeyDown(e);
-            return;
-          }
+          selectAccount(suggestions[highlightIndex]);
         }
         onKeyDown(e);
         return;

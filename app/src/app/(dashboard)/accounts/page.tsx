@@ -363,11 +363,18 @@ function AccountRow({
     <>
       <tr
         className={`group border-b border-[#EFEFEF] transition-colors cursor-pointer hover:bg-[#F9FAFB] ${isTopLevel ? "bg-[#FAFBFC]" : ""}`}
-        onClick={hasChildren ? () => onToggle(account.guid) : undefined}
+        onClick={() => {
+          if (hasChildren) {
+            onToggle(account.guid);
+          } else if (account.type !== "ROOT") {
+            // Leaf accounts open their ledger on a single click
+            onOpenRegister(account);
+          }
+        }}
         onDoubleClick={(e) => {
           e.stopPropagation();
-          // Don't open ROOT type accounts
-          if (account.type !== "ROOT") {
+          // Double-click on parent accounts still opens the register
+          if (account.type !== "ROOT" && hasChildren) {
             onOpenRegister(account);
           }
         }}
