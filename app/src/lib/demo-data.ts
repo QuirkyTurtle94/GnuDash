@@ -483,6 +483,7 @@ export function generateDemoData(): DashboardData {
     currencyFraction: 100,
     commodities: [],
     prices: [],
+    orphanedPriceGuids: [],
     availableCurrencies: [{ guid: "", mnemonic: "GBP", fullname: "British Pound Sterling" }],
     accounts,
     netWorthSeries,

@@ -7,21 +7,42 @@ import { useDashboard } from "@/lib/dashboard-context";
 import type { GnuCashPrice, CommodityInfo } from "@/lib/types/gnucash";
 import { Plus, Pencil, Trash2, AlertTriangle } from "lucide-react";
 
-/** Human-readable labels for price source fields */
+/** Human-readable labels for price source fields (non-transaction sources only). */
 const SOURCE_LABELS: Record<string, { label: string; color: string }> = {
   "user:price-editor": { label: "User", color: "bg-blue-50 text-blue-700" },
   "user:price": { label: "User", color: "bg-blue-50 text-blue-700" },
-  "user:xfer-dialog": { label: "Transaction", color: "bg-emerald-50 text-emerald-700" },
-  "transaction": { label: "Transaction", color: "bg-emerald-50 text-emerald-700" },
   "Finance::Quote": { label: "API", color: "bg-purple-50 text-purple-700" },
 };
 
-function getSourceBadge(source: string, type: string): { label: string; color: string } {
-  // Check source first, then type
-  if (SOURCE_LABELS[source]) return SOURCE_LABELS[source];
-  if (type === "transaction") return { label: "Transaction", color: "bg-emerald-50 text-emerald-700" };
-  if (source.startsWith("user:")) return { label: "User", color: "bg-blue-50 text-blue-700" };
-  return { label: source || type || "Unknown", color: "bg-gray-50 text-gray-600" };
+/** Badge describing a price's provenance. Transaction-linked prices are split
+ *  into "Linked" (originating tx still exists) and "Orphaned" (the tx has been
+ *  edited away or deleted), driven by the {@link orphaned} flag. */
+function getSourceBadge(
+  price: GnuCashPrice,
+  orphaned: boolean,
+): { label: string; color: string; title: string } {
+  if (isTransactionLinked(price)) {
+    return orphaned
+      ? {
+          label: "Orphaned",
+          color: "bg-amber-50 text-amber-700",
+          title:
+            "The transaction that created this price no longer exists or was changed. Safe to delete.",
+        }
+      : {
+          label: "Linked",
+          color: "bg-emerald-50 text-emerald-700",
+          title: "Auto-generated from a transaction. Editing here may drift from the source transaction.",
+        };
+  }
+  if (SOURCE_LABELS[price.source]) return { ...SOURCE_LABELS[price.source], title: price.source };
+  if (price.source.startsWith("user:"))
+    return { label: "User", color: "bg-blue-50 text-blue-700", title: price.source };
+  return {
+    label: price.source || price.type || "Unknown",
+    color: "bg-gray-50 text-gray-600",
+    title: price.source || price.type || "Unknown",
+  };
 }
 
 function formatPriceDate(dateStr: string): string {
@@ -47,6 +68,13 @@ export function PricesTable({ currency, selectedTicker }: Props) {
   const [editingPrice, setEditingPrice] = useState<GnuCashPrice | null>(null);
   const [deletingPrice, setDeletingPrice] = useState<GnuCashPrice | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  // Set of price guids flagged by the worker as orphaned (transaction-linked
+  // but with no matching transaction). Used to render the "Orphaned" badge.
+  const orphanSet = useMemo(
+    () => new Set(data?.orphanedPriceGuids ?? []),
+    [data?.orphanedPriceGuids],
+  );
 
   // Build commodity lookup
   const commodityMap = useMemo(() => {
@@ -147,7 +175,7 @@ export function PricesTable({ currency, selectedTicker }: Props) {
                   const commodity = commodityMap.get(p.commodity_guid);
                   const priceCurrency = commodityMap.get(p.currency_guid);
                   const priceValue = p.value_num / p.value_denom;
-                  const source = getSourceBadge(p.source, p.type);
+                  const source = getSourceBadge(p, orphanSet.has(p.guid));
 
                   return (
                     <tr key={p.guid} className="group border-b border-[#EFEFEF] hover:bg-[#F9FAFB] transition-colors">
@@ -163,7 +191,10 @@ export function PricesTable({ currency, selectedTicker }: Props) {
                         {formatAmount(priceValue, priceCurrency?.mnemonic ?? currency, 6)}
                       </td>
                       <td className="py-2 text-center">
-                        <span className={`inline-block rounded px-1.5 py-0.5 text-[10px] font-medium ${source.color}`}>
+                        <span
+                          title={source.title}
+                          className={`inline-block rounded px-1.5 py-0.5 text-[10px] font-medium ${source.color}`}
+                        >
                           {source.label}
                         </span>
                       </td>
@@ -246,11 +277,19 @@ export function PricesTable({ currency, selectedTicker }: Props) {
             <p className="mt-2 text-xs text-[#6F767E]">
               Are you sure you want to delete this price entry? This cannot be undone.
             </p>
-            {isTransactionLinked(deletingPrice) && (
+            {isTransactionLinked(deletingPrice) && !orphanSet.has(deletingPrice.guid) && (
               <div className="mt-2 flex items-start gap-2 rounded-md bg-amber-50 border border-amber-200 px-3 py-2">
                 <AlertTriangle className="h-3.5 w-3.5 mt-0.5 shrink-0 text-amber-600" />
                 <p className="text-[11px] text-amber-700">
-                  This price was generated from a transaction. Deleting it may affect portfolio valuations.
+                  This price is linked to a transaction. Deleting it may affect portfolio valuations.
+                </p>
+              </div>
+            )}
+            {orphanSet.has(deletingPrice.guid) && (
+              <div className="mt-2 flex items-start gap-2 rounded-md bg-emerald-50 border border-emerald-200 px-3 py-2">
+                <AlertTriangle className="h-3.5 w-3.5 mt-0.5 shrink-0 text-emerald-600" />
+                <p className="text-[11px] text-emerald-700">
+                  This price is orphaned — the originating transaction no longer exists. Safe to delete.
                 </p>
               </div>
             )}

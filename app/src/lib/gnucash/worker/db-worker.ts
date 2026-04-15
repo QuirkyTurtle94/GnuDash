@@ -25,6 +25,7 @@ import { TransactionBuilder } from "../engine/builders/transaction-builder";
 import { GncNumeric } from "../engine/gnc-numeric";
 import type { WritableDbAdapter } from "../engine/db/writable-adapter";
 import type { DashboardData } from "@/lib/types/gnucash";
+import { computeOrphanedPriceGuids } from "@/lib/gnucash/domain/orphan-prices";
 import { deleteTransaction } from "../engine/operations/transaction-ops";
 import { bulkEditTransactions } from "../engine/operations/bulk-ops";
 import { AccountBuilder } from "../engine/builders/account-builder";
@@ -339,6 +340,7 @@ function getFullDashboardData(): DashboardData {
       fraction: c.fraction,
     })),
     prices: ctx.prices,
+    orphanedPriceGuids: Array.from(computeOrphanedPriceGuids(ctx)),
     availableCurrencies: ctx.availableCurrencies,
     hasClosingTransactions: hasClosing,
     cashFlowSeriesExcludingClosing,

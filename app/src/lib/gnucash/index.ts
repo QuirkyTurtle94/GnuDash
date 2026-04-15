@@ -14,6 +14,7 @@ import { computeCashFlowBudgetData } from "./domain/cash-flow-budget";
 import { computeCashFlowByCategory } from "./domain/cash-flow-by-category";
 import { getUpcomingBills } from "./domain/bills";
 import { hasClosingTransactions } from "./domain/closing";
+import { computeOrphanedPriceGuids } from "./domain/orphan-prices";
 import { formatMonth } from "./shared/dates";
 
 export function parseGnuCashFile(filePath: string, overrideBaseCurrencyGuid?: string): DashboardData {
@@ -116,6 +117,7 @@ export function parseGnuCashFile(filePath: string, overrideBaseCurrencyGuid?: st
         fraction: c.fraction,
       })),
       prices: ctx.prices,
+      orphanedPriceGuids: Array.from(computeOrphanedPriceGuids(ctx)),
       availableCurrencies: ctx.availableCurrencies,
       hasClosingTransactions: hasClosing,
       cashFlowSeriesExcludingClosing,
