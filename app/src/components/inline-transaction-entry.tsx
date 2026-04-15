@@ -247,23 +247,68 @@ export function InlineTransactionEntry({ account, transactions, colSpan, editing
     return { shares: s, price: p, value: v };
   }
 
-  function handleInvestmentFieldChange(field: "shares" | "price" | "value", val: string) {
-    const newS = field === "shares" ? val : shares;
-    const newP = field === "price" ? val : price;
-    const newV = field === "value" ? val : value;
+  /** Raw setter used by onChange — never triggers auto-compute or the recalc picker
+   *  while the user is still typing. See {@link commitInvestmentField}. */
+  function setInvestmentFieldRaw(field: "shares" | "price" | "value", val: string) {
+    if (field === "shares") setShares(val);
+    else if (field === "price") setPrice(val);
+    else setValue(val);
+    markDirty();
+  }
 
-    // If all three are already filled, ask which to recalculate
-    if (parseNum(shares) != null && parseNum(price) != null && parseNum(value) != null && parseNum(val) != null) {
-      pendingInvChange.current = { field, val };
-      setShowRecalcPicker(true);
-      return;
+  /** Commits an edit to an investment field (shares/price/value).
+   *
+   *  Called on blur, Tab, or Enter — never mid-typing. Behaviour mirrors GnuCash:
+   *   - If fewer than 2 fields are filled, do nothing special.
+   *   - If exactly 2 are filled, silently compute the missing third.
+   *   - If all 3 are filled and they reconcile (shares × price ≈ value), no-op.
+   *   - If all 3 are filled but don't reconcile, show the GnuCash-style recalc
+   *     picker asking which of the other two fields to recompute.
+   *
+   *  Returns true when the recalc picker was opened so the caller can skip
+   *  advancing focus or submitting the row.
+   */
+  function commitInvestmentField(field: "shares" | "price" | "value", rawVal: string): boolean {
+    const val = evalExpr(rawVal);
+    const s = field === "shares" ? val : shares;
+    const p = field === "price" ? val : price;
+    const v = field === "value" ? val : value;
+
+    // Canonicalise the edited field (e.g. "10+5" → "15") before any further work.
+    if (field === "shares" && val !== shares) setShares(val);
+    else if (field === "price" && val !== price) setPrice(val);
+    else if (field === "value" && val !== value) setValue(val);
+
+    const sN = parseNum(s);
+    const pN = parseNum(p);
+    const vN = parseNum(v);
+    const filled = (sN != null ? 1 : 0) + (pN != null ? 1 : 0) + (vN != null ? 1 : 0);
+
+    if (filled < 2) {
+      markDirty();
+      return false;
     }
 
-    const result = investmentAutoCompute(field, newS, newP, newV);
-    setShares(result.shares);
-    setPrice(result.price);
-    setValue(result.value);
-    markDirty();
+    if (filled === 2) {
+      const result = investmentAutoCompute(field, s, p, v);
+      setShares(result.shares);
+      setPrice(result.price);
+      setValue(result.value);
+      markDirty();
+      return false;
+    }
+
+    // All three filled — check reconciliation within a 1-cent tolerance.
+    if (sN != null && pN != null && vN != null) {
+      if (Math.abs(sN * pN - vN) < 0.01) {
+        markDirty();
+        return false;
+      }
+      pendingInvChange.current = { field, val };
+      setShowRecalcPicker(true);
+      return true;
+    }
+    return false;
   }
 
   function handleRecalcPick(recalcField: "shares" | "price" | "value") {
@@ -321,6 +366,24 @@ export function InlineTransactionEntry({ account, transactions, colSpan, editing
     }
     if (e.key === "Enter") {
       e.preventDefault();
+      // Investment fields defer auto-compute to commit time. Flush the edit
+      // (which may fill the missing third field or open the recalc picker)
+      // before attempting to submit.
+      if (
+        isInvestment &&
+        !isMultiSplit &&
+        (field === "shares" || field === "price" || field === "value")
+      ) {
+        const pickerShown = commitInvestmentField(
+          field,
+          (e.currentTarget as HTMLInputElement).value,
+        );
+        if (pickerShown) return;
+        // Defer so the setState queued by commitInvestmentField flushes before
+        // handleSubmit closes over the (stale) previous state.
+        setTimeout(() => submitRef.current(), 0);
+        return;
+      }
       submitRef.current();
       return;
     }
@@ -671,8 +734,8 @@ export function InlineTransactionEntry({ account, transactions, colSpan, editing
                 type="text"
                 inputMode="decimal"
                 value={shares}
-                onChange={(e) => handleInvestmentFieldChange("shares", e.target.value)}
-                onBlur={(e) => { const v = evalExpr(e.target.value); if (v !== shares) handleInvestmentFieldChange("shares", v); }}
+                onChange={(e) => setInvestmentFieldRaw("shares", e.target.value)}
+                onBlur={(e) => commitInvestmentField("shares", e.target.value)}
                 onFocus={(e) => e.target.select()}
                 onKeyDown={(e) => handleFieldKeyDown("shares", e)}
                 placeholder="Shares"
@@ -688,8 +751,8 @@ export function InlineTransactionEntry({ account, transactions, colSpan, editing
                 type="text"
                 inputMode="decimal"
                 value={price}
-                onChange={(e) => handleInvestmentFieldChange("price", e.target.value)}
-                onBlur={(e) => { const v = evalExpr(e.target.value); if (v !== price) handleInvestmentFieldChange("price", v); }}
+                onChange={(e) => setInvestmentFieldRaw("price", e.target.value)}
+                onBlur={(e) => commitInvestmentField("price", e.target.value)}
                 onFocus={(e) => e.target.select()}
                 onKeyDown={(e) => handleFieldKeyDown("price", e)}
                 placeholder="Price"
@@ -705,8 +768,8 @@ export function InlineTransactionEntry({ account, transactions, colSpan, editing
                 type="text"
                 inputMode="decimal"
                 value={value}
-                onChange={(e) => handleInvestmentFieldChange("value", e.target.value)}
-                onBlur={(e) => { const v = evalExpr(e.target.value); if (v !== value) handleInvestmentFieldChange("value", v); }}
+                onChange={(e) => setInvestmentFieldRaw("value", e.target.value)}
+                onBlur={(e) => commitInvestmentField("value", e.target.value)}
                 onFocus={(e) => e.target.select()}
                 onKeyDown={(e) => handleFieldKeyDown("value", e)}
                 placeholder="Value"
