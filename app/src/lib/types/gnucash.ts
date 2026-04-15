@@ -451,6 +451,10 @@ export interface DashboardData {
   commodities: CommodityInfo[];
   /** All price entries from the prices table, ordered by date descending */
   prices: GnuCashPrice[];
+  /** GUIDs of transaction-linked prices whose originating transaction can no
+   *  longer be found (i.e. the tx was edited away or deleted). Used by the
+   *  prices table to render an "Orphaned" badge and offer bulk cleanup. */
+  orphanedPriceGuids: string[];
   /** Currencies available for the display currency selector (CURRENCY namespace only) */
   availableCurrencies: { guid: string; mnemonic: string; fullname: string }[];
   /** True if the file contains book-closing transactions (year-end entries that zero out income/expense) */
