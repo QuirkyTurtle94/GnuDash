@@ -35,7 +35,7 @@ export function Sidebar({ onNavigate, expanded }: SidebarProps) {
 
   return (
     <aside
-      className={`flex h-full flex-col border-r border-[#EFEFEF] bg-white transition-[width] duration-200 overflow-hidden ${
+      className={`flex h-full flex-col border-r border-border bg-card transition-[width] duration-200 overflow-hidden ${
         expanded ? "w-[260px]" : "w-[60px]"
       }`}
     >
@@ -43,7 +43,7 @@ export function Sidebar({ onNavigate, expanded }: SidebarProps) {
         {/* Main Menu */}
         <div>
           {expanded && (
-            <p className="mb-2 px-3 text-xs text-[#9A9FA5]">Main menu</p>
+            <p className="mb-2 px-3 text-xs text-muted-foreground/70">Main menu</p>
           )}
           <nav className="flex flex-col gap-0.5">
             {mainNav.map((item) => {
@@ -63,12 +63,12 @@ export function Sidebar({ onNavigate, expanded }: SidebarProps) {
                       : "h-[42px] w-[42px] mx-auto justify-center"
                   } ${
                     isActive
-                      ? "bg-[#6C9B8B]/10 text-[#1A1D1F]"
-                      : "text-[#6F767E] hover:bg-[#F4F5F7]"
+                      ? "bg-[#6C9B8B]/10 text-foreground dark:bg-[#8FBCA9]/10"
+                      : "text-muted-foreground hover:bg-muted"
                   }`}
                 >
                   <item.icon
-                    className={`h-[18px] w-[18px] shrink-0 ${isActive ? "text-[#6C9B8B]" : "text-[#9A9FA5]"}`}
+                    className={`h-[18px] w-[18px] shrink-0 ${isActive ? "text-[#6C9B8B] dark:text-[#8FBCA9]" : "text-muted-foreground/70"}`}
                   />
                   {expanded && (
                     <span className={`text-sm ${isActive ? "font-medium" : ""}`}>
@@ -83,33 +83,33 @@ export function Sidebar({ onNavigate, expanded }: SidebarProps) {
       </div>
 
       {/* Bottom: Export + Upload new file */}
-      <div className={`mt-auto border-t border-[#EFEFEF] ${expanded ? "p-5" : "p-2"}`}>
+      <div className={`mt-auto border-t border-border ${expanded ? "p-5" : "p-2"}`}>
         <button
           onClick={exportFile}
           title="Export .gnucash file"
-          className={`flex items-center rounded-[10px] text-sm text-[#6F767E] transition-colors hover:bg-[#F4F5F7] whitespace-nowrap ${
+          className={`flex items-center rounded-[10px] text-sm text-muted-foreground transition-colors hover:bg-muted whitespace-nowrap ${
             expanded
               ? "w-full gap-2.5 px-3 py-2"
               : "h-[42px] w-[42px] mx-auto justify-center"
           }`}
         >
-          <Download className="h-[18px] w-[18px] shrink-0 text-[#9A9FA5]" />
+          <Download className="h-[18px] w-[18px] shrink-0 text-muted-foreground/70" />
           {expanded && "Export .gnucash file"}
         </button>
         <button
           onClick={clearData}
           title="Upload new file"
-          className={`flex items-center rounded-[10px] text-sm text-[#6F767E] transition-colors hover:bg-[#F4F5F7] whitespace-nowrap ${
+          className={`flex items-center rounded-[10px] text-sm text-muted-foreground transition-colors hover:bg-muted whitespace-nowrap ${
             expanded
               ? "w-full gap-2.5 px-3 py-2"
               : "h-[42px] w-[42px] mx-auto justify-center"
           }`}
         >
-          <LogOut className="h-[18px] w-[18px] shrink-0 text-[#9A9FA5]" />
+          <LogOut className="h-[18px] w-[18px] shrink-0 text-muted-foreground/70" />
           {expanded && "Upload new file"}
         </button>
         {expanded && uploadedAt && (
-          <p className="mt-1.5 px-3 text-xs text-[#9A9FA5]">
+          <p className="mt-1.5 px-3 text-xs text-muted-foreground/70">
             Loaded {uploadedAt.toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" })}{" "}
             {uploadedAt.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })}
           </p>
