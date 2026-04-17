@@ -51,6 +51,11 @@
 :root {
   --background: oklch(1 0 0);
   --foreground: oklch(0.145 0 0);
+  /* Chart axis/grid colors for SVG `stroke=`/`fill=` attributes that can't
+     go through Tailwind classes. Kept as rgb()/hex so they inline cleanly. */
+  --chart-grid: #EFEFEF;
+  --chart-axis-tick: #9A9FA5;
+  --chart-axis-line: rgba(26, 29, 31, 0.3);
   --card: oklch(1 0 0);
   --card-foreground: oklch(0.145 0 0);
   --popover: oklch(1 0 0);
@@ -86,6 +91,9 @@
 .dark {
   --background: oklch(0.145 0 0);
   --foreground: oklch(0.985 0 0);
+  --chart-grid: rgba(255, 255, 255, 0.08);
+  --chart-axis-tick: rgba(255, 255, 255, 0.55);
+  --chart-axis-line: rgba(255, 255, 255, 0.4);
   --card: oklch(0.205 0 0);
   --card-foreground: oklch(0.985 0 0);
   --popover: oklch(0.205 0 0);
@@ -102,11 +110,14 @@
   --border: oklch(1 0 0 / 10%);
   --input: oklch(1 0 0 / 15%);
   --ring: oklch(0.556 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
+  /* Charts: flipped from light mode (dark → light) so values stay legible
+     against the dark background. Light mode uses a descending gray scale
+     (0.87 → 0.269); dark mode uses an ascending scale (0.269 → 0.87). */
+  --chart-1: oklch(0.269 0 0);
+  --chart-2: oklch(0.439 0 0);
+  --chart-3: oklch(0.556 0 0);
+  --chart-4: oklch(0.708 0 0);
+  --chart-5: oklch(0.87 0 0);
   --sidebar: oklch(0.205 0 0);
   --sidebar-foreground: oklch(0.985 0 0);
   --sidebar-primary: oklch(0.488 0.243 264.376);
@@ -116,6 +127,62 @@
   --sidebar-border: oklch(1 0 0 / 10%);
   --sidebar-ring: oklch(0.556 0 0);
 }
+
+/* -----------------------------------------------------------------------
+   Dark-mode overrides for hardcoded hex Tailwind classes.
+
+   The dashboard was built before dark mode existed, so many components use
+   arbitrary-value classes like `text-[#1A1D1F]` and `bg-white` directly.
+   Rewriting every file to use CSS-variable-backed classes would be a huge
+   sweep — these overrides remap the common hex values to dark-appropriate
+   ones when `.dark` is on `<html>`, so existing light-mode code stays
+   untouched but renders correctly in both themes.
+
+   As components are migrated to `bg-card` / `text-muted-foreground` etc.,
+   the matching rules below become dead code and can be removed.
+   ----------------------------------------------------------------------- */
+.dark .bg-white                                                      { background-color: var(--card); }
+.dark .bg-\[\#F4F5F7\]                                               { background-color: var(--muted); }
+.dark .hover\:bg-\[\#F4F5F7\]:hover                                  { background-color: var(--muted); }
+.dark .bg-\[\#F9FAFB\]                                               { background-color: var(--muted); }
+.dark .hover\:bg-\[\#F9FAFB\]:hover                                  { background-color: var(--muted); }
+.dark .bg-\[\#EFEFEF\]                                               { background-color: var(--muted); }
+.dark .hover\:bg-\[\#EFEFEF\]:hover                                  { background-color: color-mix(in oklch, var(--muted), white 10%); }
+.dark .bg-\[\#EBF5EC\]                                               { background-color: color-mix(in oklch, var(--muted), #6C9B8B 12%); }
+
+/* Neutral text */
+.dark .text-\[\#1A1D1F\]                                             { color: var(--foreground); }
+.dark .text-\[\#6F767E\]                                             { color: var(--muted-foreground); }
+.dark .text-\[\#9A9FA5\]                                             { color: color-mix(in oklch, var(--muted-foreground), transparent 20%); }
+.dark .text-\[\#D4DAE0\]                                             { color: color-mix(in oklch, var(--muted-foreground), transparent 40%); }
+.dark .hover\:text-\[\#1A1D1F\]:hover                                { color: var(--foreground); }
+.dark .hover\:text-\[\#6F767E\]:hover                                { color: var(--muted-foreground); }
+
+/* Neutral borders */
+.dark .border-\[\#EFEFEF\]                                           { border-color: var(--border); }
+.dark .border-\[\#D4DAE0\]                                           { border-color: var(--border); }
+.dark .border-\[\#D1D5DB\]                                           { border-color: var(--border); }
+
+/* Brand blue (#3B6B8A) — lighten slightly in dark for contrast */
+.dark .text-\[\#3B6B8A\]                                             { color: #6FA4C7; }
+.dark .border-\[\#3B6B8A\]                                           { border-color: #6FA4C7; }
+.dark .bg-\[\#3B6B8A\]                                               { background-color: #6FA4C7; }
+.dark .hover\:bg-\[\#3B6B8A\]:hover                                  { background-color: #6FA4C7; }
+.dark .hover\:text-\[\#3B6B8A\]:hover                                { color: #6FA4C7; }
+.dark .hover\:bg-\[\#2D5570\]:hover                                  { background-color: #5A93B6; }
+.dark .hover\:bg-\[\#2F5770\]:hover                                  { background-color: #5A93B6; }
+.dark .hover\:text-\[\#2D5570\]:hover                                { color: #5A93B6; }
+
+/* Brand green (#6C9B8B) — lighten slightly in dark for contrast */
+.dark .text-\[\#6C9B8B\]                                             { color: #8FBCA9; }
+.dark .border-\[\#6C9B8B\]                                           { border-color: #8FBCA9; }
+.dark .bg-\[\#6C9B8B\]                                               { background-color: #8FBCA9; }
+.dark .hover\:bg-\[\#6C9B8B\]:hover                                  { background-color: #8FBCA9; }
+.dark .hover\:text-\[\#6C9B8B\]:hover                                { color: #8FBCA9; }
+.dark .hover\:border-\[\#6C9B8B\]:hover                              { border-color: #8FBCA9; }
+
+/* Destructive red accents — keep the light-mode red, which reads fine on dark */
+/* (#E87C6B, #F87171 unchanged) */
 
 @layer base {
   * {

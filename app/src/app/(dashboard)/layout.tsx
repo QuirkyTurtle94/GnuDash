@@ -8,6 +8,7 @@ import { PrivacyProvider, usePrivacy } from "@/lib/privacy-context";
 import { ClosingProvider, useClosing } from "@/lib/closing-context";
 import { FileUpload } from "@/components/upload/file-upload";
 import { Sidebar } from "@/components/dashboard/sidebar";
+import { ThemeToggle } from "@/components/dashboard/theme-toggle";
 
 function CurrencySelector() {
   const { data, setCurrency } = useDashboard();
@@ -28,14 +29,14 @@ function CurrencySelector() {
     <div className="relative" ref={ref}>
       <button
         onClick={() => setOpen((v) => !v)}
-        className="flex items-center gap-1 rounded-lg border border-[#EFEFEF] px-2.5 py-1.5 text-xs font-medium text-[#6F767E] transition-colors hover:bg-[#F4F5F7]"
+        className="flex items-center gap-1 rounded-lg border border-border px-2.5 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted"
         title="Change display currency"
       >
         {data.currency}
         <ChevronDown className="h-3 w-3" />
       </button>
       {open && (
-        <div className="absolute right-0 top-full z-50 mt-1 max-h-60 w-48 overflow-y-auto rounded-lg border border-[#EFEFEF] bg-white py-1 shadow-lg">
+        <div className="absolute right-0 top-full z-50 mt-1 max-h-60 w-48 overflow-y-auto rounded-lg border border-border bg-popover py-1 shadow-lg">
           {data.availableCurrencies.map((c) => (
             <button
               key={c.guid}
@@ -43,12 +44,12 @@ function CurrencySelector() {
                 setCurrency(c.guid);
                 setOpen(false);
               }}
-              className={`flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs transition-colors hover:bg-[#F4F5F7] ${
-                c.mnemonic === data.currency ? "font-semibold text-[#3B6B8A]" : "text-[#6F767E]"
+              className={`flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs transition-colors hover:bg-muted ${
+                c.mnemonic === data.currency ? "font-semibold text-[#3B6B8A] dark:text-[#6FA4C7]" : "text-muted-foreground"
               }`}
             >
               <span className="w-10 font-mono">{c.mnemonic}</span>
-              <span className="truncate text-[#9A9FA5]">{c.fullname}</span>
+              <span className="truncate text-muted-foreground/70">{c.fullname}</span>
             </button>
           ))}
         </div>
@@ -69,7 +70,7 @@ function DashboardInner({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <div className={`flex h-screen bg-[#F4F5F7] ${hideValues ? "privacy-mode" : ""}`}>
+    <div className={`flex h-screen bg-muted ${hideValues ? "privacy-mode" : ""}`}>
       {/* Mobile overlay */}
       {sidebarOpen && (
         <div
@@ -94,11 +95,11 @@ function DashboardInner({ children }: { children: React.ReactNode }) {
 
       <main className="flex flex-1 flex-col overflow-hidden">
         {/* Top bar */}
-        <header className="flex h-[68px] shrink-0 items-center justify-between border-b border-[#EFEFEF] bg-white px-4 sm:px-8">
+        <header className="flex h-[68px] shrink-0 items-center justify-between border-b border-border bg-card px-4 sm:px-8">
           <div className="flex items-center gap-3 -ml-6">
             <button
               onClick={() => setSidebarOpen(true)}
-              className="rounded-lg p-1.5 text-[#6F767E] transition-colors hover:bg-[#F4F5F7] md:hidden"
+              className="rounded-lg p-1.5 text-muted-foreground transition-colors hover:bg-muted md:hidden"
             >
               <Menu className="h-5 w-5" />
             </button>
@@ -114,7 +115,7 @@ function DashboardInner({ children }: { children: React.ReactNode }) {
           <div className="flex items-center gap-2 sm:gap-3">
             {isXmlSource && data && (
               <span
-                className="flex items-center gap-1.5 rounded-lg border border-[#EFEFEF] px-3 py-1.5 text-xs font-medium text-[#9A9FA5]"
+                className="flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-muted-foreground"
                 title="XML files are read-only. Re-save as SQLite3 in GNUCash to enable editing."
               >
                 <Lock className="h-3 w-3" />
@@ -124,7 +125,7 @@ function DashboardInner({ children }: { children: React.ReactNode }) {
             {!isXmlSource && isWritable && (
               <button
                 onClick={toggleWritable}
-                className="flex items-center gap-1.5 rounded-lg border border-[#3B6B8A] bg-[#3B6B8A]/10 px-3 py-1.5 text-xs font-medium text-[#3B6B8A] transition-colors hover:bg-[#3B6B8A]/20"
+                className="flex items-center gap-1.5 rounded-lg border border-[#3B6B8A] bg-[#3B6B8A]/10 px-3 py-1.5 text-xs font-medium text-[#3B6B8A] transition-colors hover:bg-[#3B6B8A]/20 dark:border-[#6FA4C7] dark:text-[#6FA4C7] dark:bg-[#6FA4C7]/10 dark:hover:bg-[#6FA4C7]/20"
                 title="Click to switch to read-only mode"
               >
                 <Pencil className="h-3.5 w-3.5" />
@@ -134,7 +135,7 @@ function DashboardInner({ children }: { children: React.ReactNode }) {
             {!isXmlSource && !isWritable && data && (
               <button
                 onClick={toggleWritable}
-                className="flex items-center gap-1.5 rounded-lg border border-[#EFEFEF] px-3 py-1.5 text-xs font-medium text-[#9A9FA5] transition-colors hover:bg-[#F4F5F7] hover:text-[#6F767E]"
+                className="flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                 title="Click to enable editing"
               >
                 <Lock className="h-3 w-3" />
@@ -146,8 +147,8 @@ function DashboardInner({ children }: { children: React.ReactNode }) {
                 onClick={toggleExcludeClosing}
                 className={`flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors ${
                   excludeClosing
-                    ? "border-[#6C9B8B] bg-[#6C9B8B]/10 text-[#6C9B8B]"
-                    : "border-[#EFEFEF] text-[#6F767E] hover:bg-[#F4F5F7]"
+                    ? "border-[#6C9B8B] bg-[#6C9B8B]/10 text-[#6C9B8B] dark:border-[#8FBCA9] dark:text-[#8FBCA9] dark:bg-[#8FBCA9]/10"
+                    : "border-border text-muted-foreground hover:bg-muted"
                 }`}
                 title={excludeClosing ? "Show closing transactions" : "Exclude closing transactions"}
               >
@@ -160,14 +161,15 @@ function DashboardInner({ children }: { children: React.ReactNode }) {
               onClick={toggleHideValues}
               className={`flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors ${
                 hideValues
-                  ? "border-[#6C9B8B] bg-[#6C9B8B]/10 text-[#6C9B8B]"
-                  : "border-[#EFEFEF] text-[#6F767E] hover:bg-[#F4F5F7]"
+                  ? "border-[#6C9B8B] bg-[#6C9B8B]/10 text-[#6C9B8B] dark:border-[#8FBCA9] dark:text-[#8FBCA9] dark:bg-[#8FBCA9]/10"
+                  : "border-border text-muted-foreground hover:bg-muted"
               }`}
               title={hideValues ? "Show values" : "Hide values"}
             >
               {hideValues ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
               <span className="hidden sm:inline">{hideValues ? "Show values" : "Hide values"}</span>
             </button>
+            <ThemeToggle />
           </div>
         </header>
 

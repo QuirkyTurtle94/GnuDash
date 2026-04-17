@@ -110,16 +110,16 @@ export function InvestmentPerformance({ investments, currency }: InvestmentPerfo
         <div className="h-[280px]">
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={chartData} margin={{ top: 5, right: 5, bottom: 0, left: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#EFEFEF" vertical={false} />
+              <CartesianGrid strokeDasharray="3 3" stroke="var(--chart-grid)" vertical={false} />
               <XAxis
                 dataKey="name"
-                tick={{ fontSize: 11, fill: "#9A9FA5" }}
+                tick={{ fontSize: 11, fill: "var(--chart-axis-tick)" }}
                 axisLine={false}
                 tickLine={false}
               />
               <YAxis
                 tickFormatter={(v) => formatCurrencyShort(v, currency)}
-                tick={{ fontSize: 11, fill: "#9A9FA5" }}
+                tick={{ fontSize: 11, fill: "var(--chart-axis-tick)" }}
                 axisLine={false}
                 tickLine={false}
                 width={55}
@@ -130,8 +130,9 @@ export function InvestmentPerformance({ investments, currency }: InvestmentPerfo
                   name === "costBasis" ? "Cost Basis" : "Market Value",
                 ]}
                 contentStyle={{
-                  backgroundColor: "white",
-                  border: "1px solid #EFEFEF",
+                  backgroundColor: "var(--popover)",
+                  color: "var(--popover-foreground)",
+                  border: "1px solid var(--border)",
                   borderRadius: "10px",
                   fontSize: "13px",
                 }}

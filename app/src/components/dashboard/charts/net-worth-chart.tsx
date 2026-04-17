@@ -217,12 +217,12 @@ export function NetWorthChart({ series, currentNetWorth, currency, externalPerio
                   <stop offset="100%" stopColor="#3B6B8A" stopOpacity={0} />
                 </linearGradient>
               </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke="#EFEFEF" vertical={false} />
+              <CartesianGrid strokeDasharray="3 3" stroke="var(--chart-grid)" vertical={false} />
               <XAxis
                 dataKey="month"
                 tickFormatter={formatAxisMonth}
                 ticks={getVisibleTicks(filtered)}
-                tick={{ fontSize: 11, fill: "#9A9FA5" }}
+                tick={{ fontSize: 11, fill: "var(--chart-axis-tick)" }}
                 axisLine={false}
                 tickLine={false}
               />
@@ -231,12 +231,12 @@ export function NetWorthChart({ series, currentNetWorth, currency, externalPerio
                 ticks={yTicks}
                 interval={0}
                 tickFormatter={(v) => formatCurrencyShort(v, currency)}
-                tick={{ fontSize: 11, fill: "#9A9FA5" }}
+                tick={{ fontSize: 11, fill: "var(--chart-axis-tick)" }}
                 axisLine={false}
                 tickLine={false}
                 width={55}
               />
-              <ReferenceLine y={0} stroke="#1A1D1F" strokeWidth={1} strokeOpacity={0.3} />
+              <ReferenceLine y={0} stroke="var(--chart-axis-line)" strokeWidth={1} />
               <Tooltip
                 content={({ active, payload, label }) => {
                   if (!active || !payload?.length) return null;
@@ -245,7 +245,7 @@ export function NetWorthChart({ series, currentNetWorth, currency, externalPerio
                   const [y, m] = (label as string).split("-");
                   const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
                   return (
-                    <div className="rounded-[10px] border border-[#EFEFEF] bg-white px-3 py-2 text-[13px] shadow-md">
+                    <div className="rounded-[10px] border border-border bg-popover px-3 py-2 text-[13px] shadow-md">
                       <p className="mb-1.5 text-xs font-medium text-[#6F767E]">{months[parseInt(m) - 1]} {y}</p>
                       <div className="flex flex-col gap-1">
                         <div className="flex items-center justify-between gap-4">
