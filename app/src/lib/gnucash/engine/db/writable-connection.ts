@@ -40,6 +40,7 @@ export function createWritableConnection(filePath: string): WritableDbAdapter {
   db.exec(ENSURE_TABLES_SQL);
 
   const adapter: WritableDbAdapter = {
+    dialect: "sqlite",
     prepare(sql: string): PreparedQuery {
       const stmt = db.prepare(sql);
       return {
@@ -209,6 +210,7 @@ export function createWritableMemoryDb(): WritableDbAdapter {
   `);
 
   return {
+    dialect: "sqlite",
     prepare(sql: string): PreparedQuery {
       const stmt = db.prepare(sql);
       return {

@@ -1,4 +1,4 @@
-import type { DbAdapter } from "./db/adapter";
+import type { DbAdapter, SqlDialect } from "./db/adapter";
 import type {
   GnuCashAccount,
   GnuCashCommodity,
@@ -8,6 +8,12 @@ import { buildFxRateMap, type FxRateMap } from "./domain/fx";
 
 export interface ParseContext {
   db: DbAdapter;
+  /**
+   * Dialect of the underlying database. Read through to domain SQL helpers
+   * so they can emit `to_char(...)` on Postgres instead of the SQLite
+   * `CASE/strftime/substr` dance. Mirrors `db.dialect`.
+   */
+  dialect: SqlDialect;
   accounts: GnuCashAccount[];
   accountMap: Map<string, GnuCashAccount>;
   commodities: GnuCashCommodity[];
@@ -145,6 +151,7 @@ export function buildParseContext(db: DbAdapter, overrideBaseCurrencyGuid?: stri
 
   return {
     db,
+    dialect: db.dialect,
     accounts,
     accountMap,
     commodities,

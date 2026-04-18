@@ -93,7 +93,7 @@ export function computeInvestmentValueSeries(ctx: ParseContext): MonthlyInvestme
         a.name AS account_name,
         a.commodity_guid,
         t.currency_guid AS tx_currency_guid,
-        ${sqlMonth("t.post_date")} AS month,
+        ${sqlMonth("t.post_date", ctx.dialect)} AS month,
         CAST(s.quantity_num AS REAL) / s.quantity_denom AS shares,
         CAST(s.value_num AS REAL) / s.value_denom AS cost
       FROM splits s
@@ -119,7 +119,7 @@ export function computeInvestmentValueSeries(ctx: ParseContext): MonthlyInvestme
 
   const allPrices = db
     .prepare(
-      `SELECT commodity_guid, currency_guid, ${sqlMonth("date")} AS month, CAST(value_num AS REAL) / value_denom AS price
+      `SELECT commodity_guid, currency_guid, ${sqlMonth("date", ctx.dialect)} AS month, CAST(value_num AS REAL) / value_denom AS price
       FROM prices ORDER BY date`
     )
     .all() as { commodity_guid: string; currency_guid: string; month: string; price: number }[];

@@ -11,7 +11,16 @@ export interface PreparedQuery {
   get(...params: unknown[]): unknown | undefined;
 }
 
+/**
+ * Which SQL dialect this adapter speaks. The domain layer uses this to
+ * pick dialect-specific SQL fragments (e.g. `to_char(...)` on Postgres
+ * vs `strftime(...)` on SQLite). Add new dialects here only when a new
+ * concrete adapter lands.
+ */
+export type SqlDialect = "sqlite" | "postgres";
+
 export interface DbAdapter {
+  readonly dialect: SqlDialect;
   prepare(sql: string): PreparedQuery;
   close(): void;
 }

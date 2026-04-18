@@ -48,6 +48,7 @@ export function createWritableWasmAdapter(
   db.exec({ sql: ENSURE_TABLES_SQL });
 
   return {
+    dialect: "sqlite",
     prepare(sql: string): PreparedQuery {
       return {
         all(...params: unknown[]): unknown[] {

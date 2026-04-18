@@ -52,14 +52,14 @@ export function computeBudgetData(ctx: ParseContext): BudgetData | null {
       `SELECT
         s.account_guid,
         a.commodity_guid,
-        ${sqlMonthNum("t.post_date")} AS month_num,
-        ${sqlYear("t.post_date")} AS year,
+        ${sqlMonthNum("t.post_date", ctx.dialect)} AS month_num,
+        ${sqlYear("t.post_date", ctx.dialect)} AS year,
         SUM(CAST(s.quantity_num AS REAL) / s.quantity_denom) AS actual
       FROM splits s
       JOIN accounts a ON s.account_guid = a.guid
       JOIN transactions t ON s.tx_guid = t.guid
       WHERE a.account_type IN ('EXPENSE', 'INCOME')
-      GROUP BY s.account_guid, ${sqlYear("t.post_date")}, ${sqlMonthNum("t.post_date")}`
+      GROUP BY s.account_guid, ${sqlYear("t.post_date", ctx.dialect)}, ${sqlMonthNum("t.post_date", ctx.dialect)}`
     )
     .all() as { account_guid: string; commodity_guid: string; month_num: string; year: string; actual: number }[];
 

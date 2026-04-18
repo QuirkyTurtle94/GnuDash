@@ -41,8 +41,8 @@ export function computeCashFlowBudgetData(ctx: ParseContext): CashFlowBudgetData
     .prepare(
       `SELECT
         cp.account_guid AS counterpart_guid,
-        ${sqlMonthNum("t.post_date")} AS month_num,
-        ${sqlYear("t.post_date")} AS year,
+        ${sqlMonthNum("t.post_date", ctx.dialect)} AS month_num,
+        ${sqlYear("t.post_date", ctx.dialect)} AS year,
         SUM(-CAST(cp.value_num AS REAL) / cp.value_denom) AS cash_amount
       FROM splits cs
       JOIN accounts ca ON cs.account_guid = ca.guid
@@ -51,7 +51,7 @@ export function computeCashFlowBudgetData(ctx: ParseContext): CashFlowBudgetData
       JOIN accounts cpa ON cp.account_guid = cpa.guid
       WHERE ca.account_type IN ('BANK', 'CASH')
         AND cpa.account_type != 'EQUITY'
-      GROUP BY cp.account_guid, ${sqlYear("t.post_date")}, ${sqlMonthNum("t.post_date")}`
+      GROUP BY cp.account_guid, ${sqlYear("t.post_date", ctx.dialect)}, ${sqlMonthNum("t.post_date", ctx.dialect)}`
     )
     .all() as { counterpart_guid: string; month_num: string; year: string; cash_amount: number }[];
 

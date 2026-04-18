@@ -43,7 +43,7 @@ export function computeExpenseBreakdown(
       `SELECT
         s.account_guid,
         a.commodity_guid,
-        ${sqlMonth("t.post_date")} AS month,
+        ${sqlMonth("t.post_date", ctx.dialect)} AS month,
         SUM(CAST(s.quantity_num AS REAL) / s.quantity_denom) AS total
       FROM splits s
       JOIN accounts a ON s.account_guid = a.guid
@@ -51,7 +51,7 @@ export function computeExpenseBreakdown(
       ${closingJoin}
       WHERE a.account_type = 'EXPENSE'
       ${closingWhere}
-      GROUP BY s.account_guid, ${sqlMonth("t.post_date")}
+      GROUP BY s.account_guid, ${sqlMonth("t.post_date", ctx.dialect)}
       ORDER BY month`
     )
     .all() as { account_guid: string; commodity_guid: string; month: string; total: number }[];

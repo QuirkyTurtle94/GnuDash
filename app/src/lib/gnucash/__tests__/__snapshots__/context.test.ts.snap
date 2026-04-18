@@ -594,6 +594,7 @@ exports[`buildParseContext > snapshot: full context shape (excluding db) 1`] = `
       "namespace": "LSE",
     },
   },
+  "dialect": "sqlite",
   "latestPriceInfo": Map {
     "00000003000000030000000300000003" => {
       "currencyGuid": "00000001000000010000000100000001",

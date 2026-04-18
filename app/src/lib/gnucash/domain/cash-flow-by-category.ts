@@ -48,7 +48,7 @@ export function computeCashFlowByCategory(
         ca.commodity_guid AS cs_commodity_guid,
         cp.account_guid AS cp_account_guid,
         CAST(cp.value_num AS REAL) / cp.value_denom AS cp_value,
-        ${sqlMonth("t.post_date")} AS month
+        ${sqlMonth("t.post_date", ctx.dialect)} AS month
       FROM splits cs
       JOIN accounts ca ON cs.account_guid = ca.guid
       JOIN transactions t ON cs.tx_guid = t.guid

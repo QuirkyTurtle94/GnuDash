@@ -21,7 +21,7 @@ export function computeCashFlowSeries(ctx: ParseContext, excludeClosing = false)
   const rows = db
     .prepare(
       `SELECT
-        ${sqlMonth("t.post_date")} AS month,
+        ${sqlMonth("t.post_date", ctx.dialect)} AS month,
         a.account_type,
         a.commodity_guid,
         SUM(CAST(s.quantity_num AS REAL) / s.quantity_denom) AS total
@@ -31,7 +31,7 @@ export function computeCashFlowSeries(ctx: ParseContext, excludeClosing = false)
       ${closingJoin}
       WHERE a.account_type IN ('INCOME', 'EXPENSE')
       ${closingWhere}
-      GROUP BY ${sqlMonth("t.post_date")}, a.account_type, a.commodity_guid
+      GROUP BY ${sqlMonth("t.post_date", ctx.dialect)}, a.account_type, a.commodity_guid
       ORDER BY month`
     )
     .all() as { month: string; account_type: string; commodity_guid: string; total: number }[];

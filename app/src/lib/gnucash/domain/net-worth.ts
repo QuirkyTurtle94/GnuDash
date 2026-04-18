@@ -19,7 +19,7 @@ export function computeNetWorthSeries(ctx: ParseContext): MonthlyNetWorth[] {
   const nonInvRows = db
     .prepare(
       `SELECT
-        ${sqlMonth("t.post_date")} AS month,
+        ${sqlMonth("t.post_date", ctx.dialect)} AS month,
         a.commodity_guid,
         SUM(CASE WHEN a.account_type IN ('ASSET','BANK','CASH','RECEIVABLE')
             THEN CAST(s.quantity_num AS REAL) / s.quantity_denom ELSE 0 END) AS asset_change,
@@ -30,7 +30,7 @@ export function computeNetWorthSeries(ctx: ParseContext): MonthlyNetWorth[] {
       JOIN transactions t ON s.tx_guid = t.guid
       WHERE a.account_type IN ('ASSET','BANK','CASH','RECEIVABLE','LIABILITY','CREDIT','PAYABLE')
         AND a.placeholder = 0
-      GROUP BY ${sqlMonth("t.post_date")}, a.commodity_guid
+      GROUP BY ${sqlMonth("t.post_date", ctx.dialect)}, a.commodity_guid
       ORDER BY month`
     )
     .all() as { month: string; commodity_guid: string; asset_change: number; liability_change: number }[];
@@ -58,13 +58,13 @@ export function computeNetWorthSeries(ctx: ParseContext): MonthlyNetWorth[] {
     .prepare(
       `SELECT
         s.account_guid,
-        ${sqlMonth("t.post_date")} AS month,
+        ${sqlMonth("t.post_date", ctx.dialect)} AS month,
         SUM(CAST(s.quantity_num AS REAL) / s.quantity_denom) AS shares_change
       FROM splits s
       JOIN accounts a ON s.account_guid = a.guid
       JOIN transactions t ON s.tx_guid = t.guid
       WHERE a.account_type IN ('STOCK', 'MUTUAL')
-      GROUP BY s.account_guid, ${sqlMonth("t.post_date")}
+      GROUP BY s.account_guid, ${sqlMonth("t.post_date", ctx.dialect)}
       ORDER BY month`
     )
     .all() as { account_guid: string; month: string; shares_change: number }[];

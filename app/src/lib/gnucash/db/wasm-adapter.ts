@@ -16,6 +16,7 @@ function coerceBigInts(obj: Record<string, unknown>): Record<string, unknown> {
 
 export function createWasmAdapter(db: WasmDatabase): DbAdapter {
   return {
+    dialect: "sqlite",
     prepare(sql: string): PreparedQuery {
       return {
         all(...params: unknown[]): unknown[] {
