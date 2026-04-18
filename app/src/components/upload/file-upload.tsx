@@ -12,6 +12,14 @@ import { LocalUploadPanel } from "./local-upload-panel";
 import { ServerConnectPanel } from "./server-connect-panel";
 
 const TAB_PREF_KEY = "gnudash-upload-backend";
+/**
+ * When DashboardContext decides the last session was on Postgres, it keeps
+ * this session-storage marker in place so the upload screen can auto-select
+ * the Server tab — distinct from the localStorage tab preference because
+ * we want "was on PG last time" to beat a stale localStorage value from
+ * before the user ever touched Server.
+ */
+const BACKEND_KEY = "gnucash-dashboard-backend";
 type TabId = "local" | "server";
 const DEFAULT_TAB: TabId = "local";
 
@@ -35,13 +43,22 @@ export function FileUpload() {
   // useSyncExternalStore, which is overkill for a single tab preference.
   useEffect(() => {
     try {
+      // Session-level backend marker wins: a user returning after a failed
+      // Postgres auto-reconnect should land on the Server tab even if they'd
+      // previously picked Local. The marker is only set after a successful
+      // open/import, so a first-time visitor sees their localStorage pref.
+      const sessionBackend = sessionStorage.getItem(BACKEND_KEY);
+      if (sessionBackend === "postgres") {
+        // eslint-disable-next-line react-hooks/set-state-in-effect
+        setTab("server");
+        return;
+      }
       const saved = localStorage.getItem(TAB_PREF_KEY);
       if (saved === "local" || saved === "server") {
-        // eslint-disable-next-line react-hooks/set-state-in-effect
         setTab(saved);
       }
     } catch {
-      // localStorage unavailable (Safari private mode etc.) — ignore.
+      // localStorage / sessionStorage unavailable — stay on DEFAULT_TAB.
     }
   }, []);
 

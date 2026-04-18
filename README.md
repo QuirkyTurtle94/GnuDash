@@ -25,6 +25,12 @@ GnuDash is a fully client-side application. There is no server interaction with 
 
 To clear your data, use the dashboard's clear/reset option or clear your browser's site data.
 
+### Optional: self-hosted Server backend
+
+If you want the same book accessible from every device you use — phone, laptop, work machine — you can self-host GnuDash against your own Postgres database instead of relying on the per-browser OPFS cache. Pick **Server (Postgres)** on the upload screen, point it at your database, and GnuDash mirrors the book into a dedicated schema there. Writes round-trip to Postgres before the UI shows the "saved" state; reads hit a local SQLite WASM cache so the dashboard stays fast.
+
+This mode requires the standalone Node.js build (the public pages deployment is still fully static) and is fully documented in the [Deployment Guide](docs/deployment.md).
+
 ## Features
 
 ### Dashboard & Reports
@@ -45,6 +51,7 @@ To clear your data, use the dashboard's clear/reset option or clear your browser
 - **Accounting Engine** — Rational arithmetic (no floating point), multi-currency, GNUCash-compatible writes
 - **SQLite & XML** — Supports both GNUCash file formats (including gzip-compressed); XML files open as read-only
 - **OPFS Persistence** — Your database is stored in your browser's Origin Private File System, so it persists across sessions without re-uploading
+- **Self-hosted Postgres backend** — Optional alternative storage for cross-device access: every write is cache-and-synced to a Postgres schema you control, with auto-reconnect on app load. See the [Deployment Guide](docs/deployment.md).
 - **Multi-Currency** — Switch display currency across all views when your file contains multiple currencies
 - **Closing Transactions** — Toggle to exclude period-end closing entries from reports
 - **Export** — Download your modified `.gnucash` file for use in GNUCash desktop
