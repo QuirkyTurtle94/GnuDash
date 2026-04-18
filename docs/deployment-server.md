@@ -78,12 +78,20 @@ psql "postgres://gnudash_migrator:<migrator-pw>@<host>/gnudash?sslmode=require" 
   -f app/db/migrations/0001_gnucash_schema.sql
 ```
 
-Finally, grant the app role day-to-day access to the book schema:
+Finally, grant the app role day-to-day access to the book schema. **Run these as `gnudash_migrator` after applying the migration — `ON ALL TABLES` only covers tables that exist at grant time, so ordering matters:**
 
 ```sql
 GRANT USAGE ON SCHEMA gnudash_book TO gnudash_app;
 GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA gnudash_book TO gnudash_app;
 GRANT USAGE ON ALL SEQUENCES IN SCHEMA gnudash_book TO gnudash_app;
+
+-- Default privileges so any tables added by future migrations
+-- automatically inherit the grants — prevents "permission denied" errors
+-- the next time the schema grows.
+ALTER DEFAULT PRIVILEGES IN SCHEMA gnudash_book
+  GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO gnudash_app;
+ALTER DEFAULT PRIVILEGES IN SCHEMA gnudash_book
+  GRANT USAGE ON SEQUENCES TO gnudash_app;
 ```
 
 The app never runs as `gnudash_migrator`. If it tries to `CREATE TABLE` or `DROP`, it will fail by design.
