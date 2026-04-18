@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useRef } from "react";
 import { Card, CardContent } from "@/components/ui/card";
-import { formatCurrency } from "@/lib/format";
+import { formatAmount } from "@/lib/format";
 import { useDashboard } from "@/lib/dashboard-context";
 import type { AccountNode } from "@/lib/types/gnucash";
 import { ChevronDown, ChevronRight, Plus, Pencil, Trash2, X, List } from "lucide-react";
@@ -414,7 +414,7 @@ function AccountRow({
             const displayCurrency = account.nativeCurrencyMnemonic;
             return (
               <span className={displayBalance < 0 ? "text-[#E87C6B]" : "text-[#1A1D1F]"}>
-                {displayBalance < 0 ? "−" : ""}{formatCurrency(Math.abs(displayBalance), displayCurrency)}
+                {displayBalance < 0 ? "−" : ""}{formatAmount(Math.abs(displayBalance), displayCurrency)}
               </span>
             );
           })()}
