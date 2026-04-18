@@ -72,10 +72,18 @@ export class ApiBookClient implements BookClient {
   }
 
   async restoreSession(_writable = false): Promise<boolean> {
-    // The dashboard will decide whether a book exists by probing a query.
+    // Use the dedicated `books`-table probe rather than running a full
+    // domain query: on an empty schema the query path throws (no root
+    // account) which would surface as a server-side 500. The exists
+    // endpoint returns true/false cleanly either way.
     try {
-      await query("computeCurrentNetWorth");
-      return true;
+      const res = await fetch("/api/book/exists", {
+        method: "GET",
+        credentials: "same-origin",
+      });
+      if (!res.ok) return false;
+      const body = (await res.json()) as { exists: boolean };
+      return Boolean(body.exists);
     } catch {
       return false;
     }

@@ -15,6 +15,10 @@ import "server-only";
  * inside the same transaction as the insert so a mid-import failure rolls
  * back cleanly — no half-overwritten state.
  */
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
+import crypto from "node:crypto";
 import Database from "better-sqlite3";
 import type { WritableDbAdapter } from "../../gnucash/engine/db/writable-adapter";
 import { withBookClient } from "../../gnucash/engine/db/pg/with-book-client";
@@ -40,11 +44,20 @@ export interface ImportResult {
 }
 
 /**
- * Decode the uploaded buffer into an in-memory better-sqlite3 connection.
- * Only accepts binary SQLite format for now; gzipped/XML support follows
- * the client-side path in `worker/client.ts` and can be added later.
+ * Decode the uploaded buffer into a better-sqlite3 connection.
+ *
+ * better-sqlite3 opens databases from file paths rather than from
+ * in-memory buffers, so we persist the upload to a tmp file and open
+ * that read-only. The returned `cleanup` must be called on every exit
+ * path (success or error) — it closes the handle and deletes the file.
+ *
+ * Container deploys run with a read-only root filesystem and a writable
+ * tmpfs mount on `/tmp` (see Dockerfile.server), so this path is fine
+ * in production without loosening the fs posture.
  */
-function openSqliteFromBuffer(buffer: ArrayBuffer): Database.Database {
+function openSqliteFromBuffer(
+  buffer: ArrayBuffer
+): { db: Database.Database; cleanup: () => void } {
   const bytes = new Uint8Array(buffer);
   if (
     bytes.length < 4 ||
@@ -58,14 +71,25 @@ function openSqliteFromBuffer(buffer: ArrayBuffer): Database.Database {
         "Re-save in GnuCash desktop via File → Save As with format 'sqlite3'."
     );
   }
-  // better-sqlite3 accepts a Buffer for in-memory open via the 'buffer' mode
-  // is not native; the canonical path is to write to a temp path. For now
-  // write to memory by opening `:memory:` then restoring the serialized
-  // bytes — better-sqlite3 ≥ 11 exposes db.deserialize().
-  const db = new Database(":memory:");
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  (db as any).deserialize(Buffer.from(bytes));
-  return db;
+  const tempPath = path.join(
+    os.tmpdir(),
+    `gnudash-import-${crypto.randomBytes(16).toString("hex")}.db`
+  );
+  fs.writeFileSync(tempPath, Buffer.from(bytes), { mode: 0o600 });
+  const db = new Database(tempPath, { readonly: true });
+  const cleanup = () => {
+    try {
+      db.close();
+    } catch {
+      // already closed
+    }
+    try {
+      fs.unlinkSync(tempPath);
+    } catch {
+      // already gone
+    }
+  };
+  return { db, cleanup };
 }
 
 /**
@@ -128,7 +152,7 @@ export async function importGnucashFile(
   options: ImportOptions = {}
 ): Promise<ImportResult> {
   const schema = options.schema ?? PHASE_1_SCHEMA;
-  const sqlite = openSqliteFromBuffer(buffer);
+  const { db: sqlite, cleanup } = openSqliteFromBuffer(buffer);
   try {
     return await withBookClient(schema, async (pg) => {
       if (await targetHasData(pg)) {
@@ -168,6 +192,6 @@ export async function importGnucashFile(
       });
     });
   } finally {
-    sqlite.close();
+    cleanup();
   }
 }
