@@ -11,7 +11,7 @@ import type {
   BudgetPeriodType,
   RawBudgetCell,
 } from "@/lib/types/gnucash";
-import { ArrowLeft, AlertTriangle, Save, Target, Trash2 } from "lucide-react";
+import { ArrowLeft, AlertTriangle, ChevronDown, ChevronRight, Save, Target, Trash2 } from "lucide-react";
 
 /**
  * Inline budget editor: set any budget amount for any EXPENSE or INCOME
@@ -81,16 +81,39 @@ function buildPeriodLabels(budget: BudgetInfo): string[] {
   return labels;
 }
 
+interface FlatRow {
+  node: AccountNode;
+  depth: number;
+  isIncomeSection: boolean;
+  /** True if the account has at least one EXPENSE/INCOME child in the tree. */
+  hasBudgetableChildren: boolean;
+}
+
+
 /**
  * Flatten an account tree into a depth-indexed list, keeping only EXPENSE
  * and INCOME subtrees (matching the read-side filter in `computeBudgetData`).
  * Placeholders are included — a GnuCash budget can legally target a
  * placeholder account as a roll-up destination.
+ *
+ * `expandedGuids` controls which parents reveal their children; a parent
+ * whose guid is absent from the set is collapsed and its descendants are
+ * elided from the output. The top-level EXPENSE / INCOME container rows
+ * are always included so the user can see the two sections even when
+ * everything is fully collapsed.
+ */
+/**
+ * `expandedGuids = null` flattens every budgetable account (used when
+ * computing rollups that must see the full tree regardless of the user's
+ * collapse choices); passing a Set only reveals children of parents whose
+ * guid is in the set.
  */
 function flattenBudgetableAccounts(
   nodes: AccountNode[],
-): { node: AccountNode; depth: number; isIncomeSection: boolean }[] {
-  const out: { node: AccountNode; depth: number; isIncomeSection: boolean }[] = [];
+  expandedGuids: Set<string> | null,
+): FlatRow[] {
+  const out: FlatRow[] = [];
+
   function walk(node: AccountNode, depth: number, isIncomeSection: boolean) {
     if (node.type !== "EXPENSE" && node.type !== "INCOME") {
       // Descend through ROOT / TRADING to find the EXPENSE and INCOME
@@ -98,9 +121,15 @@ function flattenBudgetableAccounts(
       for (const c of node.children) walk(c, depth, c.type === "INCOME");
       return;
     }
-    out.push({ node, depth, isIncomeSection });
+    const hasChildren = node.children.some(
+      (c) => c.type === "EXPENSE" || c.type === "INCOME",
+    );
+    out.push({ node, depth, isIncomeSection, hasBudgetableChildren: hasChildren });
+    if (!hasChildren) return;
+    if (expandedGuids !== null && !expandedGuids.has(node.guid)) return;
     for (const c of node.children) walk(c, depth + 1, isIncomeSection);
   }
+
   for (const n of nodes) walk(n, 0, n.type === "INCOME");
   return out;
 }
@@ -146,6 +175,18 @@ export default function BudgetEditorPage() {
   const [error, setError] = useState<string | null>(null);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [savingMeta, setSavingMeta] = useState(false);
+  // Tracks which parent accounts are currently expanded in the grid.
+  // Default is fully collapsed — the user sees top-level EXPENSE/INCOME
+  // containers with their child rollups, and clicks a chevron to drill in.
+  const [expandedGuids, setExpandedGuids] = useState<Set<string>>(() => new Set());
+  const toggleExpanded = useCallback((guid: string) => {
+    setExpandedGuids((prev) => {
+      const next = new Set(prev);
+      if (next.has(guid)) next.delete(guid);
+      else next.add(guid);
+      return next;
+    });
+  }, []);
 
   const budget = data?.budgetData?.budgets.find((b) => b.guid === budgetGuid);
   const rawCells: RawBudgetCell[] = useMemo(
@@ -162,9 +203,18 @@ export default function BudgetEditorPage() {
     return m;
   }, [rawCells]);
 
-  const flatAccounts = useMemo(
-    () => (data ? flattenBudgetableAccounts(data.accounts) : []),
+  // Every budgetable account, regardless of expansion — used as input to
+  // the rollup computation so that a collapsed parent's placeholder value
+  // doesn't disappear when its children are hidden from the grid.
+  const allBudgetableAccounts = useMemo(
+    () => (data ? flattenBudgetableAccounts(data.accounts, null) : []),
     [data],
+  );
+
+  // The visible subset — applies the user's expand/collapse choices.
+  const flatAccounts = useMemo(
+    () => (data ? flattenBudgetableAccounts(data.accounts, expandedGuids) : []),
+    [data, expandedGuids],
   );
 
   // For each (parent, period), sum the explicit amounts of all descendants.
@@ -172,7 +222,7 @@ export default function BudgetEditorPage() {
   // parent has its own explicit amount that differs from the child sum.
   const rollup = useMemo(() => {
     if (!data) return new Map<string, number>();
-    // Build descendantsOf for every account in the flattened list.
+    // Build descendantsOf for every account in the full budgetable list.
     const byGuid = new Map<string, AccountNode>();
     function collect(n: AccountNode) {
       byGuid.set(n.guid, n);
@@ -196,7 +246,7 @@ export default function BudgetEditorPage() {
 
     const out = new Map<string, number>();
     const numPeriods = budget?.numPeriods ?? 0;
-    for (const { node } of flatAccounts) {
+    for (const { node } of allBudgetableAccounts) {
       const descendants = getDescendants(node.guid);
       if (descendants.length === 0) continue;
       for (let p = 0; p < numPeriods; p++) {
@@ -209,7 +259,7 @@ export default function BudgetEditorPage() {
       }
     }
     return out;
-  }, [data, flatAccounts, amounts, budget?.numPeriods]);
+  }, [data, allBudgetableAccounts, amounts, budget?.numPeriods]);
 
   const periodLabels = useMemo(
     () => (budget ? buildPeriodLabels(budget) : []),
@@ -453,12 +503,15 @@ export default function BudgetEditorPage() {
                 </tr>
               </thead>
               <tbody>
-                {flatAccounts.map(({ node, depth, isIncomeSection }) => (
+                {flatAccounts.map(({ node, depth, isIncomeSection, hasBudgetableChildren }) => (
                   <BudgetRow
                     key={node.guid}
                     node={node}
                     depth={depth}
                     isIncomeSection={isIncomeSection}
+                    hasBudgetableChildren={hasBudgetableChildren}
+                    isExpanded={expandedGuids.has(node.guid)}
+                    onToggleExpanded={toggleExpanded}
                     numPeriods={budget.numPeriods}
                     amounts={amounts}
                     rollup={rollup}
@@ -527,6 +580,9 @@ function BudgetRow({
   node,
   depth,
   isIncomeSection,
+  hasBudgetableChildren,
+  isExpanded,
+  onToggleExpanded,
   numPeriods,
   amounts,
   rollup,
@@ -535,11 +591,18 @@ function BudgetRow({
   node: AccountNode;
   depth: number;
   isIncomeSection: boolean;
+  hasBudgetableChildren: boolean;
+  isExpanded: boolean;
+  onToggleExpanded: (guid: string) => void;
   numPeriods: number;
   amounts: Map<string, { num: number; denom: number }>;
   rollup: Map<string, number>;
   onCommit: (accountGuid: string, periodNum: number, raw: string) => void;
 }) {
+  // `hasChildren` below drives the imbalance badge — uses the generic
+  // AccountNode check (not just budgetable children) because a parent with
+  // a non-EXPENSE child still has a rollup to reconcile against. In
+  // practice the two agree for EXPENSE/INCOME subtrees.
   const hasChildren = node.children.length > 0;
   return (
     <tr className="border-b border-[#F4F4F4] last:border-b-0">
@@ -547,6 +610,22 @@ function BudgetRow({
         className="sticky left-0 z-10 whitespace-nowrap bg-white px-4 py-2"
         style={{ paddingLeft: 16 + depth * 20 }}
       >
+        {hasBudgetableChildren ? (
+          <button
+            onClick={() => onToggleExpanded(node.guid)}
+            className="mr-1 inline-flex h-4 w-4 items-center justify-center rounded text-[#6F767E] hover:bg-[#EFEFEF] hover:text-[#1A1D1F] align-middle"
+            title={isExpanded ? "Collapse" : "Expand"}
+            aria-label={isExpanded ? "Collapse" : "Expand"}
+          >
+            {isExpanded ? (
+              <ChevronDown className="h-3.5 w-3.5" />
+            ) : (
+              <ChevronRight className="h-3.5 w-3.5" />
+            )}
+          </button>
+        ) : (
+          <span className="mr-1 inline-block h-4 w-4 align-middle" />
+        )}
         <span className={`${depth === 0 ? "font-semibold text-[#1A1D1F]" : "text-[#1A1D1F]"}`}>
           {node.name}
         </span>
