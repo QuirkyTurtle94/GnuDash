@@ -62,6 +62,14 @@ interface DashboardContextType {
     connection: PostgresConnectionInfo,
     bookId: string,
   ) => Promise<void>;
+  /**
+   * Replace the currently-open Postgres book with the contents of `file`.
+   * Reuses the connection + bookId captured on the most recent
+   * openPostgresBook / importFileToPostgres call, so the sidebar can drive
+   * the reupload without re-prompting for credentials. Throws if called
+   * while not connected to a Postgres backend.
+   */
+  reuploadPostgresBook: (file: File) => Promise<void>;
   loadDemo: () => Promise<void>;
   clearData: () => void;
   createTransaction: (payload: CreateTransactionPayload) => Promise<void>;
@@ -91,6 +99,10 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
   const [backend, setBackend] = useState<Backend>("local");
   const [postgresBookId, setPostgresBookId] = useState<string | null>(null);
   const clientRef = useRef<GnuCashWorkerClient | null>(null);
+  // Connection used by the currently-open Postgres book. Held in a ref, not
+  // state, so reuploadPostgresBook can see the freshly-set value synchronously
+  // even if React hasn't yet scheduled a re-render after openPostgresBook.
+  const postgresConnectionRef = useRef<PostgresConnectionInfo | null>(null);
 
   function getClient(): GnuCashWorkerClient {
     if (!clientRef.current) {
@@ -266,6 +278,7 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
       setIsWritable(true);
       setBackend("postgres");
       setPostgresBookId(bookId);
+      postgresConnectionRef.current = connection;
       sessionStorage.setItem(UPLOADED_AT_KEY, now.toISOString());
       sessionStorage.setItem(WRITABLE_KEY, "true");
       sessionStorage.setItem(BACKEND_KEY, "postgres");
@@ -340,6 +353,25 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
     }
   }
 
+  /**
+   * Replace the active Postgres book with `file`. The sidebar's Reupload
+   * button calls this after confirming with the user; we reuse the connection
+   * + book id captured on the most recent openPostgresBook, so the user never
+   * has to retype credentials mid-session. The import route drops and
+   * recreates the book schema inside a single transaction (see
+   * fix/pg-import-schema-and-rollback), so a failure leaves the previous
+   * book intact on the server — though the local cache may have been
+   * clobbered by the conversion step, so on failure the UI should prompt a
+   * fresh reconnect rather than claim the old data is still there.
+   */
+  async function reuploadPostgresBook(file: File) {
+    const connection = postgresConnectionRef.current;
+    if (backend !== "postgres" || !connection || !postgresBookId) {
+      throw new Error("Reupload is only available when connected to Postgres");
+    }
+    await importFileToPostgres(file, connection, postgresBookId);
+  }
+
   async function loadDemo() {
     setIsLoading(true);
     setError(null);
@@ -363,6 +395,7 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
     setIsXmlSource(false);
     setBackend("local");
     setPostgresBookId(null);
+    postgresConnectionRef.current = null;
     sessionStorage.removeItem(STORAGE_KEY);
     sessionStorage.removeItem(UPLOADED_AT_KEY);
     sessionStorage.removeItem(WRITABLE_KEY);
@@ -468,7 +501,7 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
 
   return (
     <DashboardContext.Provider
-      value={{ data, isLoading, error, uploadedAt, isWritable, isXmlSource, backend, postgresBookId, toggleWritable, uploadFile, openPostgresBook, importFileToPostgres, loadDemo, clearData, createTransaction, deleteTransaction: deleteTransactionFn, editTransaction, bulkEditTransactions: bulkEditTransactionsFn, createAccount: createAccountFn, updateAccount: updateAccountFn, deleteAccountWithReallocation: deleteAccountWithReallocationFn, createCommodity: createCommodityFn, addPrice: addPriceFn, editPrice: editPriceFn, deletePrice: deletePriceFn, exportFile, setCurrency: setCurrencyFn }}
+      value={{ data, isLoading, error, uploadedAt, isWritable, isXmlSource, backend, postgresBookId, toggleWritable, uploadFile, openPostgresBook, importFileToPostgres, reuploadPostgresBook, loadDemo, clearData, createTransaction, deleteTransaction: deleteTransactionFn, editTransaction, bulkEditTransactions: bulkEditTransactionsFn, createAccount: createAccountFn, updateAccount: updateAccountFn, deleteAccountWithReallocation: deleteAccountWithReallocationFn, createCommodity: createCommodityFn, addPrice: addPriceFn, editPrice: editPriceFn, deletePrice: deletePriceFn, exportFile, setCurrency: setCurrencyFn }}
     >
       {children}
     </DashboardContext.Provider>
