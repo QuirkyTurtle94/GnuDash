@@ -1,10 +1,11 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { AlertTriangle, Loader2, Server, Upload } from "lucide-react";
+import { AlertTriangle, Loader2, Server, Sparkles, Upload } from "lucide-react";
 import { useDashboard } from "@/lib/dashboard-context";
 import type { PostgresConnectionInfo } from "@/lib/gnucash/worker/messages";
 import { loadServerConfig } from "@/lib/storage/server-config";
+import { FreshBookWizard } from "./fresh-book-wizard";
 
 /**
  * Server (Postgres) backend panel of the upload screen.
@@ -69,6 +70,7 @@ export function ServerConnectPanel() {
   const [localError, setLocalError] = useState<string | null>(null);
   const [fileSizeError, setFileSizeError] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
+  const [showWizard, setShowWizard] = useState(false);
 
   // Prefill from OPFS-persisted server-config when the panel mounts so users
   // who land here after a failed auto-reconnect don't have to retype every
@@ -253,6 +255,15 @@ export function ServerConnectPanel() {
   const displayedError = error ?? localError ?? fileSizeError;
   const busy = isLoading || stage.kind === "testing" || stage.kind === "loading";
 
+  if (showWizard) {
+    return (
+      <FreshBookWizard
+        target={{ kind: "postgres", connection, bookId }}
+        onCancel={() => setShowWizard(false)}
+      />
+    );
+  }
+
   return (
     <div>
       <div className="rounded-2xl border border-[#D4DAE0] bg-white p-5">
@@ -411,6 +422,19 @@ export function ServerConnectPanel() {
               </div>
             </div>
           </div>
+          <div className="flex items-center gap-3">
+            <div className="h-px flex-1 bg-[#D4DAE0]" />
+            <span className="text-xs text-[#9A9FA5]">or</span>
+            <div className="h-px flex-1 bg-[#D4DAE0]" />
+          </div>
+          <button
+            onClick={() => setShowWizard(true)}
+            disabled={busy}
+            className="flex w-full items-center justify-center gap-2 rounded-xl border-2 border-[#D4DAE0] bg-white px-4 py-3 text-sm font-medium text-[#6F767E] transition-all hover:border-[#6C9B8B]/50 hover:bg-[#6C9B8B]/5 hover:text-[#6C9B8B] disabled:opacity-50"
+          >
+            <Sparkles className="h-4 w-4" />
+            Start fresh from a template
+          </button>
         </div>
       )}
 

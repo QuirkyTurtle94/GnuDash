@@ -17,7 +17,7 @@ import type {
   BudgetData,
   DashboardData,
 } from "@/lib/types/gnucash";
-import type { WorkerRequest, WorkerResponse, DomainFunction, MutationAction, CreateTransactionPayload, DeleteTransactionPayload, EditTransactionPayload, BulkEditTransactionsPayload, CreateAccountPayload, UpdateAccountPayload, DeleteAccountPayload, CreateCommodityPayload, AddPricePayload, EditPricePayload, DeletePricePayload, CreateBudgetPayload, UpdateBudgetPayload, DeleteBudgetPayload, SetBudgetAmountPayload, ClearBudgetAmountPayload, PostgresConnectionInfo, PostgresDumpPayload } from "./messages";
+import type { WorkerRequest, WorkerResponse, DomainFunction, MutationAction, CreateTransactionPayload, DeleteTransactionPayload, EditTransactionPayload, BulkEditTransactionsPayload, CreateAccountPayload, UpdateAccountPayload, DeleteAccountPayload, CreateCommodityPayload, AddPricePayload, EditPricePayload, DeletePricePayload, CreateBudgetPayload, UpdateBudgetPayload, DeleteBudgetPayload, SetBudgetAmountPayload, ClearBudgetAmountPayload, PostgresConnectionInfo, PostgresDumpPayload, InitEmptyBookPayload } from "./messages";
 import { parseGnuCashXml } from "../xml/parser";
 
 type PendingRequest = {
@@ -258,6 +258,38 @@ export class GnuCashWorkerClient {
       };
 
       this.send({ type: "init-pg-dump-readonly", dump });
+    });
+  }
+
+  /**
+   * Build a brand-new book from a wizard-supplied template — no file upload.
+   * When `persistToOpfs` is true the worker writes the seeded DB to OPFS and
+   * re-opens it from there, matching the post-upload state exactly. For the
+   * Postgres handoff path the caller passes `false` and exports a SQLite
+   * buffer immediately afterwards.
+   */
+  async initEmptyBook(
+    spec: InitEmptyBookPayload,
+    persistToOpfs: boolean,
+  ): Promise<void> {
+    await this.wasmReady;
+
+    return new Promise<void>((resolve, reject) => {
+      const prevHandler = this.worker.onmessage;
+      this.worker.onmessage = (e: MessageEvent<WorkerResponse>) => {
+        const msg = e.data;
+        if (msg.type === "ready") {
+          this.worker.onmessage = prevHandler;
+          resolve();
+        } else if (msg.type === "init-error") {
+          this.worker.onmessage = prevHandler;
+          reject(new Error(msg.message));
+        } else {
+          this.handleMessage(msg);
+        }
+      };
+
+      this.send({ type: "init-empty-book", spec, persistToOpfs });
     });
   }
 

@@ -10,7 +10,7 @@ import {
 } from "react";
 import type { DashboardData } from "@/lib/types/gnucash";
 import { GnuCashWorkerClient } from "@/lib/gnucash/worker/client";
-import type { CreateTransactionPayload, DeleteTransactionPayload, EditTransactionPayload, BulkEditTransactionsPayload, CreateAccountPayload, UpdateAccountPayload, DeleteAccountPayload, CreateCommodityPayload, AddPricePayload, EditPricePayload, DeletePricePayload, CreateBudgetPayload, UpdateBudgetPayload, DeleteBudgetPayload, SetBudgetAmountPayload, ClearBudgetAmountPayload, PostgresConnectionInfo, PostgresDumpPayload } from "@/lib/gnucash/worker/messages";
+import type { CreateTransactionPayload, DeleteTransactionPayload, EditTransactionPayload, BulkEditTransactionsPayload, CreateAccountPayload, UpdateAccountPayload, DeleteAccountPayload, CreateCommodityPayload, AddPricePayload, EditPricePayload, DeletePricePayload, CreateBudgetPayload, UpdateBudgetPayload, DeleteBudgetPayload, SetBudgetAmountPayload, ClearBudgetAmountPayload, PostgresConnectionInfo, PostgresDumpPayload, InitEmptyBookPayload } from "@/lib/gnucash/worker/messages";
 import { generateDemoData } from "@/lib/demo-data";
 import { deleteFromOPFS } from "@/lib/gnucash/worker/opfs";
 import {
@@ -97,6 +97,23 @@ interface DashboardContextType {
     connection: PostgresConnectionInfo,
     schema: string,
   ) => Promise<boolean>;
+  /**
+   * Create a brand-new book from a wizard-chosen template and open it in the
+   * local (OPFS) backend. Mirrors `uploadFile` but skips the .gnucash parse
+   * step — the worker seeds a fresh SQLite DB from the template directly.
+   */
+  createFreshLocalBook: (spec: InitEmptyBookPayload) => Promise<void>;
+  /**
+   * Create a brand-new book from a wizard-chosen template, push it to
+   * Postgres via the existing import pipeline, and then open it. Reuses
+   * `/api/pg/book/import` so the server never learns about templates — it
+   * just sees a SQLite buffer like any other upload.
+   */
+  createFreshPostgresBook: (
+    connection: PostgresConnectionInfo,
+    bookId: string,
+    spec: InitEmptyBookPayload,
+  ) => Promise<void>;
   loadDemo: () => Promise<void>;
   clearData: () => void;
   createTransaction: (payload: CreateTransactionPayload) => Promise<void>;
@@ -517,6 +534,91 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
     }
   }
 
+  /**
+   * Local-backend entry point for the "Start fresh" wizard. Seeds an empty
+   * OPFS book from the chosen template and flips the UI straight into the
+   * loaded-book state — no .gnucash file ever involved.
+   */
+  async function createFreshLocalBook(spec: InitEmptyBookPayload) {
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      const client = getClient();
+      await client.waitForReady();
+      await client.initEmptyBook(spec, true);
+      const dashboardData = await client.getFullDashboardData();
+      const now = new Date();
+      setData(dashboardData);
+      setUploadedAt(now);
+      setIsXmlSource(false);
+      setIsWritable(true);
+      setBackend("local");
+      setPostgresBookId(null);
+      setPostgresSchemaOverride(null);
+      sessionStorage.setItem(UPLOADED_AT_KEY, now.toISOString());
+      sessionStorage.setItem(WRITABLE_KEY, "true");
+      sessionStorage.setItem(BACKEND_KEY, "local");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Fresh book creation failed");
+    } finally {
+      setIsLoading(false);
+    }
+  }
+
+  /**
+   * Postgres-backend entry point for the "Start fresh" wizard.
+   *
+   * The server-side import route is schema-agnostic — it accepts a SQLite
+   * buffer and drops/recreates the target schema from it. So the fresh-book
+   * flow builds the empty book in the worker, exports it, and uploads that
+   * buffer using the exact same code path as `importFileToPostgres`. This
+   * avoids a new API route *and* inherits the transactional rollback
+   * behaviour the existing import already has.
+   */
+  async function createFreshPostgresBook(
+    connection: PostgresConnectionInfo,
+    bookId: string,
+    spec: InitEmptyBookPayload,
+  ) {
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      const client = getClient();
+      await client.waitForReady();
+
+      // Seed the worker's in-memory DB (no OPFS write — Postgres is the
+      // source of truth), then grab the SQLite bytes for upload.
+      await client.initEmptyBook(spec, false);
+      const sqliteBuffer = await client.exportDatabase();
+
+      const form = new FormData();
+      form.append("file", new Blob([sqliteBuffer]), "fresh.gnucash");
+      form.append("connection", JSON.stringify(connection));
+      form.append("bookId", bookId);
+
+      const importRes = await fetch("/api/pg/book/import", {
+        method: "POST",
+        body: form,
+      });
+      if (!importRes.ok) {
+        const body = (await importRes.json().catch(() => ({}))) as {
+          error?: string;
+        };
+        throw new Error(
+          body.error ?? `Import failed: HTTP ${importRes.status}`,
+        );
+      }
+
+      await openPostgresBook(connection, bookId);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Fresh book creation failed");
+    } finally {
+      setIsLoading(false);
+    }
+  }
+
   async function loadDemo() {
     setIsLoading(true);
     setError(null);
@@ -684,7 +786,7 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
 
   return (
     <DashboardContext.Provider
-      value={{ data, isLoading, error, uploadedAt, isWritable, isXmlSource, backend, postgresBookId, postgresSchemaOverride, toggleWritable, uploadFile, openPostgresBook, importFileToPostgres, reuploadPostgresBook, openExistingGnuCashBook, loadDemo, clearData, createTransaction, deleteTransaction: deleteTransactionFn, editTransaction, bulkEditTransactions: bulkEditTransactionsFn, createAccount: createAccountFn, updateAccount: updateAccountFn, deleteAccountWithReallocation: deleteAccountWithReallocationFn, createCommodity: createCommodityFn, addPrice: addPriceFn, editPrice: editPriceFn, deletePrice: deletePriceFn, createBudget: createBudgetFn, updateBudget: updateBudgetFn, deleteBudget: deleteBudgetFn, setBudgetAmount: setBudgetAmountFn, clearBudgetAmount: clearBudgetAmountFn, exportFile, setCurrency: setCurrencyFn }}
+      value={{ data, isLoading, error, uploadedAt, isWritable, isXmlSource, backend, postgresBookId, postgresSchemaOverride, toggleWritable, uploadFile, openPostgresBook, importFileToPostgres, reuploadPostgresBook, openExistingGnuCashBook, createFreshLocalBook, createFreshPostgresBook, loadDemo, clearData, createTransaction, deleteTransaction: deleteTransactionFn, editTransaction, bulkEditTransactions: bulkEditTransactionsFn, createAccount: createAccountFn, updateAccount: updateAccountFn, deleteAccountWithReallocation: deleteAccountWithReallocationFn, createCommodity: createCommodityFn, addPrice: addPriceFn, editPrice: editPriceFn, deletePrice: deletePriceFn, createBudget: createBudgetFn, updateBudget: updateBudgetFn, deleteBudget: deleteBudgetFn, setBudgetAmount: setBudgetAmountFn, clearBudgetAmount: clearBudgetAmountFn, exportFile, setCurrency: setCurrencyFn }}
     >
       {children}
     </DashboardContext.Provider>
