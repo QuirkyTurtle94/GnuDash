@@ -1,26 +1,35 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Loader2, Server, Upload } from "lucide-react";
+import { AlertTriangle, Loader2, Server, Upload } from "lucide-react";
 import { useDashboard } from "@/lib/dashboard-context";
 import type { PostgresConnectionInfo } from "@/lib/gnucash/worker/messages";
 import { loadServerConfig } from "@/lib/storage/server-config";
 
 /**
- * Server (Postgres) backend panel of the upload screen (#48).
+ * Server (Postgres) backend panel of the upload screen.
  *
- * Flow:
- *   1. Form collects host/port/user/password/database + book id.
- *   2. On Connect we POST /api/pg/test-connection to fail fast on bad creds.
- *   3. POST /api/pg/book/status — branch on `exists`.
- *   4. exists=true  → DashboardContext.openPostgresBook fetches the dump.
- *   5. exists=false → render a drag-and-drop step; on file pick,
- *      DashboardContext.importFileToPostgres uploads and then opens the book.
+ * Two modes, selected by the user via a radio at the top:
  *
- * Credentials do not leave the browser except via the API calls above.
- * DashboardContext persists them to OPFS on the first successful open so a
- * future PR can auto-reconnect on app boot.
+ * - **gnudash-managed** (default) — gnudash owns a dedicated schema named
+ *   `book_{bookId}`. Full read-write: every mutation applied locally first
+ *   and round-tripped to Postgres via the sync client. Flow:
+ *     connect form → test-connection → book/status → load-existing *or*
+ *     file-picker-to-import.
+ *
+ * - **existing GnuCash DB** — points gnudash at a schema maintained by
+ *   GnuCash desktop (usually `public`). Opened read-only: writes are
+ *   blocked at the context level, an amber banner is shown, and no sync
+ *   client is created. Flow:
+ *     connect form + schema field → book/status → openExistingGnuCashBook
+ *     (no import step, no file picker — we never write to this schema).
+ *
+ * Credentials never leave the browser except via the API calls above;
+ * DashboardContext persists them to OPFS on success so auto-reconnect works
+ * on next load.
  */
+
+type Mode = "gnudash" | "existing";
 
 type Stage =
   | { kind: "form" }
@@ -38,16 +47,24 @@ const DEFAULT_CONNECTION: PostgresConnectionInfo = {
 };
 
 const DEFAULT_BOOK_ID = "default";
+const DEFAULT_EXISTING_SCHEMA = "public";
 
 const MAX_FILE_SIZE_BYTES = 200 * 1024 * 1024;
 
 export function ServerConnectPanel() {
-  const { openPostgresBook, importFileToPostgres, isLoading, error } =
-    useDashboard();
+  const {
+    openPostgresBook,
+    importFileToPostgres,
+    openExistingGnuCashBook,
+    isLoading,
+    error,
+  } = useDashboard();
 
+  const [mode, setMode] = useState<Mode>("gnudash");
   const [connection, setConnection] =
     useState<PostgresConnectionInfo>(DEFAULT_CONNECTION);
   const [bookId, setBookId] = useState(DEFAULT_BOOK_ID);
+  const [existingSchema, setExistingSchema] = useState(DEFAULT_EXISTING_SCHEMA);
   const [stage, setStage] = useState<Stage>({ kind: "form" });
   const [localError, setLocalError] = useState<string | null>(null);
   const [fileSizeError, setFileSizeError] = useState<string | null>(null);
@@ -55,23 +72,27 @@ export function ServerConnectPanel() {
 
   // Prefill from OPFS-persisted server-config when the panel mounts so users
   // who land here after a failed auto-reconnect don't have to retype every
-  // field. Runs after first paint to keep SSR/CSR output identical (OPFS
-  // isn't accessible on the server).
+  // field. Runs after first paint to keep SSR/CSR output identical.
   useEffect(() => {
     let cancelled = false;
     loadServerConfig()
       .then((saved) => {
         if (cancelled || !saved) return;
-        const { bookId: savedBookId, ...rest } = saved;
         setConnection({
-          host: rest.host,
-          port: rest.port,
-          user: rest.user,
-          password: rest.password,
-          database: rest.database,
-          ssl: rest.ssl ?? false,
+          host: saved.host,
+          port: saved.port,
+          user: saved.user,
+          password: saved.password,
+          database: saved.database,
+          ssl: saved.ssl ?? false,
         });
-        setBookId(savedBookId);
+        if (saved.mode === "existing" && saved.schema) {
+          setMode("existing");
+          setExistingSchema(saved.schema);
+        } else if (saved.bookId) {
+          setMode("gnudash");
+          setBookId(saved.bookId);
+        }
       })
       .catch(() => {
         // No saved config or OPFS unavailable — stay on defaults.
@@ -108,39 +129,62 @@ export function ServerConnectPanel() {
         const body = (await testRes.json().catch(() => ({}))) as {
           error?: string;
         };
-        throw new Error(body.error ?? `Connect failed: HTTP ${testRes.status}`);
+        throw new Error(
+          body.error ?? `Connect failed: HTTP ${testRes.status}`,
+        );
       }
 
-      // 2. Does the book exist already in this DB?
+      // 2. Schema probe. Pass bookId OR schema depending on mode — the
+      //    route handler validates exactly one is supplied.
+      const statusBody =
+        mode === "existing"
+          ? { connection, schema: existingSchema }
+          : { connection, bookId };
       const statusRes = await fetch("/api/pg/book/status", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ connection, bookId }),
+        body: JSON.stringify(statusBody),
       });
       if (!statusRes.ok) {
         const body = (await statusRes.json().catch(() => ({}))) as {
           error?: string;
         };
-        throw new Error(body.error ?? `Status check failed: HTTP ${statusRes.status}`);
+        throw new Error(
+          body.error ?? `Status check failed: HTTP ${statusRes.status}`,
+        );
       }
       const status = (await statusRes.json()) as {
         exists: boolean;
         missingTables?: string[];
       };
 
+      if (mode === "existing") {
+        // Read-only: we never import into someone else's GnuCash schema. If
+        // the target is empty, we surface a clear error instead of offering
+        // to clobber it.
+        if (!status.exists) {
+          throw new Error(
+            `Schema "${existingSchema}" does not exist on this server.`,
+          );
+        }
+        if (status.missingTables && status.missingTables.length > 0) {
+          throw new Error(
+            `Schema "${existingSchema}" exists but is missing required ` +
+              `GnuCash tables: ${status.missingTables.join(", ")}.`,
+          );
+        }
+        await openExistingGnuCashBook(connection, existingSchema);
+        return;
+      }
+
+      // gnudash-managed flow: existing or bootstrap.
       if (
         status.exists &&
         (!status.missingTables || status.missingTables.length === 0)
       ) {
-        // 3a. Existing, fully-provisioned book → load it.
         await openPostgresBook(connection, bookId);
-        // openPostgresBook flips the backend state; this panel unmounts as
-        // the dashboard takes over, so no further local stage update needed.
         return;
       }
-
-      // 3b. Empty database (or an incomplete book) → ask the user to upload
-      //     a .gnucash file to bootstrap the book.
       setStage({
         kind: "needs-import",
         message: status.exists
@@ -151,7 +195,14 @@ export function ServerConnectPanel() {
       setLocalError(err instanceof Error ? err.message : "Connect failed");
       setStage({ kind: "form" });
     }
-  }, [connection, bookId, openPostgresBook]);
+  }, [
+    connection,
+    mode,
+    bookId,
+    existingSchema,
+    openPostgresBook,
+    openExistingGnuCashBook,
+  ]);
 
   const handleFile = useCallback(
     async (file: File) => {
@@ -212,6 +263,35 @@ export function ServerConnectPanel() {
           </span>
         </div>
 
+        {/* Mode selector */}
+        <div className="mb-4 space-y-2">
+          <ModeRadio
+            value="gnudash"
+            label="gnudash-managed database"
+            description="A schema gnudash owns — full read-write, cross-device sync."
+            selected={mode}
+            onSelect={setMode}
+          />
+          <ModeRadio
+            value="existing"
+            label="Existing GnuCash database (read-only)"
+            description="Point at a schema your GnuCash desktop already writes to."
+            selected={mode}
+            onSelect={setMode}
+          />
+        </div>
+
+        {mode === "existing" && (
+          <div className="mb-4 flex items-start gap-2 rounded-xl bg-amber-50 p-3 text-xs text-amber-900">
+            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+            <span>
+              Read-only mode is advised when pointing at a database GnuCash
+              desktop also uses. Close the desktop app before loading to avoid
+              lock / cache conflicts.
+            </span>
+          </div>
+        )}
+
         <div className="grid grid-cols-3 gap-3">
           <div className="col-span-2">
             <FieldLabel>Host</FieldLabel>
@@ -252,12 +332,25 @@ export function ServerConnectPanel() {
             />
           </div>
           <div>
-            <FieldLabel>Book id</FieldLabel>
-            <FieldInput
-              value={bookId}
-              onChange={setBookId}
-              placeholder="default"
-            />
+            {mode === "existing" ? (
+              <>
+                <FieldLabel>Schema</FieldLabel>
+                <FieldInput
+                  value={existingSchema}
+                  onChange={setExistingSchema}
+                  placeholder="public"
+                />
+              </>
+            ) : (
+              <>
+                <FieldLabel>Book id</FieldLabel>
+                <FieldInput
+                  value={bookId}
+                  onChange={setBookId}
+                  placeholder="default"
+                />
+              </>
+            )}
           </div>
         </div>
 
@@ -287,7 +380,7 @@ export function ServerConnectPanel() {
         </button>
       </div>
 
-      {stage.kind === "needs-import" && (
+      {stage.kind === "needs-import" && mode === "gnudash" && (
         <div className="mt-4 space-y-3">
           {stage.message && (
             <div className="rounded-xl bg-[#F4F5F7] p-3 text-xs text-[#6F767E]">
@@ -342,6 +435,48 @@ export function ServerConnectPanel() {
         deployment past localhost.
       </p>
     </div>
+  );
+}
+
+interface ModeRadioProps {
+  value: Mode;
+  label: string;
+  description: string;
+  selected: Mode;
+  onSelect: (v: Mode) => void;
+}
+
+function ModeRadio({
+  value,
+  label,
+  description,
+  selected,
+  onSelect,
+}: ModeRadioProps) {
+  const active = selected === value;
+  return (
+    <label
+      className={`flex cursor-pointer items-start gap-2.5 rounded-xl border p-3 transition-colors ${
+        active
+          ? "border-[#6C9B8B] bg-[#6C9B8B]/5"
+          : "border-[#D4DAE0] hover:border-[#6C9B8B]/50"
+      }`}
+    >
+      <input
+        type="radio"
+        name="server-mode"
+        value={value}
+        checked={active}
+        onChange={() => onSelect(value)}
+        className="mt-0.5 h-3.5 w-3.5 text-[#6C9B8B] accent-[#6C9B8B]"
+      />
+      <div>
+        <span className="block text-sm font-medium text-[#1A1D1F]">{label}</span>
+        <span className="mt-0.5 block text-xs text-[#9A9FA5]">
+          {description}
+        </span>
+      </div>
+    </label>
   );
 }
 

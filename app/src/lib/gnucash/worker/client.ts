@@ -231,6 +231,37 @@ export class GnuCashWorkerClient {
   }
 
   /**
+   * Read-only sibling of `openFromPostgresDump` used by the existing-GnuCash-
+   * DB interop path. Populates the local cache from the dump but wires the
+   * engine to a non-writable adapter, so every mutation path in the UI is
+   * gated off by the existing `isWritable` check and no SQL ever reaches a
+   * schema that doesn't belong to gnudash.
+   */
+  async openFromPostgresDumpReadOnly(
+    dump: PostgresDumpPayload,
+  ): Promise<void> {
+    await this.wasmReady;
+
+    return new Promise<void>((resolve, reject) => {
+      const prevHandler = this.worker.onmessage;
+      this.worker.onmessage = (e: MessageEvent<WorkerResponse>) => {
+        const msg = e.data;
+        if (msg.type === "ready") {
+          this.worker.onmessage = prevHandler;
+          resolve();
+        } else if (msg.type === "init-error") {
+          this.worker.onmessage = prevHandler;
+          reject(new Error(msg.message));
+        } else {
+          this.handleMessage(msg);
+        }
+      };
+
+      this.send({ type: "init-pg-dump-readonly", dump });
+    });
+  }
+
+  /**
    * Try to open a previously persisted DB from OPFS.
    * Returns true if successful, false if no file found.
    */

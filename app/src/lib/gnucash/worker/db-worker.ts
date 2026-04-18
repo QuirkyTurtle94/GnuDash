@@ -309,6 +309,49 @@ function closeDb(): void {
 }
 
 /**
+ * Look up the column names declared by the local SQLite schema for `table`.
+ * Used to filter dump rows on insert — real GnuCash Postgres schemas (the
+ * read-only interop path) carry extra columns like `commodities.quote_flag`
+ * that our SQLite DDL doesn't declare, and passing them through would fail
+ * the INSERT.
+ */
+function getLocalTableColumns(database: WasmDatabase, table: string): Set<string> {
+  const rows = database.selectObjects(`PRAGMA table_info(${table})`);
+  return new Set(rows.map((r) => (r as { name: string }).name));
+}
+
+/**
+ * Populate an open SQLite WASM cache from a Postgres dump payload. Skips
+ * tables that don't exist locally and drops any columns the local DDL
+ * doesn't declare. Used by both the writable (gnudash-managed) and
+ * read-only (existing GnuCash DB) init paths.
+ */
+function insertDumpIntoCache(
+  database: WasmDatabase,
+  dump: PostgresDumpPayload,
+): void {
+  for (const [table, rows] of Object.entries(dump.tables)) {
+    if (rows.length === 0) continue;
+    // `gnudash_meta` is a Postgres-only metadata table — the local cache has
+    // no schema for it and the engine never reads it.
+    if (table === "gnudash_meta") continue;
+
+    const targetColumns = getLocalTableColumns(database, table);
+    if (targetColumns.size === 0) continue; // table not in local DDL
+    const columns = Object.keys(rows[0]).filter((c) => targetColumns.has(c));
+    if (columns.length === 0) continue;
+
+    const placeholders = columns.map(() => "?").join(", ");
+    const sql = `INSERT INTO ${table} (${columns.join(", ")}) VALUES (${placeholders})`;
+    for (const row of rows) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const values = columns.map((c) => row[c]) as any[];
+      database.exec({ sql, bind: values });
+    }
+  }
+}
+
+/**
  * Build an in-memory SQLite WASM cache from a `/api/pg/book/dump` payload and
  * wrap it with a Postgres-backed writable adapter. The local cache uses the
  * engine's existing SQLite DDL (INTEGER / TEXT affinities) — SQLite's type
@@ -332,29 +375,41 @@ function initFromPostgresDump(
   db.exec({ sql: GNUCASH_SCHEMA_DDL });
   db.exec({ sql: EXTRA_ENGINE_TABLES_SQL });
 
-  for (const [table, rows] of Object.entries(dump.tables)) {
-    if (rows.length === 0) continue;
-    // `gnudash_meta` is a Postgres-only metadata table — the local cache has
-    // no schema for it and the engine never reads it.
-    if (table === "gnudash_meta") continue;
-    // Defensive: drop any columns the local SQLite schema does not declare.
-    // In practice the two match, but this keeps us forward-compatible if the
-    // Postgres schema ever gains a column the engine doesn't know about.
-    const columns = Object.keys(rows[0]);
-    const placeholders = columns.map(() => "?").join(", ");
-    const sql = `INSERT INTO ${table} (${columns.join(", ")}) VALUES (${placeholders})`;
-    for (const row of rows) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const values = columns.map((c) => row[c]) as any[];
-      db.exec({ sql, bind: values });
-    }
-  }
+  insertDumpIntoCache(db, dump);
 
   syncClient = new PostgresSyncClient(connection, bookId);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   writableAdapter = createWritablePostgresAdapter(db as any, syncClient);
   validateSchema(writableAdapter);
   ctx = buildParseContext(writableAdapter);
+}
+
+/**
+ * Read-only variant of `initFromPostgresDump` for the existing-GnuCash-DB
+ * interop path (#48 follow-up). Populates the local cache from the dump but
+ * wires the engine to a NON-writable adapter — every mutation helper in the
+ * dashboard context already gates on `isWritable`, so the engine never gets
+ * to emit a statement that could end up against a foreign schema we don't
+ * control.
+ *
+ * No sync client is created; the caller's responsibility for subsequent
+ * reloads is to fetch a fresh dump via the connection stored in OPFS.
+ */
+function initFromPostgresDumpReadOnly(dump: PostgresDumpPayload): void {
+  closeDb();
+  isWritable = false;
+  writableAdapter = null;
+  syncClient = null;
+
+  db = new sqlite3.oo1.DB();
+  db.exec({ sql: GNUCASH_SCHEMA_DDL });
+  db.exec({ sql: EXTRA_ENGINE_TABLES_SQL });
+
+  insertDumpIntoCache(db, dump);
+
+  const adapter = createWasmAdapter(db);
+  validateSchema(adapter);
+  ctx = buildParseContext(adapter);
 }
 
 function getFullDashboardData(): DashboardData {
@@ -810,6 +865,19 @@ self.onmessage = async (e: MessageEvent<WorkerRequest>) => {
           "[db-worker] DB restored from Postgres dump",
           `book=${msg.bookId}`,
           "(read-write, syncing)",
+        );
+        post({ type: "ready" });
+      } catch (err) {
+        post({ type: "init-error", message: (err as Error).message });
+      }
+      break;
+    }
+
+    case "init-pg-dump-readonly": {
+      try {
+        initFromPostgresDumpReadOnly(msg.dump);
+        console.log(
+          "[db-worker] DB restored from Postgres dump (read-only interop)",
         );
         post({ type: "ready" });
       } catch (err) {

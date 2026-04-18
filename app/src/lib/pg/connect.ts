@@ -16,6 +16,44 @@
 import { Client } from "pg";
 import { bookSchemaName } from "../gnucash/db/postgres-schema";
 
+/**
+ * Validate a raw Postgres schema name supplied by the user for the
+ * existing-GnuCash-DB interop path. Mirrors `sanitizeBookId`'s strictness —
+ * the value is interpolated into unquoted SQL (`SET search_path TO ...`) so
+ * anything that could break out of an identifier is rejected. Allows the
+ * typical GnuCash defaults like `public`.
+ */
+const SCHEMA_NAME_PATTERN = /^[a-z_][a-z0-9_]{0,62}$/;
+
+export function sanitizeSchemaName(name: string): string {
+  if (typeof name !== "string" || !SCHEMA_NAME_PATTERN.test(name)) {
+    throw new Error(
+      `Invalid schema name ${JSON.stringify(name)}: must match /^[a-z_][a-z0-9_]{0,62}$/`,
+    );
+  }
+  return name;
+}
+
+/**
+ * Resolve the Postgres schema name for a request that carries either a
+ * gnudash-managed `bookId` (mapped through `book_` prefix + sanitisation)
+ * or a raw `schema` for the existing-GnuCash-DB read-only interop path.
+ * Exactly one of the two must be present — the route's body validator
+ * enforces that before calling in.
+ */
+export function resolveSchemaName(args: {
+  bookId?: string;
+  schema?: string;
+}): string {
+  if (args.schema !== undefined) {
+    return sanitizeSchemaName(args.schema);
+  }
+  if (args.bookId !== undefined) {
+    return bookSchemaName(args.bookId);
+  }
+  throw new Error("resolveSchemaName: neither bookId nor schema supplied");
+}
+
 /** Connection parameters sent from the browser. */
 export interface PgConnection {
   host: string;
@@ -80,6 +118,24 @@ export async function withBookClient<T>(
 
   return withClient(connection, async (client) => {
     await client.query(`SET search_path TO ${schema}`);
+    return fn(client);
+  });
+}
+
+/**
+ * Same shape as `withBookClient` but pins `search_path` to a caller-supplied
+ * schema name. Used by the existing-GnuCash-DB read-only path where the
+ * user picks the schema directly instead of using gnudash's `book_` prefix.
+ */
+export async function withSchemaClient<T>(
+  connection: PgConnection,
+  schema: string,
+  fn: (client: Client) => Promise<T>,
+): Promise<T> {
+  const sanitized = sanitizeSchemaName(schema);
+
+  return withClient(connection, async (client) => {
+    await client.query(`SET search_path TO ${sanitized}`);
     return fn(client);
   });
 }
