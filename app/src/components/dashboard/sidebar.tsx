@@ -13,6 +13,7 @@ import {
   Wand2,
 } from "lucide-react";
 import { useDashboard } from "@/lib/dashboard-context";
+import { ReuploadButton } from "@/components/upload/reupload-button";
 
 const mainNav = [
   { icon: Home, label: "Dashboard", href: "/" },
@@ -30,7 +31,7 @@ interface SidebarProps {
 }
 
 export function Sidebar({ onNavigate, expanded }: SidebarProps) {
-  const { clearData, uploadedAt, exportFile } = useDashboard();
+  const { clearData, uploadedAt, exportFile, backend } = useDashboard();
   const pathname = usePathname();
 
   return (
@@ -82,7 +83,7 @@ export function Sidebar({ onNavigate, expanded }: SidebarProps) {
         </div>
       </div>
 
-      {/* Bottom: Export + Upload new file */}
+      {/* Bottom: Export + Reupload (PG only) + Upload new file */}
       <div className={`mt-auto border-t border-border ${expanded ? "p-5" : "p-2"}`}>
         <button
           onClick={exportFile}
@@ -96,9 +97,10 @@ export function Sidebar({ onNavigate, expanded }: SidebarProps) {
           <Download className="h-[18px] w-[18px] shrink-0 text-muted-foreground/70" />
           {expanded && "Export .gnucash file"}
         </button>
+        {backend === "postgres" && <ReuploadButton expanded={expanded} />}
         <button
           onClick={clearData}
-          title="Upload new file"
+          title={backend === "postgres" ? "Disconnect" : "Upload new file"}
           className={`flex items-center rounded-[10px] text-sm text-muted-foreground transition-colors hover:bg-muted whitespace-nowrap ${
             expanded
               ? "w-full gap-2.5 px-3 py-2"
@@ -106,7 +108,7 @@ export function Sidebar({ onNavigate, expanded }: SidebarProps) {
           }`}
         >
           <LogOut className="h-[18px] w-[18px] shrink-0 text-muted-foreground/70" />
-          {expanded && "Upload new file"}
+          {expanded && (backend === "postgres" ? "Disconnect" : "Upload new file")}
         </button>
         {expanded && uploadedAt && (
           <p className="mt-1.5 px-3 text-xs text-muted-foreground/70">
