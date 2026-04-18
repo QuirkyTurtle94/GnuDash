@@ -1,0 +1,76 @@
+# Full-stack local test of the production container shape.
+#
+# Builds the Dockerfile.server image and runs it against a dev Postgres
+# using the same bootstrap as docker-compose.dev.yml. Use this before
+# opening a PR to smoke-test the image itself — not for day-to-day dev
+# (rebuild-per-change is slow; use docker-compose.dev.yml + native npm run
+# dev for that).
+#
+# Usage:
+#   cd docker
+#   cp .env.prod.example .env.prod                     # once
+#   docker compose -f docker-compose.prod.yml --env-file .env.prod up --build
+#
+# After up:
+#   App on http://localhost:3000
+#   Postgres on localhost:5432 (internal name: postgres)
+#   Adminer on http://localhost:8080
+#
+# Login with the passphrase that corresponds to APP_PASSPHRASE_HASH in
+# .env.prod. Generate one with:
+#   node -e 'require("@node-rs/argon2").hash("your-pass").then(console.log)'
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: gnudash_migrator
+      POSTGRES_PASSWORD: testpass
+      POSTGRES_DB: gnudash
+    volumes:
+      - gnudash-prod-pg-data:/var/lib/postgresql/data
+      - ./dev-init/01-roles.sql:/docker-entrypoint-initdb.d/01-roles.sql:ro
+      - ../app/db/migrations/0001_gnucash_schema.sql:/docker-entrypoint-initdb.d/02-schema.sql:ro
+      - ./dev-init/03-grants.sql:/docker-entrypoint-initdb.d/03-grants.sql:ro
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "gnudash_migrator", "-d", "gnudash"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  gnudash:
+    build:
+      context: ..
+      dockerfile: Dockerfile.server
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "3000:3000"
+    environment:
+      # NOTE: NODE_ENV stays "development" here on purpose — production mode
+      # refuses a DATABASE_URL without sslmode=require, and this compose runs
+      # over the internal Docker network without TLS. The prod walkthrough in
+      # docs/deployment-server.md covers the TLS posture for a real deploy.
+      NODE_ENV: development
+      DATABASE_URL: postgres://gnudash_app:testapppass@postgres:5432/gnudash
+      SESSION_SECRET: ${SESSION_SECRET}
+      APP_PASSPHRASE_HASH: ${APP_PASSPHRASE_HASH}
+      APP_ORIGIN: http://localhost:3000
+      TRUSTED_PROXY_HOPS: "0"
+
+  adminer:
+    image: adminer:4
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "8080:8080"
+    environment:
+      ADMINER_DEFAULT_SERVER: postgres
+
+volumes:
+  gnudash-prod-pg-data:

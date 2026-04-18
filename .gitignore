@@ -73,3 +73,7 @@ gnucash-source/
 *.tsbuildinfo
 next-env.d.ts
 plan/
+
+# Never commit local secrets
+docker/.env.prod
+

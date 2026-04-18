@@ -1,0 +1,67 @@
+# Local dev environment for GnuDash server-mode work.
+#
+# Starts Postgres preloaded with the two GnuDash roles, the full schema
+# migration, and matching grants. Adminer is included for browsing the DB
+# in a browser.
+#
+# The app itself stays OUT of this compose — run it natively with
+# `npm run dev` from app/ so you get hot reload. The full-stack "like prod"
+# shape lives in docker-compose.prod.yml.
+#
+# Usage:
+#   cd docker
+#   docker compose -f docker-compose.dev.yml up -d       # start
+#   docker compose -f docker-compose.dev.yml down        # stop, keep data
+#   docker compose -f docker-compose.dev.yml down -v     # stop, wipe data
+#
+# Adminer: http://localhost:8080
+#   System: PostgreSQL
+#   Server: postgres
+#   Username: gnudash_migrator   (or gnudash_app)
+#   Password: testpass           (or testapppass)
+#   Database: gnudash
+#
+# App connects with:
+#   DATABASE_URL='postgres://gnudash_app:testapppass@localhost:5432/gnudash'
+#
+# Defaults are hardcoded in the init scripts for dev. NEVER use these in
+# production — regenerate passwords and hashes there.
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: gnudash-dev-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: gnudash_migrator
+      POSTGRES_PASSWORD: testpass
+      POSTGRES_DB: gnudash
+    ports:
+      - "5432:5432"
+    volumes:
+      - gnudash-pg-data:/var/lib/postgresql/data
+      # Init scripts — run once on first container start, alphabetical order.
+      # Numbered so the order is obvious: roles, then schema, then grants.
+      - ./dev-init/01-roles.sql:/docker-entrypoint-initdb.d/01-roles.sql:ro
+      - ../app/db/migrations/0001_gnucash_schema.sql:/docker-entrypoint-initdb.d/02-schema.sql:ro
+      - ./dev-init/03-grants.sql:/docker-entrypoint-initdb.d/03-grants.sql:ro
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "gnudash_migrator", "-d", "gnudash"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  adminer:
+    image: adminer:4
+    container_name: gnudash-dev-adminer
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "8080:8080"
+    environment:
+      ADMINER_DEFAULT_SERVER: postgres
+
+volumes:
+  gnudash-pg-data:
