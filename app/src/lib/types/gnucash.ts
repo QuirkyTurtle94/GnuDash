@@ -26,7 +26,7 @@ export interface GnuCashTransaction {
   currency_guid: string;
   /** Check number or reference string */
   num: string;
-  /** Date the transaction was posted, in GNUCash format (YYYYMMDDHHMMSS or YYYY-MM-DD HH:MM:SS) */
+  /** Date the transaction was posted, in compact GNUCash format (YYYYMMDDHHmmss) */
   post_date: string;
   /** Date the transaction was entered into the system */
   enter_date: string;

@@ -6,13 +6,13 @@ exports[`getUpcomingBills > snapshot 1`] = `
     "amount": null,
     "enabled": true,
     "name": "Internet",
-    "nextDate": "2025-03-15",
+    "nextDate": "20250315000000",
   },
   {
     "amount": null,
     "enabled": true,
     "name": "Rent",
-    "nextDate": "2025-03-31",
+    "nextDate": "20250401000000",
   },
 ]
 `;

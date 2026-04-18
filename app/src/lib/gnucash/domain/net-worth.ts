@@ -92,7 +92,7 @@ export function computeNetWorthSeries(ctx: ParseContext): MonthlyNetWorth[] {
 
   const pricesByMonth = new Map<string, Map<string, { price: number; currencyGuid: string }>>();
   for (const p of allPrices) {
-    const pMonth = p.date.substring(0, 7);
+    const pMonth = `${p.date.substring(0, 4)}-${p.date.substring(4, 6)}`;
     if (!pricesByMonth.has(p.commodity_guid)) pricesByMonth.set(p.commodity_guid, new Map());
     pricesByMonth.get(p.commodity_guid)!.set(pMonth, { price: p.price, currencyGuid: p.currency_guid });
   }

@@ -142,7 +142,7 @@ describe("transaction-ops", () => {
       updateTransaction(db, txGuid, { postDate: new Date(2025, 5, 1) });
 
       const tx = db.prepare(`SELECT post_date FROM transactions WHERE guid = ?`).get(txGuid) as { post_date: string };
-      expect(tx.post_date).toContain("2025-06-01");
+      expect(tx.post_date).toContain("20250601");
     });
 
     it("updates num", () => {

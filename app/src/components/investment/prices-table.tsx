@@ -4,6 +4,7 @@ import { useState, useMemo } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { formatCurrency, formatAmount } from "@/lib/format";
 import { useDashboard } from "@/lib/dashboard-context";
+import { parseGnuCashDate } from "@/lib/gnucash/shared/dates";
 import type { GnuCashPrice, CommodityInfo } from "@/lib/types/gnucash";
 import { Plus, Pencil, Trash2, AlertTriangle } from "lucide-react";
 
@@ -46,7 +47,7 @@ function getSourceBadge(
 }
 
 function formatPriceDate(dateStr: string): string {
-  const d = new Date(dateStr);
+  const d = parseGnuCashDate(dateStr);
   if (isNaN(d.getTime())) return dateStr;
   return d.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
 }
@@ -351,8 +352,9 @@ function PriceDialog({
   const [currencyGuid, setCurrencyGuid] = useState(editingPrice?.currency_guid ?? (currencyComms.find((c) => c.mnemonic === currency)?.guid ?? ""));
   const [date, setDate] = useState(() => {
     if (editingPrice?.date) {
-      const d = new Date(editingPrice.date);
-      return isNaN(d.getTime()) ? new Date().toISOString().slice(0, 10) : d.toISOString().slice(0, 10);
+      const d = parseGnuCashDate(editingPrice.date);
+      if (isNaN(d.getTime())) return new Date().toISOString().slice(0, 10);
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
     }
     return new Date().toISOString().slice(0, 10);
   });

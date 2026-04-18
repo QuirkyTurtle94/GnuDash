@@ -38,6 +38,30 @@ import type { GnuCashXmlData } from "../xml/types";
 import { GNUCASH_SCHEMA_DDL } from "../xml/schema";
 
 let sqlite3: Sqlite3Static;
+
+const DATE_COLUMNS = [
+  ["transactions", "post_date"],
+  ["transactions", "enter_date"],
+  ["prices", "date"],
+  ["schedxactions", "start_date"],
+  ["schedxactions", "end_date"],
+  ["schedxactions", "last_occur"],
+  ["recurrences", "recurrence_period_start"],
+] as const;
+
+/** Convert any ISO-format dates (YYYY-MM-DD HH:MM:SS) to compact GnuCash format (YYYYMMDDHHmmss). */
+function normaliseDatesToCompact(database: WasmDatabase): void {
+  for (const [table, col] of DATE_COLUMNS) {
+    try {
+      database.exec(
+        `UPDATE ${table} SET ${col} = REPLACE(REPLACE(REPLACE(${col}, '-', ''), ' ', ''), ':', '')
+         WHERE ${col} LIKE '____-__-%'`
+      );
+    } catch {
+      // Table may not exist in older files
+    }
+  }
+}
 let db: WasmDatabase | null = null;
 let ctx: ParseContext | null = null;
 let isWritable = false;
@@ -82,6 +106,8 @@ async function initFromBuffer(buffer: ArrayBuffer, writable: boolean): Promise<v
     }
   }
 
+  normaliseDatesToCompact(db);
+
   if (writable) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     writableAdapter = createWritableWasmAdapter(db as any);
@@ -108,6 +134,7 @@ function initFromOpfs(writable: boolean): void {
 
   // This will throw if the file doesn't exist
   db = new sqlite3.oo1.OpfsDb(OPFS_DB_NAME, writable ? "rw" : "r");
+  normaliseDatesToCompact(db);
 
   if (writable) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
