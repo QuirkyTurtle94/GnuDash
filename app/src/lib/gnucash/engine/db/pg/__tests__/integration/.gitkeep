@@ -1,0 +1,9 @@
+# Integration tests for the Postgres adapter.
+# Placed here so the CI workflow's --run target resolves even when the
+# directory is empty. Real tests land in a follow-up:
+#
+#   - schema DDL applies without error
+#   - withBookClient isolates search_path (two books can't see each other)
+#   - rewritePlaceholders output runs cleanly against live Postgres
+#   - import → query round-trip
+#   - dialect golden tests: identical results vs SQLite on shared fixtures
