@@ -133,7 +133,17 @@ export async function POST(request: Request) {
             if (table === "gnudash_meta") continue;
             const rows = rowsByTable[table];
             if (!rows || rows.length === 0) continue;
-            await bulkInsert(client, schema, table, rows);
+            // Real .gnucash SQLite files carry a wider column set than our
+            // PG DDL — e.g. commodities has quote_flag/quote_source/quote_tz
+            // that the engine never touches. Ask PG what columns actually
+            // exist in the freshly-created table and only copy those, so
+            // source-schema drift never produces an INSERT failure.
+            const targetColumns = await fetchTableColumns(
+              client,
+              schema,
+              table,
+            );
+            await bulkInsert(client, schema, table, rows, targetColumns);
           }
 
           // Bump the underlying sequence past any explicit `id` values we
@@ -261,14 +271,36 @@ function readSourceTables(
   return out;
 }
 
-/** Insert rows in chunks so we don't exceed PG's parameter limit (~65k). */
+/** Column names present in `schema.table` in the target Postgres. */
+async function fetchTableColumns(
+  client: import("pg").Client,
+  schema: string,
+  table: string,
+): Promise<Set<string>> {
+  const res = await client.query<{ column_name: string }>(
+    `SELECT column_name FROM information_schema.columns
+     WHERE table_schema = $1 AND table_name = $2`,
+    [schema, table],
+  );
+  return new Set(res.rows.map((r) => r.column_name));
+}
+
+/**
+ * Insert rows in chunks so we don't exceed PG's parameter limit (~65k).
+ * Only columns in `targetColumns` are copied; extra columns present in the
+ * source .gnucash file (e.g. `quote_flag` on `commodities`) are silently
+ * dropped because our schema doesn't declare them and the engine doesn't
+ * use them.
+ */
 async function bulkInsert(
   client: import("pg").Client,
   schema: string,
   table: string,
   rows: Record<string, unknown>[],
+  targetColumns: Set<string>,
 ): Promise<void> {
-  const columns = Object.keys(rows[0]);
+  const columns = Object.keys(rows[0]).filter((c) => targetColumns.has(c));
+  if (columns.length === 0) return;
   const CHUNK = 500;
   for (let start = 0; start < rows.length; start += CHUNK) {
     const chunk = rows.slice(start, start + CHUNK);
