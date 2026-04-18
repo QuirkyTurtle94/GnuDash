@@ -1,0 +1,57 @@
+# GnuDash — server mode Dockerfile
+#
+# Builds a Next.js server bundle (BUILD_MODE=server) and runs it as a
+# non-root user on a minimal Node base. The app expects an external
+# Postgres accessible at DATABASE_URL.
+#
+# Separate from Dockerfile (which builds the static-export local mode
+# image for nginx). Two images cover two deploy shapes from one repo.
+FROM --platform=$BUILDPLATFORM node:20-alpine@sha256:f598378b5240225e6beab68fa9f356db1fb8efe55173e6d4d8153113bb8f333c AS build
+
+WORKDIR /app
+COPY app/package*.json ./
+
+# Security posture: refuse install scripts from transitive deps. The only
+# packages that genuinely need one are whitelisted here. This blocks the
+# malicious-post-install vector called out in the security review §1.14.
+RUN npm ci --ignore-scripts
+
+COPY app/ ./
+
+# Next 16 needs `@node-rs/argon2` and `better-sqlite3` native bindings
+# at runtime; npm ci --ignore-scripts skipped their postinstall. Rebuild
+# just these by name.
+RUN npm rebuild @node-rs/argon2 better-sqlite3
+
+ENV BUILD_MODE=server
+RUN npm run build:server
+
+# ── runtime stage ─────────────────────────────────────────────────────
+FROM node:20-alpine@sha256:f598378b5240225e6beab68fa9f356db1fb8efe55173e6d4d8153113bb8f333c
+
+# Run as non-root. The `node` user/group is baked into the base image.
+WORKDIR /app
+
+# Only copy what the server needs to run — no source, no test fixtures.
+COPY --from=build --chown=node:node /app/.next /app/.next
+COPY --from=build --chown=node:node /app/public /app/public
+COPY --from=build --chown=node:node /app/package.json /app/package.json
+COPY --from=build --chown=node:node /app/package-lock.json /app/package-lock.json
+COPY --from=build --chown=node:node /app/node_modules /app/node_modules
+
+# Strip dev dependencies to shrink the attack surface.
+RUN npm prune --omit=dev --ignore-scripts
+
+USER node
+ENV NODE_ENV=production
+ENV PORT=3000
+# Block eval-based code generation at the Node runtime level.
+ENV NODE_OPTIONS=--disallow-code-generation-from-strings
+
+EXPOSE 3000
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
+  CMD wget --quiet --tries=1 --spider http://localhost:3000/api/health || exit 1
+
+# Run `next start` directly; it reads PORT from env.
+CMD ["npx", "--no-install", "next", "start"]

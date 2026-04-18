@@ -1,0 +1,33 @@
+-- Example Postgres init for GnuDash self-hosting.
+-- Runs once when the postgres container starts with an empty data dir.
+-- Copy to init.sql and adjust passwords before deploying.
+--
+-- Two roles by design (security review §1.4):
+--   gnudash_migrator — DDL rights, runs schema migrations (not daily traffic).
+--   gnudash_app     — SELECT/INSERT/UPDATE/DELETE only; no DDL, no superuser.
+-- The app container connects as gnudash_app. Never point DATABASE_URL at
+-- gnudash_migrator in a running deploy.
+
+CREATE ROLE gnudash_app WITH LOGIN PASSWORD 'CHANGE-ME-APP-PASSWORD'
+  NOSUPERUSER NOCREATEDB NOCREATEROLE;
+
+-- Least-privilege tuning: survive inside any transaction.
+ALTER ROLE gnudash_app SET statement_timeout = '10s';
+ALTER ROLE gnudash_app SET idle_in_transaction_session_timeout = '30s';
+ALTER ROLE gnudash_app SET lock_timeout = '5s';
+
+-- Lock down the public schema so the app role can't create objects there.
+REVOKE CREATE ON SCHEMA public FROM PUBLIC;
+REVOKE CREATE ON SCHEMA public FROM gnudash_app;
+GRANT USAGE ON SCHEMA public TO gnudash_app;
+
+-- The app's book data lives in its own schema, created by migrations.
+-- After migrations run, grant the app role the minimum it needs on that
+-- schema (this is idempotent — re-running is safe):
+--
+--   GRANT USAGE ON SCHEMA gnudash_book TO gnudash_app;
+--   GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA gnudash_book TO gnudash_app;
+--   GRANT USAGE ON ALL SEQUENCES IN SCHEMA gnudash_book TO gnudash_app;
+--
+-- Run these as gnudash_migrator (or postgres superuser) after applying
+-- db/migrations/0001_gnucash_schema.sql.

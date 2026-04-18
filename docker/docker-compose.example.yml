@@ -1,0 +1,52 @@
+# Reference docker-compose for self-hosters (Coolify-style).
+# Not used by CI — operators copy and adapt.
+#
+# Two services: gnudash (this image) + postgres. The app connects over
+# the internal Compose network; only gnudash is exposed.
+
+services:
+  gnudash:
+    image: ghcr.io/quirkyturtle94/gnudash:${IMAGE_TAG:-latest}-server
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "3000:3000"
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgres://gnudash_app:${GNUDASH_APP_PASSWORD}@postgres:5432/gnudash?sslmode=require
+      DATABASE_SSL_CA: /etc/ssl/pg-ca.crt
+      SESSION_SECRET: ${SESSION_SECRET}
+      APP_ORIGIN: ${APP_ORIGIN}
+      TRUSTED_PROXY_HOPS: "1"
+      APP_PASSPHRASE_HASH: ${APP_PASSPHRASE_HASH}
+    volumes:
+      - ./pg-ca.crt:/etc/ssl/pg-ca.crt:ro
+    read_only: true
+    tmpfs:
+      - /tmp
+      - /app/.next/cache
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: gnudash
+      POSTGRES_USER: gnudash_migrator
+      POSTGRES_PASSWORD: ${GNUDASH_MIGRATOR_PASSWORD}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./init.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "gnudash_migrator", "-d", "gnudash"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres-data:
