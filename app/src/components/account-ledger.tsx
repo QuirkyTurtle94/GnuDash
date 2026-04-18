@@ -4,6 +4,7 @@ import { useMemo, useState, useCallback, useRef } from "react";
 import { createPortal } from "react-dom";
 import { Card, CardContent } from "@/components/ui/card";
 import { formatCurrency, formatAmount } from "@/lib/format";
+import { parseGnuCashDate } from "@/lib/gnucash/shared/dates";
 import { useDashboard } from "@/lib/dashboard-context";
 import { buildCurrencySplitPayload, isInvestmentType } from "@/lib/transaction-helpers";
 import type { AccountNode, LedgerTransaction, LedgerSplit } from "@/lib/types/gnucash";
@@ -19,7 +20,7 @@ type SortField = "date" | "description" | "transfer" | "amount";
 type SortDir = "asc" | "desc";
 
 function formatDate(dateStr: string): string {
-  const d = new Date(dateStr + "T00:00:00");
+  const d = parseGnuCashDate(dateStr);
   return d.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
 }
 

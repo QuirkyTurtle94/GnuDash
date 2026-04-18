@@ -281,80 +281,80 @@ const insertSplit = db.prepare(
 );
 
 // Opening balance: bank = 5000 GBP
-insertTx.run(GUIDS.txOpeningBank, GUIDS.GBP, "", "2025-01-01 00:00:00", "2025-01-01 00:00:00", "Opening Balance");
+insertTx.run(GUIDS.txOpeningBank, GUIDS.GBP, "", "20250101000000", "20250101000000", "Opening Balance");
 insertSplit.run(splitGuid(), GUIDS.txOpeningBank, GUIDS.bank, "", "y", 500000, 100, 500000, 100);
 insertSplit.run(splitGuid(), GUIDS.txOpeningBank, GUIDS.openingBalances, "", "y", -500000, 100, -500000, 100);
 
 // Opening balance: savings = 10000 GBP
-insertTx.run(GUIDS.txOpeningSavings, GUIDS.GBP, "", "2025-01-01 00:00:00", "2025-01-01 00:00:00", "Opening Balance");
+insertTx.run(GUIDS.txOpeningSavings, GUIDS.GBP, "", "20250101000000", "20250101000000", "Opening Balance");
 insertSplit.run(splitGuid(), GUIDS.txOpeningSavings, GUIDS.savings, "", "y", 1000000, 100, 1000000, 100);
 insertSplit.run(splitGuid(), GUIDS.txOpeningSavings, GUIDS.openingBalances, "", "y", -1000000, 100, -1000000, 100);
 
 // Salary: 3000 GBP/month (Jan, Feb, Mar 2025)
-insertTx.run(GUIDS.txSalaryJan, GUIDS.GBP, "", "2025-01-28 00:00:00", "2025-01-28 00:00:00", "Salary January");
+insertTx.run(GUIDS.txSalaryJan, GUIDS.GBP, "", "20250128000000", "20250128000000", "Salary January");
 insertSplit.run(splitGuid(), GUIDS.txSalaryJan, GUIDS.bank, "", "c", 300000, 100, 300000, 100);
 insertSplit.run(splitGuid(), GUIDS.txSalaryJan, GUIDS.salary, "", "c", -300000, 100, -300000, 100);
 
-insertTx.run(GUIDS.txSalaryFeb, GUIDS.GBP, "", "2025-02-28 00:00:00", "2025-02-28 00:00:00", "Salary February");
+insertTx.run(GUIDS.txSalaryFeb, GUIDS.GBP, "", "20250228000000", "20250228000000", "Salary February");
 insertSplit.run(splitGuid(), GUIDS.txSalaryFeb, GUIDS.bank, "", "c", 300000, 100, 300000, 100);
 insertSplit.run(splitGuid(), GUIDS.txSalaryFeb, GUIDS.salary, "", "c", -300000, 100, -300000, 100);
 
-insertTx.run(GUIDS.txSalaryMar, GUIDS.GBP, "", "2025-03-28 00:00:00", "2025-03-28 00:00:00", "Salary March");
+insertTx.run(GUIDS.txSalaryMar, GUIDS.GBP, "", "20250328000000", "20250328000000", "Salary March");
 insertSplit.run(splitGuid(), GUIDS.txSalaryMar, GUIDS.bank, "", "n", 300000, 100, 300000, 100);
 insertSplit.run(splitGuid(), GUIDS.txSalaryMar, GUIDS.salary, "", "n", -300000, 100, -300000, 100);
 
 // Freelance income: 500 GBP in Feb
-insertTx.run(GUIDS.txFreelanceFeb, GUIDS.GBP, "", "2025-02-15 00:00:00", "2025-02-15 00:00:00", "Freelance Project");
+insertTx.run(GUIDS.txFreelanceFeb, GUIDS.GBP, "", "20250215000000", "20250215000000", "Freelance Project");
 insertSplit.run(splitGuid(), GUIDS.txFreelanceFeb, GUIDS.bank, "", "c", 50000, 100, 50000, 100);
 insertSplit.run(splitGuid(), GUIDS.txFreelanceFeb, GUIDS.freelance, "", "c", -50000, 100, -50000, 100);
 
 // Groceries: 200 GBP Jan, 180 GBP Feb
-insertTx.run(GUIDS.txGroceriesJan, GUIDS.GBP, "", "2025-01-15 00:00:00", "2025-01-15 00:00:00", "Tesco Groceries");
+insertTx.run(GUIDS.txGroceriesJan, GUIDS.GBP, "", "20250115000000", "20250115000000", "Tesco Groceries");
 insertSplit.run(splitGuid(), GUIDS.txGroceriesJan, GUIDS.groceries, "", "c", 20000, 100, 20000, 100);
 insertSplit.run(splitGuid(), GUIDS.txGroceriesJan, GUIDS.bank, "", "c", -20000, 100, -20000, 100);
 
-insertTx.run(GUIDS.txGroceriesFeb, GUIDS.GBP, "", "2025-02-10 00:00:00", "2025-02-10 00:00:00", "Sainsburys Groceries");
+insertTx.run(GUIDS.txGroceriesFeb, GUIDS.GBP, "", "20250210000000", "20250210000000", "Sainsburys Groceries");
 insertSplit.run(splitGuid(), GUIDS.txGroceriesFeb, GUIDS.groceries, "", "n", 18000, 100, 18000, 100);
 insertSplit.run(splitGuid(), GUIDS.txGroceriesFeb, GUIDS.bank, "", "n", -18000, 100, -18000, 100);
 
 // Restaurant: 45 GBP Jan (on credit card)
-insertTx.run(GUIDS.txRestaurantJan, GUIDS.GBP, "", "2025-01-20 00:00:00", "2025-01-20 00:00:00", "Pizza Express");
+insertTx.run(GUIDS.txRestaurantJan, GUIDS.GBP, "", "20250120000000", "20250120000000", "Pizza Express");
 insertSplit.run(splitGuid(), GUIDS.txRestaurantJan, GUIDS.restaurants, "", "n", 4500, 100, 4500, 100);
 insertSplit.run(splitGuid(), GUIDS.txRestaurantJan, GUIDS.creditCard, "", "n", -4500, 100, -4500, 100);
 
 // Electric: 85 GBP Jan, 90 GBP Feb
-insertTx.run(GUIDS.txElectricJan, GUIDS.GBP, "", "2025-01-05 00:00:00", "2025-01-05 00:00:00", "British Gas Electric");
+insertTx.run(GUIDS.txElectricJan, GUIDS.GBP, "", "20250105000000", "20250105000000", "British Gas Electric");
 insertSplit.run(splitGuid(), GUIDS.txElectricJan, GUIDS.electric, "", "c", 8500, 100, 8500, 100);
 insertSplit.run(splitGuid(), GUIDS.txElectricJan, GUIDS.bank, "", "c", -8500, 100, -8500, 100);
 
-insertTx.run(GUIDS.txElectricFeb, GUIDS.GBP, "", "2025-02-05 00:00:00", "2025-02-05 00:00:00", "British Gas Electric");
+insertTx.run(GUIDS.txElectricFeb, GUIDS.GBP, "", "20250205000000", "20250205000000", "British Gas Electric");
 insertSplit.run(splitGuid(), GUIDS.txElectricFeb, GUIDS.electric, "", "c", 9000, 100, 9000, 100);
 insertSplit.run(splitGuid(), GUIDS.txElectricFeb, GUIDS.bank, "", "c", -9000, 100, -9000, 100);
 
 // Water: 40 GBP Mar
-insertTx.run(GUIDS.txWaterMar, GUIDS.GBP, "", "2025-03-10 00:00:00", "2025-03-10 00:00:00", "Thames Water");
+insertTx.run(GUIDS.txWaterMar, GUIDS.GBP, "", "20250310000000", "20250310000000", "Thames Water");
 insertSplit.run(splitGuid(), GUIDS.txWaterMar, GUIDS.water, "", "n", 4000, 100, 4000, 100);
 insertSplit.run(splitGuid(), GUIDS.txWaterMar, GUIDS.bank, "", "n", -4000, 100, -4000, 100);
 
 // Credit card payment: 45 GBP (Feb, clears the restaurant charge)
-insertTx.run(GUIDS.txCreditCardPayment, GUIDS.GBP, "", "2025-02-01 00:00:00", "2025-02-01 00:00:00", "Credit Card Payment");
+insertTx.run(GUIDS.txCreditCardPayment, GUIDS.GBP, "", "20250201000000", "20250201000000", "Credit Card Payment");
 insertSplit.run(splitGuid(), GUIDS.txCreditCardPayment, GUIDS.creditCard, "", "c", 4500, 100, 4500, 100);
 insertSplit.run(splitGuid(), GUIDS.txCreditCardPayment, GUIDS.bank, "", "c", -4500, 100, -4500, 100);
 
 // Buy AAPL: 10 shares at $150 each = $1500 cost basis (in Jan)
 // Transaction in GBP: 1500 USD * 0.80 = 1200 GBP
-insertTx.run(GUIDS.txBuyAAPL, GUIDS.GBP, "", "2025-01-10 00:00:00", "2025-01-10 00:00:00", "Buy AAPL");
+insertTx.run(GUIDS.txBuyAAPL, GUIDS.GBP, "", "20250110000000", "20250110000000", "Buy AAPL");
 insertSplit.run(splitGuid(), GUIDS.txBuyAAPL, GUIDS.aaplAccount, "", "n", 120000, 100, 100000, 10000); // value=1200 GBP, qty=10 shares
 insertSplit.run(splitGuid(), GUIDS.txBuyAAPL, GUIDS.bank, "", "n", -120000, 100, -120000, 100);
 
 // Buy VWRL: 50 units at 80 GBP each = 4000 GBP cost basis (in Feb)
-insertTx.run(GUIDS.txBuyVWRL, GUIDS.GBP, "", "2025-02-20 00:00:00", "2025-02-20 00:00:00", "Buy VWRL");
+insertTx.run(GUIDS.txBuyVWRL, GUIDS.GBP, "", "20250220000000", "20250220000000", "Buy VWRL");
 insertSplit.run(splitGuid(), GUIDS.txBuyVWRL, GUIDS.vwrlAccount, "", "n", 400000, 100, 500000, 10000); // value=4000 GBP, qty=50 units
 insertSplit.run(splitGuid(), GUIDS.txBuyVWRL, GUIDS.bank, "", "n", -400000, 100, -400000, 100);
 
 // USD deposit: 500 USD into USD account (in Jan)
 // value in GBP = 400, quantity in USD = 500
-insertTx.run(GUIDS.txUsdDeposit, GUIDS.GBP, "", "2025-01-12 00:00:00", "2025-01-12 00:00:00", "USD Transfer");
+insertTx.run(GUIDS.txUsdDeposit, GUIDS.GBP, "", "20250112000000", "20250112000000", "USD Transfer");
 insertSplit.run(splitGuid(), GUIDS.txUsdDeposit, GUIDS.usdBank, "", "n", 40000, 100, 50000, 100); // value=400 GBP, qty=500 USD
 insertSplit.run(splitGuid(), GUIDS.txUsdDeposit, GUIDS.bank, "", "n", -40000, 100, -40000, 100);
 
@@ -366,17 +366,17 @@ const insertPrice = db.prepare(
 );
 
 // AAPL prices (in GBP)
-insertPrice.run(GUIDS.priceAAPLJan, GUIDS.AAPL, GUIDS.GBP, "2025-01-31 00:00:00", "user:price", "last", 12500, 100); // 125 GBP
-insertPrice.run(GUIDS.priceAAPLFeb, GUIDS.AAPL, GUIDS.GBP, "2025-02-28 00:00:00", "user:price", "last", 13000, 100); // 130 GBP
-insertPrice.run(GUIDS.priceAAPLMar, GUIDS.AAPL, GUIDS.GBP, "2025-03-31 00:00:00", "user:price", "last", 13500, 100); // 135 GBP
+insertPrice.run(GUIDS.priceAAPLJan, GUIDS.AAPL, GUIDS.GBP, "20250131000000", "user:price", "last", 12500, 100); // 125 GBP
+insertPrice.run(GUIDS.priceAAPLFeb, GUIDS.AAPL, GUIDS.GBP, "20250228000000", "user:price", "last", 13000, 100); // 130 GBP
+insertPrice.run(GUIDS.priceAAPLMar, GUIDS.AAPL, GUIDS.GBP, "20250331000000", "user:price", "last", 13500, 100); // 135 GBP
 
 // VWRL prices (in GBP)
-insertPrice.run(GUIDS.priceVWRLJan, GUIDS.VWRL, GUIDS.GBP, "2025-01-31 00:00:00", "user:price", "last", 8200, 100); // 82 GBP
-insertPrice.run(GUIDS.priceVWRLMar, GUIDS.VWRL, GUIDS.GBP, "2025-03-31 00:00:00", "user:price", "last", 8500, 100); // 85 GBP
+insertPrice.run(GUIDS.priceVWRLJan, GUIDS.VWRL, GUIDS.GBP, "20250131000000", "user:price", "last", 8200, 100); // 82 GBP
+insertPrice.run(GUIDS.priceVWRLMar, GUIDS.VWRL, GUIDS.GBP, "20250331000000", "user:price", "last", 8500, 100); // 85 GBP
 
 // USD/GBP exchange rates
-insertPrice.run(GUIDS.priceUSDGBPJan, GUIDS.USD, GUIDS.GBP, "2025-01-15 00:00:00", "user:price", "last", 80, 100); // 1 USD = 0.80 GBP
-insertPrice.run(GUIDS.priceUSDGBPMar, GUIDS.USD, GUIDS.GBP, "2025-03-15 00:00:00", "user:price", "last", 79, 100); // 1 USD = 0.79 GBP
+insertPrice.run(GUIDS.priceUSDGBPJan, GUIDS.USD, GUIDS.GBP, "20250115000000", "user:price", "last", 80, 100); // 1 USD = 0.80 GBP
+insertPrice.run(GUIDS.priceUSDGBPMar, GUIDS.USD, GUIDS.GBP, "20250315000000", "user:price", "last", 79, 100); // 1 USD = 0.79 GBP
 
 // -------------------------------------------------------------------
 // Data: Scheduled Transactions (Bills)
@@ -388,11 +388,11 @@ const insertRec = db.prepare(
   `INSERT INTO recurrences (obj_guid, recurrence_mult, recurrence_period_type, recurrence_period_start) VALUES (?, ?, ?, ?)`
 );
 
-insertSx.run(GUIDS.sxRent, "Rent", 1, "2025-01-01", "2025-03-01");
-insertRec.run(GUIDS.sxRent, 1, "month", "2025-01-01");
+insertSx.run(GUIDS.sxRent, "Rent", 1, "20250101000000", "20250301000000");
+insertRec.run(GUIDS.sxRent, 1, "month", "20250101000000");
 
-insertSx.run(GUIDS.sxInternet, "Internet", 1, "2025-01-15", "2025-02-15");
-insertRec.run(GUIDS.sxInternet, 1, "month", "2025-01-15");
+insertSx.run(GUIDS.sxInternet, "Internet", 1, "20250115000000", "20250215000000");
+insertRec.run(GUIDS.sxInternet, 1, "month", "20250115000000");
 
 // -------------------------------------------------------------------
 // Data: Budgets

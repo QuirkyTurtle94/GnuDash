@@ -49,13 +49,21 @@ function parseNumDenom(s: string): { num: number; denom: number } {
 }
 
 /**
- * Normalise a GNUCash XML date string to the format the SQLite schema uses.
- * Input:  "2025-01-01 10:59:00 +0200" or "2025-01-01 10:59:00 +0000"
- * Output: "2025-01-01 10:59:00"   (timezone stripped)
+ * Normalise a GNUCash XML datetime to compact YYYYMMDDHHmmss format.
+ * Input:  "2025-01-01 10:59:00 +0200"
+ * Output: "20250101105900"
  */
 function normaliseDate(raw: string): string {
-  // Strip timezone suffix (e.g. " +0200")
-  return raw.replace(/\s*[+-]\d{4}$/, "");
+  return raw.replace(/\s*[+-]\d{4}$/, "").replace(/[-: ]/g, "");
+}
+
+/**
+ * Normalise a GNUCash XML gdate (YYYY-MM-DD) to compact YYYYMMDDHHmmss format.
+ * Input:  "2025-01-01"
+ * Output: "20250101000000"
+ */
+function normaliseGdate(raw: string): string {
+  return raw.replace(/-/g, "") + "000000";
 }
 
 /**
@@ -338,13 +346,16 @@ export function parseGnuCashXml(xmlString: string): GnuCashXmlData {
     const autoCreate = childText(el, NS.sx, "autoCreate") === "y" ? 1 : 0;
 
     const startEl = childEl(el, NS.sx, "start");
-    const startDate = startEl ? (startEl.getElementsByTagName("gdate")[0]?.textContent?.trim() ?? "") : "";
+    const startRaw = startEl ? (startEl.getElementsByTagName("gdate")[0]?.textContent?.trim() ?? "") : "";
+    const startDate = startRaw ? normaliseGdate(startRaw) : "";
 
     const endEl = childEl(el, NS.sx, "end");
-    const endDate = endEl ? (endEl.getElementsByTagName("gdate")[0]?.textContent?.trim() ?? null) : null;
+    const endRaw = endEl ? (endEl.getElementsByTagName("gdate")[0]?.textContent?.trim() ?? null) : null;
+    const endDate = endRaw ? normaliseGdate(endRaw) : null;
 
     const lastEl = childEl(el, NS.sx, "last");
-    const lastOccur = lastEl ? (lastEl.getElementsByTagName("gdate")[0]?.textContent?.trim() ?? null) : null;
+    const lastRaw = lastEl ? (lastEl.getElementsByTagName("gdate")[0]?.textContent?.trim() ?? null) : null;
+    const lastOccur = lastRaw ? normaliseGdate(lastRaw) : null;
 
     schedxactions.push({
       guid,
@@ -364,9 +375,10 @@ export function parseGnuCashXml(xmlString: string): GnuCashXmlData {
       const recEls = scheduleEl.getElementsByTagNameNS(NS.gnc, "recurrence");
       for (const recEl of Array.from(recEls)) {
         const recStartEl = childEl(recEl, NS.recurrence, "start");
-        const recStart = recStartEl
+        const recStartRaw = recStartEl
           ? (recStartEl.getElementsByTagName("gdate")[0]?.textContent?.trim() ?? "")
           : "";
+        const recStart = recStartRaw ? normaliseGdate(recStartRaw) : "";
 
         recurrences.push({
           objGuid: guid,

@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatCurrency } from "@/lib/format";
 import { useSpendingFilter } from "@/lib/spending-filter-context";
 import { getMonthsForPeriod } from "@/lib/spending-utils";
+import { parseGnuCashDate } from "@/lib/gnucash/shared/dates";
 import type { ExpenseTransaction } from "@/lib/types/gnucash";
 
 interface ExpenseTableCardProps {
@@ -204,6 +205,6 @@ function SortHeader({
 }
 
 function formatDate(dateStr: string): string {
-  const d = new Date(dateStr + "T00:00:00");
+  const d = parseGnuCashDate(dateStr);
   return d.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
 }

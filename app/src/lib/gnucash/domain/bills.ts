@@ -1,6 +1,6 @@
 import type { UpcomingBill } from "@/lib/types/gnucash";
 import type { ParseContext } from "../context";
-import { parseGnuCashDate } from "../shared/dates";
+import { parseGnuCashDate, formatGnuCashDate } from "../shared/dates";
 
 /**
  * Get upcoming scheduled transactions (bills) from the GNUCash schedxactions table.
@@ -57,7 +57,7 @@ export function getUpcomingBills(ctx: ParseContext): UpcomingBill[] {
           last.setFullYear(last.getFullYear() + mult);
           break;
       }
-      nextDate = last.toISOString().split("T")[0];
+      nextDate = formatGnuCashDate(last);
     }
 
     return {

@@ -3521,7 +3521,7 @@ exports[`parseGnuCashFile > snapshot: full DashboardData 1`] = `
     {
       "commodity_guid": "00000003000000030000000300000003",
       "currency_guid": "00000001000000010000000100000001",
-      "date": "2025-03-31 00:00:00",
+      "date": "20250331000000",
       "guid": "0000002f0000002f0000002f0000002f",
       "source": "user:price",
       "type": "last",
@@ -3531,7 +3531,7 @@ exports[`parseGnuCashFile > snapshot: full DashboardData 1`] = `
     {
       "commodity_guid": "00000004000000040000000400000004",
       "currency_guid": "00000001000000010000000100000001",
-      "date": "2025-03-31 00:00:00",
+      "date": "20250331000000",
       "guid": "00000031000000310000003100000031",
       "source": "user:price",
       "type": "last",
@@ -3541,7 +3541,7 @@ exports[`parseGnuCashFile > snapshot: full DashboardData 1`] = `
     {
       "commodity_guid": "00000002000000020000000200000002",
       "currency_guid": "00000001000000010000000100000001",
-      "date": "2025-03-15 00:00:00",
+      "date": "20250315000000",
       "guid": "00000033000000330000003300000033",
       "source": "user:price",
       "type": "last",
@@ -3551,7 +3551,7 @@ exports[`parseGnuCashFile > snapshot: full DashboardData 1`] = `
     {
       "commodity_guid": "00000003000000030000000300000003",
       "currency_guid": "00000001000000010000000100000001",
-      "date": "2025-02-28 00:00:00",
+      "date": "20250228000000",
       "guid": "0000002e0000002e0000002e0000002e",
       "source": "user:price",
       "type": "last",
@@ -3561,7 +3561,7 @@ exports[`parseGnuCashFile > snapshot: full DashboardData 1`] = `
     {
       "commodity_guid": "00000003000000030000000300000003",
       "currency_guid": "00000001000000010000000100000001",
-      "date": "2025-01-31 00:00:00",
+      "date": "20250131000000",
       "guid": "0000002d0000002d0000002d0000002d",
       "source": "user:price",
       "type": "last",
@@ -3571,7 +3571,7 @@ exports[`parseGnuCashFile > snapshot: full DashboardData 1`] = `
     {
       "commodity_guid": "00000004000000040000000400000004",
       "currency_guid": "00000001000000010000000100000001",
-      "date": "2025-01-31 00:00:00",
+      "date": "20250131000000",
       "guid": "00000030000000300000003000000030",
       "source": "user:price",
       "type": "last",
@@ -3581,7 +3581,7 @@ exports[`parseGnuCashFile > snapshot: full DashboardData 1`] = `
     {
       "commodity_guid": "00000002000000020000000200000002",
       "currency_guid": "00000001000000010000000100000001",
-      "date": "2025-01-15 00:00:00",
+      "date": "20250115000000",
       "guid": "00000032000000320000003200000032",
       "source": "user:price",
       "type": "last",
@@ -3778,13 +3778,13 @@ exports[`parseGnuCashFile > snapshot: full DashboardData 1`] = `
       "amount": null,
       "enabled": true,
       "name": "Internet",
-      "nextDate": "2025-03-15",
+      "nextDate": "20250315000000",
     },
     {
       "amount": null,
       "enabled": true,
       "name": "Rent",
-      "nextDate": "2025-03-31",
+      "nextDate": "20250401000000",
     },
   ],
 }

@@ -28,9 +28,9 @@ export function isTransactionLinkedPrice(price: GnuCashPrice): boolean {
   return price.source === "user:xfer-dialog" || price.type === "transaction";
 }
 
-/** Normalise a GnuCash timestamp ("YYYY-MM-DD HH:MM:SS") or ISO date to "YYYY-MM-DD". */
+/** Extract the YYYYMMDD day portion from a compact GnuCash date. */
 function toDayKey(date: string): string {
-  return date.slice(0, 10);
+  return date.slice(0, 8);
 }
 
 interface SplitRatioRow {

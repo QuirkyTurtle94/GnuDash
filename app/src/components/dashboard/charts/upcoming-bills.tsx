@@ -2,10 +2,11 @@
 
 import { Plus } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { parseGnuCashDate } from "@/lib/gnucash/shared/dates";
 import type { UpcomingBill } from "@/lib/types/gnucash";
 
 function formatDate(dateStr: string): string {
-  const date = new Date(dateStr);
+  const date = parseGnuCashDate(dateStr);
   return date.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 }
 
