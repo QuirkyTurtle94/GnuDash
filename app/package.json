@@ -4,7 +4,9 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "npm run build:local",
+    "build:local": "node bin/build-local.mjs",
+    "build:server": "BUILD_MODE=server next build",
     "start": "next start",
     "lint": "eslint",
     "test": "vitest run",
