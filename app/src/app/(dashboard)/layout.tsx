@@ -137,7 +137,16 @@ function DashboardInner({ children }: { children: React.ReactNode }) {
                 <span className="hidden sm:inline">XML &middot; Read-only</span>
               </span>
             )}
-            {!isXmlSource && isWritable && (
+            {postgresSchemaOverride !== null && data && (
+              <span
+                className="flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-muted-foreground"
+                title="Existing GnuCash Postgres databases are opened read-only. Close GnuCash desktop and edit there."
+              >
+                <Lock className="h-3 w-3" />
+                <span className="hidden sm:inline">Read-only</span>
+              </span>
+            )}
+            {postgresSchemaOverride === null && !isXmlSource && isWritable && (
               <button
                 onClick={toggleWritable}
                 className="flex items-center gap-1.5 rounded-lg border border-[#3B6B8A] bg-[#3B6B8A]/10 px-3 py-1.5 text-xs font-medium text-[#3B6B8A] transition-colors hover:bg-[#3B6B8A]/20 dark:border-[#6FA4C7] dark:text-[#6FA4C7] dark:bg-[#6FA4C7]/10 dark:hover:bg-[#6FA4C7]/20"
@@ -147,7 +156,7 @@ function DashboardInner({ children }: { children: React.ReactNode }) {
                 <span className="hidden sm:inline">Editing</span>
               </button>
             )}
-            {!isXmlSource && !isWritable && data && (
+            {postgresSchemaOverride === null && !isXmlSource && !isWritable && data && (
               <button
                 onClick={toggleWritable}
                 className="flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"

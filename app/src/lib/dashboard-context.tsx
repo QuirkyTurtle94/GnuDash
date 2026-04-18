@@ -249,6 +249,11 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
   }, [data]);
 
   async function toggleWritable() {
+    // Interop mode points at a schema gnudash doesn't own — flipping writable
+    // would re-open the local OPFS cache read-write and expose every edit
+    // affordance (top badge + per-row edit/delete), yet writes would never
+    // reach Postgres (no sync client is wired) and could corrupt on reupload.
+    if (postgresSchemaOverride !== null) return;
     const newWritable = !isWritable;
     try {
       const client = getClient();
