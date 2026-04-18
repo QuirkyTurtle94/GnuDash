@@ -1,14 +1,23 @@
 import { NextResponse } from "next/server";
-import { withClient, type PgConnection } from "@/lib/pg/connect";
-import { bookSchemaName } from "@/lib/gnucash/db/postgres-schema";
+import {
+  resolveSchemaName,
+  withClient,
+  type PgConnection,
+} from "@/lib/pg/connect";
 import { REQUIRED_TABLES } from "@/lib/gnucash/db/validation";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+/**
+ * Request body accepts exactly one of `bookId` (gnudash-managed schemas,
+ * `book_{bookId}`) or `schema` (existing-GnuCash-DB read-only interop).
+ * The shared `resolveSchemaName` helper in lib/pg/connect validates both.
+ */
 interface Body {
   connection: PgConnection;
-  bookId: string;
+  bookId?: string;
+  schema?: string;
 }
 
 /**
@@ -34,16 +43,22 @@ export async function POST(request: Request) {
     );
   }
 
-  if (!body.connection || !body.bookId) {
+  if (!body.connection) {
     return NextResponse.json(
-      { error: "Missing 'connection' or 'bookId'" },
+      { error: "Missing 'connection'" },
+      { status: 400 },
+    );
+  }
+  if ((!body.bookId && !body.schema) || (body.bookId && body.schema)) {
+    return NextResponse.json(
+      { error: "Provide exactly one of 'bookId' or 'schema'" },
       { status: 400 },
     );
   }
 
   let schema: string;
   try {
-    schema = bookSchemaName(body.bookId);
+    schema = resolveSchemaName({ bookId: body.bookId, schema: body.schema });
   } catch (err) {
     return NextResponse.json({ error: (err as Error).message }, { status: 400 });
   }

@@ -71,7 +71,18 @@ const validConfig: ServerConfig = {
   user: "gnudash",
   password: "hunter2",
   database: "gnudash",
+  mode: "gnudash",
   bookId: "default",
+};
+
+const validExistingConfig: ServerConfig = {
+  host: "db.example",
+  port: 5432,
+  user: "gnudash",
+  password: "hunter2",
+  database: "gnudash",
+  mode: "existing",
+  schema: "public",
 };
 
 describe("isServerConfigSupported", () => {
@@ -133,6 +144,90 @@ describe("OPFS round-trip", () => {
 
   it("clearServerConfig is idempotent when no file exists", async () => {
     await expect(clearServerConfig()).resolves.toBeUndefined();
+  });
+
+  it("roundtrips an existing-mode config with a schema field", async () => {
+    await saveServerConfig(validExistingConfig);
+    const loaded = await loadServerConfig();
+    expect(loaded).toEqual(validExistingConfig);
+  });
+});
+
+describe("legacy / mode compatibility", () => {
+  beforeEach(() => {
+    installOpfsMock();
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("loads a pre-v1 config (no mode field) as gnudash", async () => {
+    const files = installOpfsMock();
+    files.set(
+      "gnudash-server.json",
+      JSON.stringify({
+        host: "db",
+        port: 5432,
+        user: "u",
+        password: "p",
+        database: "d",
+        bookId: "default",
+      }),
+    );
+    const loaded = await loadServerConfig();
+    expect(loaded?.mode).toBe("gnudash");
+    expect(loaded?.bookId).toBe("default");
+  });
+
+  it("rejects an existing-mode config missing the schema field", async () => {
+    const files = installOpfsMock();
+    files.set(
+      "gnudash-server.json",
+      JSON.stringify({
+        host: "db",
+        port: 5432,
+        user: "u",
+        password: "p",
+        database: "d",
+        mode: "existing",
+      }),
+    );
+    expect(await loadServerConfig()).toBeNull();
+  });
+
+  it("rejects a gnudash-mode config missing the bookId field", async () => {
+    const files = installOpfsMock();
+    files.set(
+      "gnudash-server.json",
+      JSON.stringify({
+        host: "db",
+        port: 5432,
+        user: "u",
+        password: "p",
+        database: "d",
+        mode: "gnudash",
+      }),
+    );
+    expect(await loadServerConfig()).toBeNull();
+  });
+
+  it("falls back to gnudash mode for an unrecognised mode string", async () => {
+    const files = installOpfsMock();
+    files.set(
+      "gnudash-server.json",
+      JSON.stringify({
+        host: "db",
+        port: 5432,
+        user: "u",
+        password: "p",
+        database: "d",
+        mode: "nonsense",
+        bookId: "default",
+      }),
+    );
+    const loaded = await loadServerConfig();
+    expect(loaded?.mode).toBe("gnudash");
   });
 });
 

@@ -39,8 +39,14 @@ interface DashboardContextType {
   isXmlSource: boolean;
   /** Whether the active book is stored locally (OPFS) or on a Postgres server. */
   backend: Backend;
-  /** The book id of the currently open Postgres book, or null when on local backend. */
+  /** The book id of the currently open gnudash-managed Postgres book, or null. */
   postgresBookId: string | null;
+  /**
+   * Raw Postgres schema name for the existing-GnuCash-DB read-only path, or
+   * null. Non-null implies `backend === "postgres"` AND `isWritable === false`
+   * AND the UI should show the amber "existing database — read only" banner.
+   */
+  postgresSchemaOverride: string | null;
   toggleWritable: () => Promise<void>;
   uploadFile: (file: File, writable?: boolean) => Promise<void>;
   /**
@@ -75,9 +81,22 @@ interface DashboardContextType {
    * Reuses the connection + bookId captured on the most recent
    * openPostgresBook / importFileToPostgres call, so the sidebar can drive
    * the reupload without re-prompting for credentials. Throws if called
-   * while not connected to a Postgres backend.
+   * while not connected to a gnudash-managed Postgres backend — the
+   * existing-DB interop path is read-only and has no reupload.
    */
   reuploadPostgresBook: (file: File) => Promise<void>;
+  /**
+   * Open a pre-existing GnuCash Postgres database in read-only mode. Unlike
+   * `openPostgresBook`, the caller supplies a raw `schema` name (usually
+   * "public") instead of a bookId; the schema is used as-is without the
+   * `book_` prefix. The worker loads the dump into the local cache but
+   * wires up a non-writable adapter, so every mutation path in the UI is
+   * gated off by `isWritable: false`. No sync client is created.
+   */
+  openExistingGnuCashBook: (
+    connection: PostgresConnectionInfo,
+    schema: string,
+  ) => Promise<boolean>;
   loadDemo: () => Promise<void>;
   clearData: () => void;
   createTransaction: (payload: CreateTransactionPayload) => Promise<void>;
@@ -106,6 +125,9 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
   const [isXmlSource, setIsXmlSource] = useState(false);
   const [backend, setBackend] = useState<Backend>("local");
   const [postgresBookId, setPostgresBookId] = useState<string | null>(null);
+  const [postgresSchemaOverride, setPostgresSchemaOverride] = useState<
+    string | null
+  >(null);
   const clientRef = useRef<GnuCashWorkerClient | null>(null);
   // Connection used by the currently-open Postgres book. Held in a ref, not
   // state, so reuploadPostgresBook can see the freshly-set value synchronously
@@ -149,8 +171,14 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
           // from the same BACKEND_KEY marker.
           return;
         }
-        const { bookId, ...connection } = cfg;
-        const ok = await openPostgresBook(connection, bookId);
+        const { mode, bookId, schema, ...connection } = cfg;
+        let ok = false;
+        if (mode === "existing" && schema) {
+          ok = await openExistingGnuCashBook(connection, schema);
+        } else if (mode !== "existing" && bookId) {
+          // gnudash mode (explicit or legacy-null).
+          ok = await openPostgresBook(connection, bookId);
+        }
         if (!ok && !cancelled) {
           // Clear the session marker so a reload doesn't silently retry the
           // same broken auto-reconnect; next time the user must actively
@@ -253,6 +281,7 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
       setIsWritable(isXml ? false : writable);
       setBackend("local");
       setPostgresBookId(null);
+      setPostgresSchemaOverride(null);
       sessionStorage.setItem(UPLOADED_AT_KEY, now.toISOString());
       sessionStorage.setItem(WRITABLE_KEY, String(isXml ? false : writable));
       sessionStorage.setItem(BACKEND_KEY, "local");
@@ -309,6 +338,7 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
       setIsWritable(true);
       setBackend("postgres");
       setPostgresBookId(bookId);
+      setPostgresSchemaOverride(null);
       postgresConnectionRef.current = connection;
       sessionStorage.setItem(UPLOADED_AT_KEY, now.toISOString());
       sessionStorage.setItem(WRITABLE_KEY, "true");
@@ -316,7 +346,7 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
 
       // Persist the connection so a page refresh can reconnect without
       // prompting. Plaintext on disk — see server-config.ts security note.
-      const cfg: ServerConfig = { ...connection, bookId };
+      const cfg: ServerConfig = { ...connection, mode: "gnudash", bookId };
       await saveServerConfig(cfg).catch(() => {
         // If OPFS is unavailable the PG session is still fully usable —
         // the user will just have to re-enter credentials next time.
@@ -399,10 +429,81 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
    */
   async function reuploadPostgresBook(file: File) {
     const connection = postgresConnectionRef.current;
-    if (backend !== "postgres" || !connection || !postgresBookId) {
-      throw new Error("Reupload is only available when connected to Postgres");
+    if (
+      backend !== "postgres" ||
+      !connection ||
+      !postgresBookId ||
+      postgresSchemaOverride !== null
+    ) {
+      throw new Error(
+        "Reupload is only available on a gnudash-managed Postgres book",
+      );
     }
     await importFileToPostgres(file, connection, postgresBookId);
+  }
+
+  /**
+   * Open a pre-existing GnuCash desktop Postgres database read-only. Same
+   * fetch-dump → worker flow as `openPostgresBook` but:
+   * - Uses the raw `schema` name instead of `book_{bookId}`.
+   * - Initialises the worker via `openFromPostgresDumpReadOnly`, which wires
+   *   a non-writable adapter. Every mutation method on this context is
+   *   already gated by `isWritable`, so no engine SQL can reach the foreign
+   *   schema.
+   * - Persists the connection with `mode: "existing"` so auto-reconnect
+   *   restores this path on next load.
+   */
+  async function openExistingGnuCashBook(
+    connection: PostgresConnectionInfo,
+    schema: string,
+  ): Promise<boolean> {
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      const client = getClient();
+      await client.waitForReady();
+
+      const res = await fetch("/api/pg/book/dump", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ connection, schema }),
+      });
+      if (!res.ok) {
+        const body = (await res.json().catch(() => ({}))) as { error?: string };
+        throw new Error(body.error ?? `Dump failed: HTTP ${res.status}`);
+      }
+      const dump = (await res.json()) as PostgresDumpPayload;
+
+      await client.openFromPostgresDumpReadOnly(dump);
+      const dashboardData = await client.getFullDashboardData();
+      const now = new Date();
+
+      // Drop any stray OPFS SQLite a previous local session may have left.
+      await deleteFromOPFS().catch(() => {});
+
+      setData(dashboardData);
+      setUploadedAt(now);
+      setIsXmlSource(false);
+      setIsWritable(false);
+      setBackend("postgres");
+      setPostgresBookId(null);
+      setPostgresSchemaOverride(schema);
+      postgresConnectionRef.current = connection;
+      sessionStorage.setItem(UPLOADED_AT_KEY, now.toISOString());
+      sessionStorage.setItem(WRITABLE_KEY, "false");
+      sessionStorage.setItem(BACKEND_KEY, "postgres");
+
+      const cfg: ServerConfig = { ...connection, mode: "existing", schema };
+      await saveServerConfig(cfg).catch(() => {});
+
+      return true;
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Open failed");
+      return false;
+    } finally {
+      setIsLoading(false);
+    }
   }
 
   async function loadDemo() {
@@ -428,6 +529,7 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
     setIsXmlSource(false);
     setBackend("local");
     setPostgresBookId(null);
+    setPostgresSchemaOverride(null);
     postgresConnectionRef.current = null;
     sessionStorage.removeItem(STORAGE_KEY);
     sessionStorage.removeItem(UPLOADED_AT_KEY);
@@ -534,7 +636,7 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
 
   return (
     <DashboardContext.Provider
-      value={{ data, isLoading, error, uploadedAt, isWritable, isXmlSource, backend, postgresBookId, toggleWritable, uploadFile, openPostgresBook, importFileToPostgres, reuploadPostgresBook, loadDemo, clearData, createTransaction, deleteTransaction: deleteTransactionFn, editTransaction, bulkEditTransactions: bulkEditTransactionsFn, createAccount: createAccountFn, updateAccount: updateAccountFn, deleteAccountWithReallocation: deleteAccountWithReallocationFn, createCommodity: createCommodityFn, addPrice: addPriceFn, editPrice: editPriceFn, deletePrice: deletePriceFn, exportFile, setCurrency: setCurrencyFn }}
+      value={{ data, isLoading, error, uploadedAt, isWritable, isXmlSource, backend, postgresBookId, postgresSchemaOverride, toggleWritable, uploadFile, openPostgresBook, importFileToPostgres, reuploadPostgresBook, openExistingGnuCashBook, loadDemo, clearData, createTransaction, deleteTransaction: deleteTransactionFn, editTransaction, bulkEditTransactions: bulkEditTransactionsFn, createAccount: createAccountFn, updateAccount: updateAccountFn, deleteAccountWithReallocation: deleteAccountWithReallocationFn, createCommodity: createCommodityFn, addPrice: addPriceFn, editPrice: editPriceFn, deletePrice: deletePriceFn, exportFile, setCurrency: setCurrencyFn }}
     >
       {children}
     </DashboardContext.Provider>

@@ -2,7 +2,16 @@
 
 import { useState, useRef, useEffect } from "react";
 import Image from "next/image";
-import { Menu, Eye, EyeOff, Pencil, Lock, BookX, ChevronDown } from "lucide-react";
+import {
+  AlertTriangle,
+  BookX,
+  ChevronDown,
+  Eye,
+  EyeOff,
+  Lock,
+  Menu,
+  Pencil,
+} from "lucide-react";
 import { useDashboard } from "@/lib/dashboard-context";
 import { PrivacyProvider, usePrivacy } from "@/lib/privacy-context";
 import { ClosingProvider, useClosing } from "@/lib/closing-context";
@@ -59,7 +68,13 @@ function CurrencySelector() {
 }
 
 function DashboardInner({ children }: { children: React.ReactNode }) {
-  const { data, isWritable, isXmlSource, toggleWritable } = useDashboard();
+  const {
+    data,
+    isWritable,
+    isXmlSource,
+    toggleWritable,
+    postgresSchemaOverride,
+  } = useDashboard();
   const { hideValues, toggleHideValues } = usePrivacy();
   const { excludeClosing, toggleExcludeClosing } = useClosing();
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -172,6 +187,23 @@ function DashboardInner({ children }: { children: React.ReactNode }) {
             <ThemeToggle />
           </div>
         </header>
+
+        {/* Existing-GnuCash-DB read-only banner. Shown across every page so
+            the user doesn't forget they're looking at (and can't change) a
+            database GnuCash desktop is the source of truth for. */}
+        {postgresSchemaOverride && (
+          <div className="flex items-center gap-2 border-b border-amber-300 bg-amber-50 px-4 py-2 text-xs text-amber-900 dark:border-amber-700 dark:bg-amber-950/40 dark:text-amber-200 sm:px-8">
+            <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
+            <span>
+              Connected to existing GnuCash database{" "}
+              <code className="rounded bg-amber-100 px-1 py-0.5 font-mono text-[11px] dark:bg-amber-900/50">
+                {postgresSchemaOverride}
+              </code>{" "}
+              in read-only mode. Close GnuCash desktop before editing on either
+              side to avoid data conflicts.
+            </span>
+          </div>
+        )}
 
         {/* Content */}
         <div className="flex-1 overflow-y-auto p-4 sm:p-6 md:p-8">

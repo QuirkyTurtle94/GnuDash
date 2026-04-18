@@ -22,10 +22,19 @@
  * and not worth gating MVP on.
  */
 
+/** How the active Postgres session is scoped. */
+export type ServerConfigMode = "gnudash" | "existing";
+
 /**
  * Shape of the config we persist. Mirrors `PgConnection` (from
- * `lib/pg/connect`) plus the active `bookId` so the auto-reconnect path can
- * target the same schema without prompting.
+ * `lib/pg/connect`) plus enough context to re-open the same book on
+ * auto-reconnect:
+ *
+ * - `mode: "gnudash"` (default) — gnudash owns the schema, named
+ *   `book_{bookId}`. Writes round-trip to Postgres via the sync client.
+ * - `mode: "existing"` — a real GnuCash desktop database; `schema` names
+ *   the target (usually `public`). Opened read-only; the engine's write
+ *   paths are gated off by `isWritable=false`.
  */
 export interface ServerConfig {
   host: string;
@@ -33,9 +42,14 @@ export interface ServerConfig {
   user: string;
   password: string;
   database: string;
-  bookId: string;
   /** Enable TLS. Required for any non-localhost deployment. */
   ssl?: boolean;
+  /** "gnudash" or "existing"; defaults to "gnudash" for pre-v1 saves. */
+  mode?: ServerConfigMode;
+  /** Book id for gnudash mode (required when mode === "gnudash"). */
+  bookId?: string;
+  /** Raw schema name for existing mode (required when mode === "existing"). */
+  schema?: string;
 }
 
 /** Filename inside the OPFS root. */
@@ -133,6 +147,9 @@ export async function hasServerConfig(): Promise<boolean> {
  * Validate and return a ServerConfig from raw text. Missing/wrong-typed
  * fields cause a null return — we'd rather fall back to the upload screen
  * than feed garbage into an auto-reconnect attempt.
+ *
+ * `mode` is optional and defaults to "gnudash" when missing so configs
+ * written before the existing-DB interop landed still load cleanly.
  */
 function parseServerConfig(text: string): ServerConfig | null {
   let parsed: unknown;
@@ -148,20 +165,30 @@ function parseServerConfig(text: string): ServerConfig | null {
     typeof cfg.port !== "number" ||
     typeof cfg.user !== "string" ||
     typeof cfg.password !== "string" ||
-    typeof cfg.database !== "string" ||
-    typeof cfg.bookId !== "string"
+    typeof cfg.database !== "string"
   ) {
     return null;
   }
-  return {
+
+  const mode: ServerConfigMode =
+    cfg.mode === "existing" || cfg.mode === "gnudash" ? cfg.mode : "gnudash";
+
+  const base = {
     host: cfg.host,
     port: cfg.port,
     user: cfg.user,
     password: cfg.password,
     database: cfg.database,
-    bookId: cfg.bookId,
     ssl: typeof cfg.ssl === "boolean" ? cfg.ssl : undefined,
   };
+
+  if (mode === "existing") {
+    if (typeof cfg.schema !== "string") return null;
+    return { ...base, mode: "existing", schema: cfg.schema };
+  }
+  // gnudash mode (including legacy configs without a mode field)
+  if (typeof cfg.bookId !== "string") return null;
+  return { ...base, mode: "gnudash", bookId: cfg.bookId };
 }
 
 function isRecord(v: unknown): v is Record<string, unknown> {

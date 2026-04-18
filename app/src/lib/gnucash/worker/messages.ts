@@ -33,6 +33,10 @@ export type WorkerRequest =
       connection: PostgresConnectionInfo;
       bookId: string;
     }
+  | {
+      type: "init-pg-dump-readonly";
+      dump: PostgresDumpPayload;
+    }
   | { type: "query"; id: string; fn: DomainFunction }
   | { type: "mutation"; id: string; action: MutationAction; payload: unknown }
   | { type: "set-currency"; id: string; currencyGuid: string }
