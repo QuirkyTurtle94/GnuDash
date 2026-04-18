@@ -33,9 +33,11 @@ import { updateAccount, deleteAccountWithReallocation } from "../engine/operatio
 import { createCommodity } from "../engine/operations/commodity-ops";
 import { addPrice, deletePrice } from "../engine/operations/price-ops";
 import type { AccountType } from "../engine/types";
-import type { WorkerRequest, WorkerResponse, DomainFunction, CreateTransactionPayload, DeleteTransactionPayload, EditTransactionPayload, BulkEditTransactionsPayload, CreateAccountPayload, UpdateAccountPayload, DeleteAccountPayload, CreateCommodityPayload, AddPricePayload, EditPricePayload, DeletePricePayload } from "./messages";
+import type { WorkerRequest, WorkerResponse, DomainFunction, CreateTransactionPayload, DeleteTransactionPayload, EditTransactionPayload, BulkEditTransactionsPayload, CreateAccountPayload, UpdateAccountPayload, DeleteAccountPayload, CreateCommodityPayload, AddPricePayload, EditPricePayload, DeletePricePayload, PostgresConnectionInfo, PostgresDumpPayload } from "./messages";
 import type { GnuCashXmlData } from "../xml/types";
 import { GNUCASH_SCHEMA_DDL } from "../xml/schema";
+import { PostgresSyncClient } from "../db/postgres-sync-client";
+import { createWritablePostgresAdapter } from "../db/postgres-adapter";
 
 let sqlite3: Sqlite3Static;
 
@@ -66,8 +68,43 @@ let db: WasmDatabase | null = null;
 let ctx: ParseContext | null = null;
 let isWritable = false;
 let writableAdapter: WritableDbAdapter | null = null;
+/**
+ * Non-null when the currently open book is backed by the Server (Postgres)
+ * backend. Set by `initFromPostgresDump`; cleared by `closeDb`. When set,
+ * every mutation handler awaits `syncClient.flush()` before responding so
+ * the UI only sees the "saved" state after the Postgres round-trip.
+ */
+let syncClient: PostgresSyncClient | null = null;
 
 const OPFS_DB_NAME = "/gnucash-dashboard.db";
+
+/**
+ * DDL for ancillary engine tables (`lots`) that older .gnucash files may be
+ * missing. Duplicates the private ENSURE_TABLES_SQL in writable-wasm-adapter
+ * so the Postgres-backed local cache can bootstrap the same shape without
+ * depending on the writable adapter that we are intentionally NOT using here.
+ */
+const EXTRA_ENGINE_TABLES_SQL = `
+  CREATE TABLE IF NOT EXISTS lots (
+    guid TEXT PRIMARY KEY,
+    account_guid TEXT NOT NULL,
+    is_closed INTEGER DEFAULT 0
+  );
+  CREATE TABLE IF NOT EXISTS slots (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    obj_guid TEXT NOT NULL,
+    name TEXT NOT NULL,
+    slot_type INTEGER NOT NULL,
+    int64_val INTEGER,
+    string_val TEXT,
+    double_val REAL,
+    timespec_val TEXT,
+    guid_val TEXT,
+    numeric_val_num INTEGER,
+    numeric_val_denom INTEGER,
+    gdate_val TEXT
+  );
+`;
 
 function post(msg: WorkerResponse) {
   self.postMessage(msg);
@@ -268,6 +305,56 @@ function closeDb(): void {
     writableAdapter = null;
     isWritable = false;
   }
+  syncClient = null;
+}
+
+/**
+ * Build an in-memory SQLite WASM cache from a `/api/pg/book/dump` payload and
+ * wrap it with a Postgres-backed writable adapter. The local cache uses the
+ * engine's existing SQLite DDL (INTEGER / TEXT affinities) — SQLite's type
+ * system transparently coerces the BIGINT-as-string values that node-postgres
+ * returns into INTEGER for the numeric-pair columns, so no per-column
+ * normalisation is required here.
+ *
+ * Every mutation routed through the resulting adapter will be applied
+ * locally first and enqueued on `syncClient`; the mutation handler in the
+ * message loop awaits `syncClient.flush()` before posting the result.
+ */
+function initFromPostgresDump(
+  dump: PostgresDumpPayload,
+  connection: PostgresConnectionInfo,
+  bookId: string,
+): void {
+  closeDb();
+  isWritable = true;
+
+  db = new sqlite3.oo1.DB();
+  db.exec({ sql: GNUCASH_SCHEMA_DDL });
+  db.exec({ sql: EXTRA_ENGINE_TABLES_SQL });
+
+  for (const [table, rows] of Object.entries(dump.tables)) {
+    if (rows.length === 0) continue;
+    // `gnudash_meta` is a Postgres-only metadata table — the local cache has
+    // no schema for it and the engine never reads it.
+    if (table === "gnudash_meta") continue;
+    // Defensive: drop any columns the local SQLite schema does not declare.
+    // In practice the two match, but this keeps us forward-compatible if the
+    // Postgres schema ever gains a column the engine doesn't know about.
+    const columns = Object.keys(rows[0]);
+    const placeholders = columns.map(() => "?").join(", ");
+    const sql = `INSERT INTO ${table} (${columns.join(", ")}) VALUES (${placeholders})`;
+    for (const row of rows) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const values = columns.map((c) => row[c]) as any[];
+      db.exec({ sql, bind: values });
+    }
+  }
+
+  syncClient = new PostgresSyncClient(connection, bookId);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  writableAdapter = createWritablePostgresAdapter(db as any, syncClient);
+  validateSchema(writableAdapter);
+  ctx = buildParseContext(writableAdapter);
 }
 
 function getFullDashboardData(): DashboardData {
@@ -716,6 +803,21 @@ self.onmessage = async (e: MessageEvent<WorkerRequest>) => {
       break;
     }
 
+    case "init-pg-dump": {
+      try {
+        initFromPostgresDump(msg.dump, msg.connection, msg.bookId);
+        console.log(
+          "[db-worker] DB restored from Postgres dump",
+          `book=${msg.bookId}`,
+          "(read-write, syncing)",
+        );
+        post({ type: "ready" });
+      } catch (err) {
+        post({ type: "init-error", message: (err as Error).message });
+      }
+      break;
+    }
+
     case "query": {
       try {
         if (!ctx) throw new Error("No database loaded");
@@ -769,6 +871,14 @@ self.onmessage = async (e: MessageEvent<WorkerRequest>) => {
             break;
           default:
             throw new Error(`Unknown mutation action: ${msg.action}`);
+        }
+        // On the Postgres backend, round-trip the pending write batch before
+        // telling the UI the mutation succeeded. Sync errors propagate to the
+        // catch block and surface as a standard `error` response — the UI is
+        // expected to show the message and prompt the user to reload so the
+        // local cache can reconcile with authoritative server state.
+        if (syncClient) {
+          await syncClient.flush();
         }
         post({ type: "result", id: msg.id, data });
       } catch (err) {
