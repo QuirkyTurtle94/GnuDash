@@ -4,6 +4,7 @@
  */
 
 import type { GnuCashXmlData } from "../xml/types";
+import type { AccountType } from "../engine/types";
 
 /** Connection params for the Postgres backend (#48). Mirrors `PgConnection`
  *  in `lib/pg/connect.ts` but lives here so worker modules never need to
@@ -28,6 +29,11 @@ export type WorkerRequest =
   | { type: "init-xml"; xmlData: GnuCashXmlData }
   | { type: "init-opfs"; fileName: string; writable?: boolean }
   | {
+      type: "init-empty-book";
+      spec: InitEmptyBookPayload;
+      persistToOpfs: boolean;
+    }
+  | {
       type: "init-pg-dump";
       dump: PostgresDumpPayload;
       connection: PostgresConnectionInfo;
@@ -42,6 +48,33 @@ export type WorkerRequest =
   | { type: "set-currency"; id: string; currencyGuid: string }
   | { type: "export"; id: string }
   | { type: "close" };
+
+/**
+ * Serialisable payload describing a fresh chart of accounts. Built on the
+ * main thread from the wizard's template + user edits, then posted to the
+ * worker via `init-empty-book`. The worker walks the tree depth-first,
+ * assigning generated GUIDs as it goes, so the caller never has to
+ * pre-compute parent relationships.
+ */
+export interface InitEmptyBookPayload {
+  /** Cosmetic book name — currently only stored for future use. */
+  bookName: string;
+  /** ISO 4217 code for the base currency commodity. Uppercased before use. */
+  baseCurrencyMnemonic: string;
+  /** Human-readable name for the base currency (e.g. "US Dollar"). */
+  baseCurrencyFullname: string;
+  /** Top-level accounts under ROOT — walked recursively. */
+  accounts: TemplateAccountNode[];
+}
+
+/** Tree node mirroring `TemplateAccount` from the templates module. */
+export interface TemplateAccountNode {
+  name: string;
+  type: AccountType;
+  placeholder?: boolean;
+  description?: string;
+  children?: TemplateAccountNode[];
+}
 
 export type DomainFunction =
   | "buildAccountTree"

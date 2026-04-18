@@ -1,8 +1,9 @@
 "use client";
 
 import { useCallback, useState } from "react";
-import { Loader2, Play, Upload } from "lucide-react";
+import { Loader2, Play, Sparkles, Upload } from "lucide-react";
 import { useDashboard } from "@/lib/dashboard-context";
+import { FreshBookWizard } from "./fresh-book-wizard";
 
 const MAX_FILE_SIZE_BYTES = 200 * 1024 * 1024;
 
@@ -21,6 +22,7 @@ export function LocalUploadPanel() {
   const [isDragging, setIsDragging] = useState(false);
   const [readOnly, setReadOnly] = useState(false);
   const [fileSizeError, setFileSizeError] = useState<string | null>(null);
+  const [showWizard, setShowWizard] = useState(false);
 
   const handleFile = useCallback(
     (file: File) => {
@@ -69,6 +71,15 @@ export function LocalUploadPanel() {
     };
     input.click();
   }, [handleFile]);
+
+  if (showWizard) {
+    return (
+      <FreshBookWizard
+        target={{ kind: "local" }}
+        onCancel={() => setShowWizard(false)}
+      />
+    );
+  }
 
   return (
     <div>
@@ -126,14 +137,24 @@ export function LocalUploadPanel() {
         <div className="h-px flex-1 bg-[#D4DAE0]" />
       </div>
 
-      <button
-        onClick={loadDemo}
-        disabled={isLoading}
-        className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl border-2 border-[#D4DAE0] bg-white px-4 py-3 text-sm font-medium text-[#6F767E] transition-all hover:border-[#6C9B8B]/50 hover:bg-[#6C9B8B]/5 hover:text-[#6C9B8B] disabled:opacity-50"
-      >
-        <Play className="h-4 w-4" />
-        Try with demo data
-      </button>
+      <div className="mt-4 grid grid-cols-2 gap-3">
+        <button
+          onClick={() => setShowWizard(true)}
+          disabled={isLoading}
+          className="flex items-center justify-center gap-2 rounded-xl border-2 border-[#D4DAE0] bg-white px-4 py-3 text-sm font-medium text-[#6F767E] transition-all hover:border-[#6C9B8B]/50 hover:bg-[#6C9B8B]/5 hover:text-[#6C9B8B] disabled:opacity-50"
+        >
+          <Sparkles className="h-4 w-4" />
+          Start fresh
+        </button>
+        <button
+          onClick={loadDemo}
+          disabled={isLoading}
+          className="flex items-center justify-center gap-2 rounded-xl border-2 border-[#D4DAE0] bg-white px-4 py-3 text-sm font-medium text-[#6F767E] transition-all hover:border-[#6C9B8B]/50 hover:bg-[#6C9B8B]/5 hover:text-[#6C9B8B] disabled:opacity-50"
+        >
+          <Play className="h-4 w-4" />
+          Try demo
+        </button>
+      </div>
 
       {(error || fileSizeError) && (
         <div className="mt-4 rounded-xl bg-red-50 p-4 text-center">

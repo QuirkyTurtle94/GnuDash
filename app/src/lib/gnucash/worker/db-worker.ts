@@ -40,7 +40,8 @@ import {
   clearBudgetAmount as clearBudgetAmountOp,
 } from "../engine/operations/budget-ops";
 import type { AccountType } from "../engine/types";
-import type { WorkerRequest, WorkerResponse, DomainFunction, CreateTransactionPayload, DeleteTransactionPayload, EditTransactionPayload, BulkEditTransactionsPayload, CreateAccountPayload, UpdateAccountPayload, DeleteAccountPayload, CreateCommodityPayload, AddPricePayload, EditPricePayload, DeletePricePayload, CreateBudgetPayload, UpdateBudgetPayload, DeleteBudgetPayload, SetBudgetAmountPayload, ClearBudgetAmountPayload, PostgresConnectionInfo, PostgresDumpPayload } from "./messages";
+import type { WorkerRequest, WorkerResponse, DomainFunction, CreateTransactionPayload, DeleteTransactionPayload, EditTransactionPayload, BulkEditTransactionsPayload, CreateAccountPayload, UpdateAccountPayload, DeleteAccountPayload, CreateCommodityPayload, AddPricePayload, EditPricePayload, DeletePricePayload, CreateBudgetPayload, UpdateBudgetPayload, DeleteBudgetPayload, SetBudgetAmountPayload, ClearBudgetAmountPayload, PostgresConnectionInfo, PostgresDumpPayload, InitEmptyBookPayload, TemplateAccountNode } from "./messages";
+import { generateGuid } from "../engine/guid";
 import type { GnuCashXmlData } from "../xml/types";
 import { GNUCASH_SCHEMA_DDL } from "../xml/schema";
 import { PostgresSyncClient } from "../db/postgres-sync-client";
@@ -302,6 +303,150 @@ function initFromXmlData(data: GnuCashXmlData): void {
   const adapter = createWasmAdapter(db);
   validateSchema(adapter);
   ctx = buildParseContext(adapter);
+}
+
+/**
+ * Seed the open `db` with a minimal viable GnuCash book:
+ *   - one `books` row
+ *   - one ROOT account owning the tree
+ *   - one CURRENCY commodity (the user-chosen base currency)
+ *   - a ROOT template account that budgets/recurrences reference
+ *   - the template's account tree, walked depth-first
+ *
+ * Shared between the in-memory (init-empty-book) path and anywhere else
+ * that needs to materialise a blank book against an already-open DB.
+ */
+function seedEmptyBook(database: WasmDatabase, spec: InitEmptyBookPayload): void {
+  const mnemonic = spec.baseCurrencyMnemonic.trim().toUpperCase();
+  if (!/^[A-Z]{3}$/.test(mnemonic)) {
+    throw new Error(
+      `Base currency "${spec.baseCurrencyMnemonic}" must be a 3-letter ISO code.`,
+    );
+  }
+
+  const bookGuid = generateGuid();
+  const rootAccountGuid = generateGuid();
+  const rootTemplateGuid = generateGuid();
+  const commodityGuid = generateGuid();
+
+  // Commodity first so the ROOT account can reference it via FK.
+  database.exec({
+    sql: `INSERT INTO commodities (guid, namespace, mnemonic, fullname, cusip, fraction) VALUES (?, ?, ?, ?, ?, ?)`,
+    bind: [commodityGuid, "CURRENCY", mnemonic, spec.baseCurrencyFullname || mnemonic, "", 100],
+  });
+
+  // ROOT account — the hidden top of the tree every real account hangs off.
+  // commodity_guid on ROOT doubles as the book's base currency marker
+  // (buildParseContext reads it via `WHERE account_type = 'ROOT'`).
+  database.exec({
+    sql: `INSERT INTO accounts (guid, name, account_type, commodity_guid, commodity_scu,
+                                non_std_scu, parent_guid, code, description, hidden, placeholder)
+          VALUES (?, ?, 'ROOT', ?, 100, 0, NULL, '', '', 0, 0)`,
+    bind: [rootAccountGuid, "Root Account", commodityGuid],
+  });
+
+  // Template Root — GnuCash desktop creates this even in books without
+  // scheduled transactions. Harmless to include; matches the shape the
+  // desktop app produces so round-tripping through .gnucash export works.
+  database.exec({
+    sql: `INSERT INTO accounts (guid, name, account_type, commodity_guid, commodity_scu,
+                                non_std_scu, parent_guid, code, description, hidden, placeholder)
+          VALUES (?, ?, 'ROOT', ?, 100, 0, NULL, '', '', 0, 0)`,
+    bind: [rootTemplateGuid, "Template Root", commodityGuid],
+  });
+
+  database.exec({
+    sql: `INSERT INTO books (guid, root_account_guid, root_template_guid, num_periods) VALUES (?, ?, ?, 0)`,
+    bind: [bookGuid, rootAccountGuid, rootTemplateGuid],
+  });
+
+  // Walk the template tree. Each node becomes an `accounts` row; children
+  // recurse with their parent's freshly-generated GUID.
+  const insertNode = (node: TemplateAccountNode, parentGuid: string): void => {
+    const guid = generateGuid();
+    database.exec({
+      sql: `INSERT INTO accounts (guid, name, account_type, commodity_guid, commodity_scu,
+                                  non_std_scu, parent_guid, code, description, hidden, placeholder)
+            VALUES (?, ?, ?, ?, 100, 0, ?, '', ?, 0, ?)`,
+      bind: [
+        guid,
+        node.name,
+        node.type,
+        commodityGuid,
+        parentGuid,
+        node.description ?? "",
+        node.placeholder ? 1 : 0,
+      ],
+    });
+    if (node.children) {
+      for (const child of node.children) {
+        insertNode(child, guid);
+      }
+    }
+  };
+
+  for (const top of spec.accounts) {
+    insertNode(top, rootAccountGuid);
+  }
+}
+
+/**
+ * Create a brand-new empty book — no source file, just a user-picked
+ * template + base currency — and open it through the standard adapter
+ * plumbing so the rest of the engine treats it identically to an imported
+ * book.
+ *
+ * When `persistToOpfs` is set and OPFS is available, the freshly seeded DB
+ * is dumped to OPFS and re-opened from there so reloads restore the book.
+ * For the Postgres path the caller flips this off, uses `exportDatabase`
+ * to grab a SQLite buffer, and uploads it via the existing import route —
+ * the local copy is transient and gets cleared right after.
+ */
+async function initEmptyBook(
+  spec: InitEmptyBookPayload,
+  persistToOpfs: boolean,
+): Promise<void> {
+  closeDb();
+  isWritable = true;
+
+  const hasOpfs = !!sqlite3.oo1.OpfsDb;
+  const shouldPersist = persistToOpfs && hasOpfs;
+
+  // Build the fresh book in an in-memory scratch DB first. Going straight to
+  // OPFS would commit every partial INSERT to disk even on failure; keeping
+  // the build in-memory means a crash leaves no half-written file behind.
+  const scratch = new sqlite3.oo1.DB();
+  try {
+    scratch.exec({ sql: GNUCASH_SCHEMA_DDL });
+    scratch.exec({ sql: EXTRA_ENGINE_TABLES_SQL });
+    seedEmptyBook(scratch, spec);
+
+    if (shouldPersist) {
+      // Export the scratch DB to a buffer, import it into OPFS, then re-open
+      // from OPFS so the engine sees the on-disk file as the source of truth.
+      const exported = sqlite3.capi.sqlite3_js_db_export(scratch.pointer!);
+      const buffer = exported.buffer.slice(
+        exported.byteOffset,
+        exported.byteOffset + exported.byteLength,
+      );
+      await sqlite3.oo1.OpfsDb.importDb(OPFS_DB_NAME, buffer);
+      scratch.close();
+      db = new sqlite3.oo1.OpfsDb(OPFS_DB_NAME, "rw");
+    } else {
+      // Non-persistent path (Postgres upload, or OPFS unavailable). Keep the
+      // scratch DB as the live handle so `exportDatabase` works.
+      db = scratch;
+    }
+  } catch (err) {
+    // Only close scratch if we didn't already hand it off as `db`.
+    if (db !== scratch) scratch.close();
+    throw err;
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  writableAdapter = createWritableWasmAdapter(db as any);
+  validateSchema(writableAdapter);
+  ctx = buildParseContext(writableAdapter);
 }
 
 function closeDb(): void {
@@ -923,6 +1068,20 @@ self.onmessage = async (e: MessageEvent<WorkerRequest>) => {
       try {
         initFromOpfs(msg.writable ?? false);
         console.log("[db-worker] DB restored from OPFS", isWritable ? "(read-write)" : "(read-only)");
+        post({ type: "ready" });
+      } catch (err) {
+        post({ type: "init-error", message: (err as Error).message });
+      }
+      break;
+    }
+
+    case "init-empty-book": {
+      try {
+        await initEmptyBook(msg.spec, msg.persistToOpfs);
+        console.log(
+          "[db-worker] DB created from fresh-book template",
+          msg.persistToOpfs ? "(persisted to OPFS)" : "(in-memory)",
+        );
         post({ type: "ready" });
       } catch (err) {
         post({ type: "init-error", message: (err as Error).message });
