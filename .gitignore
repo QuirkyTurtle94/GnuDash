@@ -10,6 +10,10 @@ build/
 dist/
 .wrangler/
 
+# Created by scripts/next-build.mjs when NEXT_OUTPUT=export is set; should
+# be removed automatically but an interrupted build can leave it behind.
+.api-parked-for-export/
+
 # Environment
 .env
 .env.local
@@ -58,7 +62,12 @@ coverage/
 playwright.config.ts
 playwright-report/
 test-results/
-app/scripts/
+# Dev-only automation scripts (Playwright screenshots etc.) live under
+# app/scripts/ and are ignored by default; un-ignore specific scripts below
+# if they are production build tooling. Git can't re-include files when the
+# directory itself is ignored, so we ignore contents instead of the dir.
+app/scripts/*
+!app/scripts/next-build.mjs
 
 # Internal docs
 ROADMAP.md

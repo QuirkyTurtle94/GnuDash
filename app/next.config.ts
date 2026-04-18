@@ -10,6 +10,11 @@ const output: NextConfig["output"] =
 
 const nextConfig: NextConfig = {
   output,
+  // better-sqlite3 is a native module and `pg` pulls in optional native bits
+  // (pg-native). Keep them as external commonjs requires at runtime instead
+  // of letting the bundler try to inline them — both are only used by the
+  // Server-backend API routes (/api/pg/*) under Node, never in the browser.
+  serverExternalPackages: ["better-sqlite3", "pg"],
   images: {
     unoptimized: true,
   },
