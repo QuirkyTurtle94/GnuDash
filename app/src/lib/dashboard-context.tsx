@@ -14,6 +14,7 @@ import type { CreateTransactionPayload, DeleteTransactionPayload, EditTransactio
 import { generateDemoData } from "@/lib/demo-data";
 import { deleteFromOPFS } from "@/lib/gnucash/worker/opfs";
 import {
+  loadServerConfig,
   saveServerConfig,
   type ServerConfig,
 } from "@/lib/storage/server-config";
@@ -45,13 +46,20 @@ interface DashboardContextType {
   /**
    * Open a book from a Postgres server: fetch the dump, restore into the
    * worker's in-memory SQLite cache, and switch the backend to "postgres".
-   * Persists the connection to OPFS (plaintext — see server-config.ts) so a
-   * future PR can auto-reconnect.
+   * Persists the connection to OPFS (plaintext — see server-config.ts) so
+   * the next app load can auto-reconnect.
+   *
+   * Returns `true` on success and `false` if anything in the pipeline
+   * failed (server unreachable, credentials rejected, book missing, etc.)
+   * — failure is also surfaced via the `error` field on the context, so
+   * UI callers can usually ignore the return value; the boolean exists for
+   * the auto-reconnect path in `restore()` which needs to decide whether
+   * to clear the "was on Postgres last time" marker.
    */
   openPostgresBook: (
     connection: PostgresConnectionInfo,
     bookId: string,
-  ) => Promise<void>;
+  ) => Promise<boolean>;
   /**
    * Upload a .gnucash file (SQLite or XML) to a Postgres server and then
    * open the resulting book. XML files are converted to SQLite client-side
@@ -125,13 +133,31 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
       const storedBackend =
         (sessionStorage.getItem(BACKEND_KEY) as Backend | null) ?? "local";
 
-      // Postgres sessions don't persist anything usable on the client, so
-      // skip the OPFS + session-storage restore paths outright and let the
-      // upload screen render. The Server tab preselect handles UX continuity.
+      // Postgres session: try to auto-reconnect from the OPFS-persisted
+      // credentials (written by openPostgresBook via saveServerConfig).
+      // On any failure (no config saved, server down, credentials rotated,
+      // book gone) we fall through to the upload screen with the Server tab
+      // preselected and fields prefilled so the user can retry without
+      // retyping. The `isLoading` flag keeps the upload form hidden until
+      // the auto-reconnect resolves one way or the other.
       if (storedBackend === "postgres") {
-        // Drop any local-mode caches that a previous local session may have
-        // left behind — we're in Postgres land now.
         sessionStorage.removeItem(STORAGE_KEY);
+        const cfg = await loadServerConfig();
+        if (cancelled || !cfg) {
+          // Either the config never made it to OPFS or it's been cleared.
+          // Fall through to the upload screen — the Server tab will preselect
+          // from the same BACKEND_KEY marker.
+          return;
+        }
+        const { bookId, ...connection } = cfg;
+        const ok = await openPostgresBook(connection, bookId);
+        if (!ok && !cancelled) {
+          // Clear the session marker so a reload doesn't silently retry the
+          // same broken auto-reconnect; next time the user must actively
+          // Connect. The Server tab still preselects via the panel's own
+          // loadServerConfig() read, so fields stay prefilled.
+          sessionStorage.removeItem(BACKEND_KEY);
+        }
         return;
       }
 
@@ -175,6 +201,11 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
 
     restore();
     return () => { cancelled = true; };
+    // `openPostgresBook` is defined in the same render and doesn't capture
+    // stale state (it reads everything through setters / refs), so the
+    // mount-only semantics here are intentional — adding it to deps would
+    // just re-run the whole restore-on-boot logic every render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Persist to sessionStorage when data changes (fast restore cache)
@@ -242,7 +273,7 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
   async function openPostgresBook(
     connection: PostgresConnectionInfo,
     bookId: string,
-  ) {
+  ): Promise<boolean> {
     setIsLoading(true);
     setError(null);
 
@@ -290,8 +321,10 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
         // If OPFS is unavailable the PG session is still fully usable —
         // the user will just have to re-enter credentials next time.
       });
+      return true;
     } catch (err) {
       setError(err instanceof Error ? err.message : "Open failed");
+      return false;
     } finally {
       setIsLoading(false);
     }

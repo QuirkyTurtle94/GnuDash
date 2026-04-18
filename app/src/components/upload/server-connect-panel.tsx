@@ -1,9 +1,10 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Loader2, Server, Upload } from "lucide-react";
 import { useDashboard } from "@/lib/dashboard-context";
 import type { PostgresConnectionInfo } from "@/lib/gnucash/worker/messages";
+import { loadServerConfig } from "@/lib/storage/server-config";
 
 /**
  * Server (Postgres) backend panel of the upload screen (#48).
@@ -51,6 +52,34 @@ export function ServerConnectPanel() {
   const [localError, setLocalError] = useState<string | null>(null);
   const [fileSizeError, setFileSizeError] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
+
+  // Prefill from OPFS-persisted server-config when the panel mounts so users
+  // who land here after a failed auto-reconnect don't have to retype every
+  // field. Runs after first paint to keep SSR/CSR output identical (OPFS
+  // isn't accessible on the server).
+  useEffect(() => {
+    let cancelled = false;
+    loadServerConfig()
+      .then((saved) => {
+        if (cancelled || !saved) return;
+        const { bookId: savedBookId, ...rest } = saved;
+        setConnection({
+          host: rest.host,
+          port: rest.port,
+          user: rest.user,
+          password: rest.password,
+          database: rest.database,
+          ssl: rest.ssl ?? false,
+        });
+        setBookId(savedBookId);
+      })
+      .catch(() => {
+        // No saved config or OPFS unavailable — stay on defaults.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const updateConnection = useCallback(
     <K extends keyof PostgresConnectionInfo>(

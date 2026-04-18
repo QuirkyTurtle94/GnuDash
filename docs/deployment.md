@@ -310,15 +310,51 @@ If you can't set custom headers (e.g. GitHub Pages), the app will still load but
 
 ---
 
-## Self-hosted Postgres backend (in development)
+## Self-hosted Postgres backend
 
-The repo-root `docker-compose.yml` starts a Postgres 16 container that the upcoming Server backend ([issue #48](https://github.com/QuirkyTurtle94/GnuDash/issues/48)) will connect to. For developers following along with that work:
+The Server (Postgres) backend is an alternative to the Local (OPFS) backend: your book lives in a Postgres database you control, so the same data is reachable from every browser that can reach the server. Every write made in the UI is applied to a local SQLite WASM cache first (keeps the dashboard fast) and round-tripped to Postgres before the UI shows the "saved" state.
+
+Requires the **standalone** build mode — the API routes that talk to Postgres can't be served by a static-file host. A static deployment (nginx, Cloudflare Pages, Netlify) cannot use this backend.
+
+### 1. Start Postgres
+
+The repo includes a ready-to-go `docker-compose.yml` that boots `postgres:16-alpine` with sensible defaults:
 
 ```bash
-docker compose up -d postgres     # start the DB
-./scripts/db-reset.sh             # stop AND drop the data volume
+docker compose up -d postgres
 ```
 
-Defaults: `host=localhost port=5432 user=gnudash password=gnudash database=gnudash`. Override via environment variables (`POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB`, `POSTGRES_PORT`) before `docker compose up`. **Any non-localhost deployment must terminate TLS in front of the app** — the Server backend sends Postgres credentials in request bodies from the browser.
+Defaults: `host=localhost port=5432 user=gnudash password=gnudash database=gnudash`. Override before the first `up` via `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB`, `POSTGRES_PORT` env vars (or a `.env` file next to `docker-compose.yml`). `./scripts/db-reset.sh` wipes the data volume when you want to start over.
 
-End-user walkthrough (Server tab on the upload screen, auto-reconnect, credentials-in-OPFS security note) will land with the final PR of issue #48.
+### 2. Run the app in standalone mode
+
+From the `app/` directory:
+
+```bash
+npm install
+npm run build          # produces app/.next/standalone/
+node .next/standalone/server.js
+```
+
+The Postgres API routes live under `/api/pg/*` and are automatically included in the standalone bundle. For a container-based deployment you can write a small Dockerfile that copies `.next/standalone/`, `.next/static/`, and `public/` into a `node:20-alpine` image and runs `server.js` on port 3000 — this repo doesn't ship one by default because the deployment shape is highly site-specific.
+
+### 3. Connect from the upload screen
+
+Open the app in a browser, pick the **Server (Postgres)** tab on the upload screen, fill in the connection form (the defaults match `docker-compose.yml`), and click **Connect**:
+
+- If the book doesn't exist yet, you'll be prompted to drop a `.gnucash` file (SQLite or XML — XML is converted to SQLite in the browser before upload). The file bootstraps the schema.
+- If the book already exists, the app loads it directly.
+
+After a successful connect the connection is persisted to your browser's Origin Private File System so a page reload auto-reconnects without prompting. The **Reupload to Postgres** button in the sidebar replaces the server book in place; the **Disconnect** button returns you to the upload screen without touching the server.
+
+### 4. Security
+
+**Credentials are stored in plaintext** in OPFS so auto-reconnect works. OPFS is sandboxed per origin (no other website can read it) but any JavaScript running on this origin can. Treat the gnudash origin like any other app that handles its own credentials:
+
+- **Terminate TLS in front of the app for any non-localhost deployment.** The Server backend sends the Postgres password in each request body from the browser; without TLS it's exposed on the wire.
+- Use a strong, dedicated Postgres user for gnudash. Don't reuse the password anywhere else.
+- Consider host the app behind an auth reverse proxy (oauth2-proxy, Authelia, etc.) if it's on the open internet.
+
+### 5. Storage model
+
+Each book lives in its own Postgres schema named `book_{bookId}` — the MVP ships with a single `book_default` but the schema indirection is there so per-user / multi-tenant deployments are an additive change rather than a redesign. The gnudash schema is **not interop-compatible with GnuCash desktop's Postgres backend**: if you have an existing GnuCash Postgres database, upload your data via the Server tab instead of pointing gnudash at it directly.
