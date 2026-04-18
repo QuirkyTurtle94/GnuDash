@@ -17,7 +17,7 @@ import type {
   BudgetData,
   DashboardData,
 } from "@/lib/types/gnucash";
-import type { WorkerRequest, WorkerResponse, DomainFunction, MutationAction, CreateTransactionPayload, DeleteTransactionPayload, EditTransactionPayload, BulkEditTransactionsPayload, CreateAccountPayload, UpdateAccountPayload, DeleteAccountPayload, CreateCommodityPayload, AddPricePayload, EditPricePayload, DeletePricePayload, PostgresConnectionInfo, PostgresDumpPayload } from "./messages";
+import type { WorkerRequest, WorkerResponse, DomainFunction, MutationAction, CreateTransactionPayload, DeleteTransactionPayload, EditTransactionPayload, BulkEditTransactionsPayload, CreateAccountPayload, UpdateAccountPayload, DeleteAccountPayload, CreateCommodityPayload, AddPricePayload, EditPricePayload, DeletePricePayload, CreateBudgetPayload, UpdateBudgetPayload, DeleteBudgetPayload, SetBudgetAmountPayload, ClearBudgetAmountPayload, PostgresConnectionInfo, PostgresDumpPayload } from "./messages";
 import { parseGnuCashXml } from "../xml/parser";
 
 type PendingRequest = {
@@ -378,6 +378,39 @@ export class GnuCashWorkerClient {
   /** Delete a price entry from the prices table. */
   async deletePrice(payload: DeletePricePayload): Promise<DashboardData> {
     return this.mutate("deletePrice", payload);
+  }
+
+  /**
+   * Create a new budget + its recurrence row. Returns the refreshed dashboard
+   * data augmented with the new budget's GUID so callers can navigate into
+   * the editor in one round-trip.
+   */
+  async createBudget(
+    payload: CreateBudgetPayload,
+  ): Promise<DashboardData & { budgetGuid: string }> {
+    return this.mutate("createBudget", payload) as Promise<
+      DashboardData & { budgetGuid: string }
+    >;
+  }
+
+  /** Update a budget's metadata and recurrence row. */
+  async updateBudget(payload: UpdateBudgetPayload): Promise<DashboardData> {
+    return this.mutate("updateBudget", payload);
+  }
+
+  /** Delete a budget and every row hanging off it (amounts + recurrence). */
+  async deleteBudget(payload: DeleteBudgetPayload): Promise<DashboardData> {
+    return this.mutate("deleteBudget", payload);
+  }
+
+  /** Upsert a single budget_amounts cell. */
+  async setBudgetAmount(payload: SetBudgetAmountPayload): Promise<DashboardData> {
+    return this.mutate("setBudgetAmount", payload);
+  }
+
+  /** Remove a single budget_amounts cell (re-enables parent rollup). */
+  async clearBudgetAmount(payload: ClearBudgetAmountPayload): Promise<DashboardData> {
+    return this.mutate("clearBudgetAmount", payload);
   }
 
   // ── Domain queries ─────────────────────────────────────────────

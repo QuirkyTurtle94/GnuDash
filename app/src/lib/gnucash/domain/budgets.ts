@@ -1,6 +1,86 @@
-import type { BudgetData, BudgetDataForBudget, BudgetInfo, BudgetCategoryRow } from "@/lib/types/gnucash";
+import type { BudgetData, BudgetDataForBudget, BudgetInfo, BudgetCategoryRow, BudgetPeriodType, RawBudgetCell } from "@/lib/types/gnucash";
 import type { ParseContext } from "../context";
 import { sqlYear, sqlMonthNum } from "../shared/dates";
+
+/**
+ * Normalise a GnuCash `recurrence_period_start` value (stored as compact
+ * `YYYYMMDD` in the SQLite backend and `YYYY-MM-DD` in Postgres) to ISO
+ * `YYYY-MM-DD` for use in the UI.
+ */
+export function normaliseRecurrenceStart(raw: string | null | undefined): string {
+  if (!raw) return "";
+  const trimmed = raw.trim();
+  if (/^\d{8}$/.test(trimmed)) {
+    return `${trimmed.slice(0, 4)}-${trimmed.slice(4, 6)}-${trimmed.slice(6, 8)}`;
+  }
+  // Already ISO or ISO-with-time — take the date portion.
+  return trimmed.slice(0, 10);
+}
+
+const VALID_PERIOD_TYPES: ReadonlySet<BudgetPeriodType> = new Set([
+  "day",
+  "week",
+  "month",
+  "year",
+]);
+
+export function normalisePeriodType(raw: string | null | undefined): BudgetPeriodType {
+  if (raw && VALID_PERIOD_TYPES.has(raw as BudgetPeriodType)) {
+    return raw as BudgetPeriodType;
+  }
+  return "month";
+}
+
+/**
+ * Load the `budgets` table joined with matching `recurrences` rows and return
+ * enriched BudgetInfo[]. Returns an empty array when the `budgets` table does
+ * not exist (older GnuCash files) or when no budgets are defined. Shared
+ * between the cash-flow budget module and the main budget module so the
+ * recurrence attachment logic stays in one place.
+ */
+export function loadBudgetInfos(db: ParseContext["db"]): BudgetInfo[] {
+  const hasBudgets = db
+    .prepare(`SELECT name FROM sqlite_master WHERE type='table' AND name='budgets'`)
+    .get() as { name: string } | undefined;
+  if (!hasBudgets) return [];
+
+  const budgetRows = db
+    .prepare(`SELECT guid, name, description, num_periods FROM budgets`)
+    .all() as { guid: string; name: string; description: string; num_periods: number }[];
+  if (budgetRows.length === 0) return [];
+
+  const hasRecurrences = db
+    .prepare(`SELECT name FROM sqlite_master WHERE type='table' AND name='recurrences'`)
+    .get() as { name: string } | undefined;
+  const recurrenceRows = hasRecurrences
+    ? (db
+        .prepare(
+          `SELECT obj_guid, recurrence_mult, recurrence_period_type, recurrence_period_start
+           FROM recurrences`
+        )
+        .all() as {
+          obj_guid: string;
+          recurrence_mult: number | null;
+          recurrence_period_type: string | null;
+          recurrence_period_start: string | null;
+        }[])
+    : [];
+  const recurrenceByBudget = new Map<string, typeof recurrenceRows[number]>();
+  for (const r of recurrenceRows) recurrenceByBudget.set(r.obj_guid, r);
+
+  return budgetRows.map((b) => {
+    const rec = recurrenceByBudget.get(b.guid);
+    return {
+      guid: b.guid,
+      name: b.name,
+      description: b.description,
+      numPeriods: b.num_periods,
+      periodType: normalisePeriodType(rec?.recurrence_period_type ?? null),
+      recurrenceMult: rec?.recurrence_mult ?? 1,
+      recurrenceStart: normaliseRecurrenceStart(rec?.recurrence_period_start ?? null),
+    };
+  });
+}
 
 /**
  * Compute budget vs actual data for all budgets in the GNUCash file.
@@ -18,33 +98,44 @@ import { sqlYear, sqlMonthNum } from "../shared/dates";
 export function computeBudgetData(ctx: ParseContext): BudgetData | null {
   const { db, accounts, accountMap, commodityMap, fxRates, rootAccount, topExpenseGuids, topIncomeGuids } = ctx;
 
-  // Check if budgets table exists
-  const tableCheck = db
-    .prepare(`SELECT name FROM sqlite_master WHERE type='table' AND name='budgets'`)
-    .get() as { name: string } | undefined;
-
-  if (!tableCheck) return null;
-
-  const budgetRows = db
-    .prepare(`SELECT guid, name, description, num_periods FROM budgets`)
-    .all() as { guid: string; name: string; description: string; num_periods: number }[];
-
-  if (budgetRows.length === 0) return null;
-
-  const budgets: BudgetInfo[] = budgetRows.map((b) => ({
-    guid: b.guid,
-    name: b.name,
-    description: b.description,
-    numPeriods: b.num_periods,
-  }));
+  const budgets = loadBudgetInfos(db);
+  if (budgets.length === 0) return null;
 
   const amountRows = db
     .prepare(
       `SELECT ba.budget_guid, ba.account_guid, ba.period_num,
-              CAST(ba.amount_num AS REAL) / ba.amount_denom AS amount
+              CAST(ba.amount_num AS REAL) / ba.amount_denom AS amount,
+              ba.amount_num, ba.amount_denom
        FROM budget_amounts ba`
     )
-    .all() as { budget_guid: string; account_guid: string; period_num: number; amount: number }[];
+    .all() as {
+      budget_guid: string;
+      account_guid: string;
+      period_num: number;
+      amount: number;
+      amount_num: number;
+      amount_denom: number;
+    }[];
+
+  // Bucket the raw rows by budget for the special-functions editor. Kept
+  // separate from `budgetAmountsMap` below because that one is FX-converted
+  // and bucketed per-account-per-period, whereas the editor wants native
+  // num/denom to round-trip edits without precision loss.
+  const rawAmountsByBudget: Record<string, RawBudgetCell[]> = {};
+  for (const row of amountRows) {
+    if (!rawAmountsByBudget[row.budget_guid]) rawAmountsByBudget[row.budget_guid] = [];
+    rawAmountsByBudget[row.budget_guid].push({
+      accountGuid: row.account_guid,
+      periodNum: row.period_num,
+      amountNum: row.amount_num,
+      amountDenom: row.amount_denom,
+    });
+  }
+  // Ensure every known budget has at least an empty bucket so the editor
+  // can distinguish "budget exists with no amounts" from "budget missing".
+  for (const b of budgets) {
+    if (!rawAmountsByBudget[b.guid]) rawAmountsByBudget[b.guid] = [];
+  }
 
   // Fetch actuals for all expense/income leaf accounts (with FX conversion)
   const actualRows = db
@@ -370,6 +461,7 @@ export function computeBudgetData(ctx: ParseContext): BudgetData | null {
     expenseCategories: defaultData.expenseCategories,
     incomeCategories: defaultData.incomeCategories,
     availableYears,
+    rawAmountsByBudget,
   };
 }
 

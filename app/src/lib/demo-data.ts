@@ -727,11 +727,22 @@ function generateBudgetData(
 
   const budgetEntry = { expenseCategories, incomeCategories };
   return {
-    budgets: [{ guid: budgetGuid, name: "2026 Budget", description: "Annual household budget", numPeriods: 12 }],
+    budgets: [
+      {
+        guid: budgetGuid,
+        name: "2026 Budget",
+        description: "Annual household budget",
+        numPeriods: 12,
+        periodType: "month",
+        recurrenceMult: 1,
+        recurrenceStart: `${currentYear}-01-01`,
+      },
+    ],
     categoriesByBudget: { [budgetGuid]: budgetEntry },
     expenseCategories,
     incomeCategories,
     availableYears: [currentYear, currentYear - 1],
+    rawAmountsByBudget: { [budgetGuid]: [] },
   };
 }
 

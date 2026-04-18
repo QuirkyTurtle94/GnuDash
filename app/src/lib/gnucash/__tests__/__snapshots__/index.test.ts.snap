@@ -364,6 +364,9 @@ exports[`parseGnuCashFile > snapshot: full DashboardData 1`] = `
         "guid": "00000034000000340000003400000034",
         "name": "2025 Budget",
         "numPeriods": 12,
+        "periodType": "month",
+        "recurrenceMult": 1,
+        "recurrenceStart": "",
       },
     ],
     "categoriesByBudget": {
@@ -1792,6 +1795,64 @@ exports[`parseGnuCashFile > snapshot: full DashboardData 1`] = `
         "variancePct": 100,
       },
     ],
+    "rawAmountsByBudget": {
+      "00000034000000340000003400000034": [
+        {
+          "accountGuid": "00000012000000120000001200000012",
+          "amountDenom": 100,
+          "amountNum": 25000,
+          "periodNum": 0,
+        },
+        {
+          "accountGuid": "00000012000000120000001200000012",
+          "amountDenom": 100,
+          "amountNum": 25000,
+          "periodNum": 1,
+        },
+        {
+          "accountGuid": "00000012000000120000001200000012",
+          "amountDenom": 100,
+          "amountNum": 25000,
+          "periodNum": 2,
+        },
+        {
+          "accountGuid": "00000015000000150000001500000015",
+          "amountDenom": 100,
+          "amountNum": 10000,
+          "periodNum": 0,
+        },
+        {
+          "accountGuid": "00000015000000150000001500000015",
+          "amountDenom": 100,
+          "amountNum": 10000,
+          "periodNum": 1,
+        },
+        {
+          "accountGuid": "00000015000000150000001500000015",
+          "amountDenom": 100,
+          "amountNum": 10000,
+          "periodNum": 2,
+        },
+        {
+          "accountGuid": "0000000e0000000e0000000e0000000e",
+          "amountDenom": 100,
+          "amountNum": 300000,
+          "periodNum": 0,
+        },
+        {
+          "accountGuid": "0000000e0000000e0000000e0000000e",
+          "amountDenom": 100,
+          "amountNum": 300000,
+          "periodNum": 1,
+        },
+        {
+          "accountGuid": "0000000e0000000e0000000e0000000e",
+          "amountDenom": 100,
+          "amountNum": 300000,
+          "periodNum": 2,
+        },
+      ],
+    },
   },
   "cashFlowBudgetData": {
     "availableYears": [
@@ -1803,6 +1864,9 @@ exports[`parseGnuCashFile > snapshot: full DashboardData 1`] = `
         "guid": "00000034000000340000003400000034",
         "name": "2025 Budget",
         "numPeriods": 12,
+        "periodType": "month",
+        "recurrenceMult": 1,
+        "recurrenceStart": "",
       },
     ],
     "categoriesByBudget": {

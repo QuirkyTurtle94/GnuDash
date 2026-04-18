@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { Card, CardContent } from "@/components/ui/card";
-import { Wand2, Layers } from "lucide-react";
+import { Wand2, Layers, Target } from "lucide-react";
 
 /**
  * Index for the "Special functions" area: a home for experimental or
@@ -41,6 +41,28 @@ export default function SpecialFunctionsPage() {
                     Group simple (2-posting) transactions by description and rename or
                     reassign accounts across the whole group in one step. Useful for
                     cleaning up auto-imported data.
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </Link>
+
+        <Link href="/special-functions/budgets" className="group">
+          <Card className="h-full transition-shadow hover:shadow-md">
+            <CardContent className="p-5">
+              <div className="flex items-start gap-3">
+                <div className="rounded-lg bg-[#6C9B8B]/10 p-2 text-[#6C9B8B]">
+                  <Target className="h-5 w-5" />
+                </div>
+                <div>
+                  <h2 className="text-base font-semibold text-[#1A1D1F] group-hover:text-[#6C9B8B]">
+                    Budgets
+                  </h2>
+                  <p className="mt-1 text-sm text-[#6F767E]">
+                    Create and edit budgets against your chart of accounts. Any account,
+                    any period. Parent accounts auto-sum from their children, and
+                    imbalances are flagged inline.
                   </p>
                 </div>
               </div>

@@ -1,30 +1,13 @@
-import type { CashFlowBudgetData, CashFlowBudgetForBudget, BudgetInfo, BudgetCategoryRow } from "@/lib/types/gnucash";
+import type { CashFlowBudgetData, CashFlowBudgetForBudget, BudgetCategoryRow } from "@/lib/types/gnucash";
 import type { ParseContext } from "../context";
 import { sqlYear, sqlMonthNum } from "../shared/dates";
-import { addUnbudgetedRows } from "./budgets";
+import { addUnbudgetedRows, loadBudgetInfos } from "./budgets";
 
 export function computeCashFlowBudgetData(ctx: ParseContext): CashFlowBudgetData | null {
   const { db, accounts, accountMap, rootAccount } = ctx;
 
-  // Check if budgets table exists
-  const tableCheck = db
-    .prepare(`SELECT name FROM sqlite_master WHERE type='table' AND name='budgets'`)
-    .get() as { name: string } | undefined;
-
-  if (!tableCheck) return null;
-
-  const budgetRows = db
-    .prepare(`SELECT guid, name, description, num_periods FROM budgets`)
-    .all() as { guid: string; name: string; description: string; num_periods: number }[];
-
-  if (budgetRows.length === 0) return null;
-
-  const budgets: BudgetInfo[] = budgetRows.map((b) => ({
-    guid: b.guid,
-    name: b.name,
-    description: b.description,
-    numPeriods: b.num_periods,
-  }));
+  const budgets = loadBudgetInfos(db);
+  if (budgets.length === 0) return null;
 
   const amountRows = db
     .prepare(

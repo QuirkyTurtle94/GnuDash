@@ -32,8 +32,15 @@ import { AccountBuilder } from "../engine/builders/account-builder";
 import { updateAccount, deleteAccountWithReallocation } from "../engine/operations/account-ops";
 import { createCommodity } from "../engine/operations/commodity-ops";
 import { addPrice, deletePrice } from "../engine/operations/price-ops";
+import {
+  createBudget as createBudgetOp,
+  updateBudget as updateBudgetOp,
+  deleteBudget as deleteBudgetOp,
+  setBudgetAmount as setBudgetAmountOp,
+  clearBudgetAmount as clearBudgetAmountOp,
+} from "../engine/operations/budget-ops";
 import type { AccountType } from "../engine/types";
-import type { WorkerRequest, WorkerResponse, DomainFunction, CreateTransactionPayload, DeleteTransactionPayload, EditTransactionPayload, BulkEditTransactionsPayload, CreateAccountPayload, UpdateAccountPayload, DeleteAccountPayload, CreateCommodityPayload, AddPricePayload, EditPricePayload, DeletePricePayload, PostgresConnectionInfo, PostgresDumpPayload } from "./messages";
+import type { WorkerRequest, WorkerResponse, DomainFunction, CreateTransactionPayload, DeleteTransactionPayload, EditTransactionPayload, BulkEditTransactionsPayload, CreateAccountPayload, UpdateAccountPayload, DeleteAccountPayload, CreateCommodityPayload, AddPricePayload, EditPricePayload, DeletePricePayload, CreateBudgetPayload, UpdateBudgetPayload, DeleteBudgetPayload, SetBudgetAmountPayload, ClearBudgetAmountPayload, PostgresConnectionInfo, PostgresDumpPayload } from "./messages";
 import type { GnuCashXmlData } from "../xml/types";
 import { GNUCASH_SCHEMA_DDL } from "../xml/schema";
 import { PostgresSyncClient } from "../db/postgres-sync-client";
@@ -802,6 +809,71 @@ function handleDeletePrice(payload: DeletePricePayload): DashboardData {
   return getFullDashboardData();
 }
 
+/** Handle creating a new budget + its recurrence row. */
+function handleCreateBudget(payload: CreateBudgetPayload): DashboardData & { budgetGuid: string } {
+  if (!ctx) throw new Error("No database loaded");
+  if (!writableAdapter) throw new Error("Database is not open in read-write mode");
+
+  const { budgetGuid } = createBudgetOp(writableAdapter, payload);
+  ctx = buildParseContext(writableAdapter);
+  // Return the new budget's GUID alongside the refreshed dashboard so the UI
+  // can navigate straight into the editor without a second round-trip.
+  return { ...getFullDashboardData(), budgetGuid };
+}
+
+/** Handle updating an existing budget's metadata + recurrence row. */
+function handleUpdateBudget(payload: UpdateBudgetPayload): DashboardData {
+  if (!ctx) throw new Error("No database loaded");
+  if (!writableAdapter) throw new Error("Database is not open in read-write mode");
+
+  const { budgetGuid, ...fields } = payload;
+  updateBudgetOp(writableAdapter, budgetGuid, fields);
+  ctx = buildParseContext(writableAdapter);
+  return getFullDashboardData();
+}
+
+/** Handle deleting a budget + its recurrence row and all amounts. */
+function handleDeleteBudget(payload: DeleteBudgetPayload): DashboardData {
+  if (!ctx) throw new Error("No database loaded");
+  if (!writableAdapter) throw new Error("Database is not open in read-write mode");
+
+  deleteBudgetOp(writableAdapter, payload.budgetGuid);
+  ctx = buildParseContext(writableAdapter);
+  return getFullDashboardData();
+}
+
+/** Handle upserting a single budget_amounts cell. */
+function handleSetBudgetAmount(payload: SetBudgetAmountPayload): DashboardData {
+  if (!ctx) throw new Error("No database loaded");
+  if (!writableAdapter) throw new Error("Database is not open in read-write mode");
+
+  setBudgetAmountOp(
+    writableAdapter,
+    payload.budgetGuid,
+    payload.accountGuid,
+    payload.periodNum,
+    payload.amountNum,
+    payload.amountDenom,
+  );
+  ctx = buildParseContext(writableAdapter);
+  return getFullDashboardData();
+}
+
+/** Handle clearing a budget_amounts cell (re-enables parent rollup for the cell). */
+function handleClearBudgetAmount(payload: ClearBudgetAmountPayload): DashboardData {
+  if (!ctx) throw new Error("No database loaded");
+  if (!writableAdapter) throw new Error("Database is not open in read-write mode");
+
+  clearBudgetAmountOp(
+    writableAdapter,
+    payload.budgetGuid,
+    payload.accountGuid,
+    payload.periodNum,
+  );
+  ctx = buildParseContext(writableAdapter);
+  return getFullDashboardData();
+}
+
 const domainFunctions: Record<DomainFunction, () => unknown> = {
   buildAccountTree: () => buildAccountTree(ctx!),
   computeNetWorthSeries: () => computeNetWorthSeries(ctx!),
@@ -936,6 +1008,21 @@ self.onmessage = async (e: MessageEvent<WorkerRequest>) => {
             break;
           case "deletePrice":
             data = handleDeletePrice(msg.payload as DeletePricePayload);
+            break;
+          case "createBudget":
+            data = handleCreateBudget(msg.payload as CreateBudgetPayload);
+            break;
+          case "updateBudget":
+            data = handleUpdateBudget(msg.payload as UpdateBudgetPayload);
+            break;
+          case "deleteBudget":
+            data = handleDeleteBudget(msg.payload as DeleteBudgetPayload);
+            break;
+          case "setBudgetAmount":
+            data = handleSetBudgetAmount(msg.payload as SetBudgetAmountPayload);
+            break;
+          case "clearBudgetAmount":
+            data = handleClearBudgetAmount(msg.payload as ClearBudgetAmountPayload);
             break;
           default:
             throw new Error(`Unknown mutation action: ${msg.action}`);

@@ -66,7 +66,9 @@ export type MutationAction =
   | "bulkEditTransactions"
   | "createAccount" | "updateAccount" | "deleteAccount"
   | "createCommodity"
-  | "addPrice" | "editPrice" | "deletePrice";
+  | "addPrice" | "editPrice" | "deletePrice"
+  | "createBudget" | "updateBudget" | "deleteBudget"
+  | "setBudgetAmount" | "clearBudgetAmount";
 
 /**
  * Payload for creating a transaction via the worker.
@@ -192,6 +194,48 @@ export interface EditPricePayload {
 /** Payload for deleting a price entry. */
 export interface DeletePricePayload {
   priceGuid: string;
+}
+
+/**
+ * Fields on a GnuCash budget + its `recurrences` row. Shared by create and
+ * update payloads so the editor UI can round-trip the same shape.
+ */
+export interface BudgetFieldsPayload {
+  name: string;
+  description: string;
+  numPeriods: number;
+  /** GnuCash recurrence period type — "day" | "week" | "month" | "year". */
+  periodType: "day" | "week" | "month" | "year";
+  /** Recurrence multiplier — e.g. periodType="month" + mult=3 ⇒ quarterly. */
+  recurrenceMult: number;
+  /** First period's start date (ISO YYYY-MM-DD). */
+  recurrenceStart: string;
+}
+
+export type CreateBudgetPayload = BudgetFieldsPayload;
+
+export interface UpdateBudgetPayload extends BudgetFieldsPayload {
+  budgetGuid: string;
+}
+
+export interface DeleteBudgetPayload {
+  budgetGuid: string;
+}
+
+/** Upsert a single budget_amounts cell. `periodNum` is 0-indexed. */
+export interface SetBudgetAmountPayload {
+  budgetGuid: string;
+  accountGuid: string;
+  periodNum: number;
+  /** Amount stored as an exact rational num/denom (e.g. 12345/100 = 123.45). */
+  amountNum: number;
+  amountDenom: number;
+}
+
+export interface ClearBudgetAmountPayload {
+  budgetGuid: string;
+  accountGuid: string;
+  periodNum: number;
 }
 
 export type WorkerResponse =
