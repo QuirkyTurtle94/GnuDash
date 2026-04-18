@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useParams, useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useMemo, useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { useDashboard } from "@/lib/dashboard-context";
@@ -21,7 +21,12 @@ import { ArrowLeft, AlertTriangle, ChevronDown, ChevronRight, Save, Target, Tras
  * its children's sum is flagged with an imbalance warning, mirroring the
  * existing /cash-flow read-only view.
  *
- * URL: /special-functions/budgets/[guid]
+ * URL: /special-functions/budgets/edit?guid=<budgetGuid>
+ *
+ * Intentionally a search-param route, not a dynamic `[guid]` segment: static
+ * export needs every dynamic route pre-listed by `generateStaticParams`, and
+ * the guids here are only known client-side (they live in the user's OPFS
+ * book). A flat route with a query param sidesteps the issue entirely.
  */
 
 const PERIOD_TYPE_OPTIONS: { value: BudgetPeriodType; label: string }[] = [
@@ -161,8 +166,8 @@ function formatAmount(num: number, denom: number): string {
 
 export default function BudgetEditorPage() {
   const router = useRouter();
-  const params = useParams<{ guid: string }>();
-  const budgetGuid = params.guid;
+  const searchParams = useSearchParams();
+  const budgetGuid = searchParams.get("guid") ?? "";
   const {
     data,
     isWritable,
