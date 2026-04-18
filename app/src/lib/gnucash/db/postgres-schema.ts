@@ -101,6 +101,18 @@ export function insertSchemaVersionSQL(): string {
  * Postgres schema must have them from the start because the engine never
  * executes schema bootstrap DDL through the Postgres adapter.
  *
+ * ## NOT NULL policy
+ *
+ * Real .gnucash SQLite files are looser than xml/schema.ts's minimal DDL —
+ * e.g. `accounts.commodity_guid` is NULL on template accounts, and most
+ * `*_DEFAULT ''` columns accept explicit NULLs from older file versions.
+ * An over-strict NOT NULL here produces an import failure on the first real
+ * file someone uploads. This DDL therefore only carries NOT NULL where the
+ * column is a foreign-key target the engine genuinely requires (account
+ * guids in splits, etc.) or a numeric pair that would corrupt accounting
+ * arithmetic if NULL. Everything else accepts the source value as-is, with
+ * DEFAULT applied only when the column is omitted (per PG semantics).
+ *
  * Apply this DDL inside the target schema via `SET search_path TO <schema>`
  * first — the caller is responsible for creating the schema.
  */
@@ -109,48 +121,48 @@ CREATE TABLE books (
   guid TEXT PRIMARY KEY,
   root_account_guid TEXT NOT NULL,
   root_template_guid TEXT,
-  num_periods BIGINT NOT NULL DEFAULT 0
+  num_periods BIGINT DEFAULT 0
 );
 
 CREATE TABLE commodities (
   guid TEXT PRIMARY KEY,
   namespace TEXT NOT NULL,
   mnemonic TEXT NOT NULL,
-  fullname TEXT NOT NULL DEFAULT '',
-  cusip TEXT NOT NULL DEFAULT '',
-  fraction BIGINT NOT NULL DEFAULT 100
+  fullname TEXT DEFAULT '',
+  cusip TEXT DEFAULT '',
+  fraction BIGINT DEFAULT 100
 );
 
 CREATE TABLE accounts (
   guid TEXT PRIMARY KEY,
   name TEXT NOT NULL,
   account_type TEXT NOT NULL,
-  commodity_guid TEXT NOT NULL,
-  commodity_scu BIGINT NOT NULL DEFAULT 100,
-  non_std_scu BIGINT NOT NULL DEFAULT 0,
+  commodity_guid TEXT,
+  commodity_scu BIGINT DEFAULT 100,
+  non_std_scu BIGINT DEFAULT 0,
   parent_guid TEXT,
-  code TEXT NOT NULL DEFAULT '',
-  description TEXT NOT NULL DEFAULT '',
-  hidden BIGINT NOT NULL DEFAULT 0,
-  placeholder BIGINT NOT NULL DEFAULT 0
+  code TEXT DEFAULT '',
+  description TEXT DEFAULT '',
+  hidden BIGINT DEFAULT 0,
+  placeholder BIGINT DEFAULT 0
 );
 
 CREATE TABLE transactions (
   guid TEXT PRIMARY KEY,
   currency_guid TEXT NOT NULL,
-  num TEXT NOT NULL DEFAULT '',
+  num TEXT DEFAULT '',
   post_date TEXT NOT NULL,
-  enter_date TEXT NOT NULL DEFAULT '',
-  description TEXT NOT NULL DEFAULT ''
+  enter_date TEXT DEFAULT '',
+  description TEXT DEFAULT ''
 );
 
 CREATE TABLE splits (
   guid TEXT PRIMARY KEY,
   tx_guid TEXT NOT NULL,
   account_guid TEXT NOT NULL,
-  memo TEXT NOT NULL DEFAULT '',
-  action TEXT NOT NULL DEFAULT '',
-  reconcile_state TEXT NOT NULL DEFAULT 'n',
+  memo TEXT DEFAULT '',
+  action TEXT DEFAULT '',
+  reconcile_state TEXT DEFAULT 'n',
   value_num BIGINT NOT NULL,
   value_denom BIGINT NOT NULL DEFAULT 100,
   quantity_num BIGINT NOT NULL,
@@ -163,8 +175,8 @@ CREATE TABLE prices (
   commodity_guid TEXT NOT NULL,
   currency_guid TEXT NOT NULL,
   date TEXT NOT NULL,
-  source TEXT NOT NULL DEFAULT '',
-  type TEXT NOT NULL DEFAULT '',
+  source TEXT DEFAULT '',
+  type TEXT DEFAULT '',
   value_num BIGINT NOT NULL,
   value_denom BIGINT NOT NULL DEFAULT 100
 );
@@ -172,28 +184,28 @@ CREATE TABLE prices (
 CREATE TABLE schedxactions (
   guid TEXT PRIMARY KEY,
   name TEXT NOT NULL,
-  enabled BIGINT NOT NULL DEFAULT 1,
-  start_date TEXT NOT NULL DEFAULT '',
+  enabled BIGINT DEFAULT 1,
+  start_date TEXT DEFAULT '',
   end_date TEXT,
   last_occur TEXT,
-  num_occur BIGINT NOT NULL DEFAULT 0,
-  rem_occur BIGINT NOT NULL DEFAULT 0,
-  auto_create BIGINT NOT NULL DEFAULT 0
+  num_occur BIGINT DEFAULT 0,
+  rem_occur BIGINT DEFAULT 0,
+  auto_create BIGINT DEFAULT 0
 );
 
 CREATE TABLE recurrences (
   id BIGSERIAL PRIMARY KEY,
   obj_guid TEXT NOT NULL,
-  recurrence_mult BIGINT NOT NULL DEFAULT 1,
-  recurrence_period_type TEXT NOT NULL DEFAULT 'month',
-  recurrence_period_start TEXT NOT NULL DEFAULT ''
+  recurrence_mult BIGINT DEFAULT 1,
+  recurrence_period_type TEXT DEFAULT 'month',
+  recurrence_period_start TEXT DEFAULT ''
 );
 
 CREATE TABLE budgets (
   guid TEXT PRIMARY KEY,
   name TEXT NOT NULL,
-  description TEXT NOT NULL DEFAULT '',
-  num_periods BIGINT NOT NULL DEFAULT 12
+  description TEXT DEFAULT '',
+  num_periods BIGINT DEFAULT 12
 );
 
 CREATE TABLE budget_amounts (
@@ -223,7 +235,7 @@ CREATE TABLE slots (
 CREATE TABLE lots (
   guid TEXT PRIMARY KEY,
   account_guid TEXT NOT NULL,
-  is_closed BIGINT NOT NULL DEFAULT 0
+  is_closed BIGINT DEFAULT 0
 );
 
 CREATE TABLE gnudash_meta (
