@@ -23,8 +23,12 @@ function makeFakeDb() {
     setChanges(n: number) {
       changesValue = n;
     },
-    selectObjects: vi.fn(() => []),
-    selectObject: vi.fn(() => undefined),
+    selectObjects: vi.fn<(sql: string, bind?: unknown[]) => unknown[]>(
+      () => [],
+    ),
+    selectObject: vi.fn<
+      (sql: string, bind?: unknown[]) => unknown | undefined
+    >(() => undefined),
     exec: vi.fn((opts: { sql: string; bind?: unknown[] }) => {
       execCalls.push(opts);
       return 0;
