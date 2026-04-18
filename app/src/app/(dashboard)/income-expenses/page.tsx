@@ -171,8 +171,9 @@ function BudgetPanel({ isIncome }: { isIncome: boolean }) {
     );
   }
 
-  // Sync pie chart's selectedCategory to the budget's drillPath.
-  // Convert "Food:Groceries" name path → [guid1, guid2] by matching accountName at each level.
+  // Drill path: manual clicks on progress bars drive it by default. When a
+  // pie-chart category is selected, it takes precedence and maps the name
+  // path ("Food:Groceries") to a GUID path by walking the hierarchy.
   let drillPath = manualDrillPath;
   if (selectedCategory && sourceCategories) {
     const nameParts = selectedCategory.split(":");
@@ -190,8 +191,6 @@ function BudgetPanel({ isIncome }: { isIncome: boolean }) {
       }
     }
     if (synced.length > 0) drillPath = synced;
-  } else if (!selectedCategory) {
-    drillPath = [];
   }
 
   return (
