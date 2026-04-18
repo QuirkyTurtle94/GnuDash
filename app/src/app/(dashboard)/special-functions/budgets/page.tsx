@@ -145,7 +145,7 @@ export default function BudgetsListPage() {
                     <td className="px-4 py-3">
                       <div className="flex items-center justify-end gap-1">
                         <Link
-                          href={`/special-functions/budgets/${b.guid}`}
+                          href={`/special-functions/budgets/edit?guid=${b.guid}`}
                           className="rounded p-1.5 text-[#3B6B8A] hover:bg-[#3B6B8A]/10"
                           title="Edit budget"
                         >
@@ -256,7 +256,7 @@ function NewBudgetRow({
         recurrenceStart,
       });
       onCreated();
-      router.push(`/special-functions/budgets/${budgetGuid}`);
+      router.push(`/special-functions/budgets/edit?guid=${budgetGuid}`);
     } catch (err) {
       onError((err as Error).message);
     } finally {
