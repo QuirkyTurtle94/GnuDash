@@ -9,7 +9,8 @@ import {
   type ReactNode,
 } from "react";
 import type { DashboardData } from "@/lib/types/gnucash";
-import { GnuCashWorkerClient } from "@/lib/gnucash/worker/client";
+import type { BookClient } from "@/lib/client/book-client";
+import { createBookClient } from "@/lib/client/factory";
 import type { CreateTransactionPayload, DeleteTransactionPayload, EditTransactionPayload, BulkEditTransactionsPayload, CreateAccountPayload, UpdateAccountPayload, DeleteAccountPayload, CreateCommodityPayload, AddPricePayload, EditPricePayload, DeletePricePayload } from "@/lib/gnucash/worker/messages";
 import { generateDemoData } from "@/lib/demo-data";
 
@@ -54,11 +55,11 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
   const [uploadedAt, setUploadedAt] = useState<Date | null>(null);
   const [isWritable, setIsWritable] = useState(false);
   const [isXmlSource, setIsXmlSource] = useState(false);
-  const clientRef = useRef<GnuCashWorkerClient | null>(null);
+  const clientRef = useRef<BookClient | null>(null);
 
-  function getClient(): GnuCashWorkerClient {
+  function getClient(): BookClient {
     if (!clientRef.current) {
-      clientRef.current = new GnuCashWorkerClient();
+      clientRef.current = createBookClient();
     }
     return clientRef.current;
   }
@@ -71,11 +72,11 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
       // Check if previously opened as writable
       const storedWritable = sessionStorage.getItem(WRITABLE_KEY) === "true";
 
-      // Try loading from OPFS via the Worker
+      // Try restoring a previously-persisted session (OPFS in local mode)
       try {
         const client = getClient();
         await client.waitForReady();
-        const loaded = await client.openFromOPFS(storedWritable);
+        const loaded = await client.restoreSession(storedWritable);
         if (loaded && !cancelled) {
           const dashboardData = await client.getFullDashboardData();
           if (!cancelled) {
@@ -131,7 +132,7 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
     try {
       const client = getClient();
       await client.waitForReady();
-      const loaded = await client.openFromOPFS(newWritable);
+      const loaded = await client.restoreSession(newWritable);
       if (loaded) {
         const dashboardData = await client.getFullDashboardData();
         setData(dashboardData);
