@@ -119,16 +119,19 @@ export async function POST(request: Request) {
       const rowsByTable = readSourceTables(source);
 
       await withClient(connection, async (client) => {
-        // Drop+recreate is outside the transaction because DDL in PG auto-
-        // commits when it can't be wrapped (CREATE SCHEMA is fine inside, but
-        // we do it here so the transaction below is data-only and smaller).
-        await client.query(dropBookSchemaSQL(bookId));
-        await client.query(createBookSchemaSQL(bookId));
-        await client.query(setSearchPathSQL(bookId));
-        await client.query(GNUCASH_POSTGRES_DDL);
-
+        // Everything — drop/recreate, DDL, inserts, sequence bumps, meta
+        // stamp — runs inside a single transaction. Postgres supports DDL
+        // inside explicit transactions, so a failure at any step rolls the
+        // schema back entirely instead of leaving empty tables behind that
+        // would trick a subsequent `book/status` check into the "already
+        // imported, just load" branch on the next reconnect.
         await client.query("BEGIN");
         try {
+          await client.query(dropBookSchemaSQL(bookId));
+          await client.query(createBookSchemaSQL(bookId));
+          await client.query(setSearchPathSQL(bookId));
+          await client.query(GNUCASH_POSTGRES_DDL);
+
           for (const table of GNUCASH_POSTGRES_TABLES) {
             if (table === "gnudash_meta") continue;
             const rows = rowsByTable[table];
