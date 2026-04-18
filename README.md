@@ -107,7 +107,12 @@ Open [http://localhost:3000](http://localhost:3000) and drag-and-drop your `.gnu
 
 ## Deployment
 
-GnuDash is a fully static site — no backend server required. See the **[Deployment Guide](docs/deployment.md)** for full instructions covering Docker, Cloudflare Pages, Vercel, Netlify, Coolify, and more.
+GnuDash ships two deployment modes:
+
+- **Static** (the default public [gnudash.pages.dev](https://gnudash.pages.dev/) deployment): build with `NEXT_OUTPUT=export npm run build` and host the `out/` folder on any static CDN (Cloudflare Pages, Netlify, the included nginx Dockerfile, a plain web server). The Local (OPFS) storage backend is the only option in this mode; nothing leaves your browser.
+- **Standalone Node.js** (default `npm run build`): run the built app on a Node.js server. This unlocks the optional Server (Postgres) backend ([issue #48](https://github.com/QuirkyTurtle94/GnuDash/issues/48)) for sharing a book across devices, while keeping the Local backend fully functional.
+
+See the **[Deployment Guide](docs/deployment.md)** for step-by-step instructions for both modes covering Docker, Cloudflare Pages, Vercel, Netlify, Coolify, Synology, and more.
 
 ## Tech Stack
 

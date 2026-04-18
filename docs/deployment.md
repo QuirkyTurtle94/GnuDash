@@ -1,6 +1,15 @@
 # Deployment Guide
 
-GnuDash builds to a fully static site — just HTML, CSS, JS, and WASM files. No Node.js server, no API, no database. This means you can host it almost anywhere.
+GnuDash supports two deployment modes:
+
+| Mode | Output | Backends | When to use |
+|---|---|---|---|
+| **Static** (`NEXT_OUTPUT=export npm run build`) | `app/out/` — plain HTML/JS/WASM | Local (OPFS) only | Cloudflare Pages, Netlify, nginx, any static host |
+| **Standalone** (default `npm run build`) | `app/.next/standalone/` — Node.js server | Local (OPFS) **and** Server (Postgres) | Self-hosted behind Node, Docker, VPS — when you want a shared Postgres book across devices |
+
+The Server (Postgres) backend is tracked by [issue #48](https://github.com/QuirkyTurtle94/GnuDash/issues/48). Until that lands, both modes behave identically from the user's perspective — the default flip to `standalone` just enables the API routes the Postgres backend needs.
+
+If you have an existing static deployment (Cloudflare Pages, Netlify, the nginx Dockerfile in this repo), follow the commands in each section below — they already set `NEXT_OUTPUT=export` so nothing changes for you.
 
 ## Important: Required HTTP Headers
 
@@ -61,15 +70,17 @@ Then log out and back in (or reboot) for the new limits to take effect. You can 
 
 ## Static Build
 
-All production deployment methods start with the same build step:
+For any of the static hosts below (nginx, Cloudflare Pages, Netlify, a plain CDN), build with `NEXT_OUTPUT=export`:
 
 ```bash
 cd app
 npm install
-npm run build
+NEXT_OUTPUT=export npm run build
 ```
 
 This produces a static export in `app/out/` containing everything needed to serve the site.
+
+Without the env var, the build instead produces a standalone Node.js bundle in `app/.next/standalone/` which is what the Server (Postgres) backend needs — but the static hosts below cannot serve it.
 
 ---
 
@@ -123,7 +134,7 @@ The nginx configuration inside the container handles the COOP/COEP headers, MIME
 2. Select **Pages** > **Connect to Git**
 3. Pick your repository and branch
 4. Configure the build:
-   - **Build command**: `cd app && npm install && npm run build`
+   - **Build command**: `cd app && npm install && NEXT_OUTPUT=export npm run build`
    - **Build output directory**: `app/out`
 5. Deploy
 
@@ -143,7 +154,7 @@ No additional configuration needed.
 
 1. Import your repository on [Vercel](https://vercel.com)
 2. Set the **Root Directory** to `app`
-3. Vercel will auto-detect Next.js and build it
+3. Vercel will auto-detect Next.js and build it. If you want a pure-static deployment (no Postgres backend), set the **Build Command** to `NEXT_OUTPUT=export npm run build` and **Output Directory** to `out`. Otherwise Vercel will deploy the standalone Node.js output, which supports both backends.
 
 Add the required headers by creating `app/vercel.json`:
 
@@ -170,7 +181,7 @@ Add the required headers by creating `app/vercel.json`:
 1. Import your repository on [Netlify](https://netlify.com)
 2. Configure the build:
    - **Base directory**: `app`
-   - **Build command**: `npm run build`
+   - **Build command**: `NEXT_OUTPUT=export npm run build`
    - **Publish directory**: `app/out`
 
 Add the required headers by creating `app/public/_headers` (already included in the repo):
@@ -240,7 +251,7 @@ You can run GnuDash on a Synology NAS using Container Manager (Docker). No comma
    git clone https://github.com/QuirkyTurtle94/GnuDash.git
    cd GnuDash/app
    npm install
-   npm run build
+   NEXT_OUTPUT=export npm run build
    ```
 
 7. **Copy files to your NAS** using File Station or a network share:
@@ -272,7 +283,7 @@ When a new version of GnuDash is released, repeat steps 6-7 (rebuild and copy th
 If you'd prefer the NAS to build the Docker image itself (no need to copy files manually), your NAS needs enough RAM (2GB+ free) and you'll use SSH:
 
 1. SSH into your NAS: `ssh admin@YOUR-NAS-IP`
-2. Clone and build:
+2. Clone and build (the repo-root `Dockerfile` forces `NEXT_OUTPUT=export` so this keeps producing a static nginx image):
    ```bash
    cd /volume1/docker
    git clone https://github.com/QuirkyTurtle94/GnuDash.git
@@ -290,9 +301,24 @@ To update: `cd /volume1/docker/GnuDash && git pull && cd app && docker build -t 
 
 If your host isn't listed above, the process is the same:
 
-1. Build the site: `cd app && npm install && npm run build`
+1. Build the site: `cd app && npm install && NEXT_OUTPUT=export npm run build`
 2. Upload the contents of `app/out/` to your host
 3. Configure your server to set the two required headers (COOP and COEP)
 4. Ensure your server serves `index.html` for client-side routes (SPA fallback)
 
 If you can't set custom headers (e.g. GitHub Pages), the app will still load but file uploads will fail because `SharedArrayBuffer` won't be available.
+
+---
+
+## Self-hosted Postgres backend (in development)
+
+The repo-root `docker-compose.yml` starts a Postgres 16 container that the upcoming Server backend ([issue #48](https://github.com/QuirkyTurtle94/GnuDash/issues/48)) will connect to. For developers following along with that work:
+
+```bash
+docker compose up -d postgres     # start the DB
+./scripts/db-reset.sh             # stop AND drop the data volume
+```
+
+Defaults: `host=localhost port=5432 user=gnudash password=gnudash database=gnudash`. Override via environment variables (`POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB`, `POSTGRES_PORT`) before `docker compose up`. **Any non-localhost deployment must terminate TLS in front of the app** — the Server backend sends Postgres credentials in request bodies from the browser.
+
+End-user walkthrough (Server tab on the upload screen, auto-reconnect, credentials-in-OPFS security note) will land with the final PR of issue #48.
