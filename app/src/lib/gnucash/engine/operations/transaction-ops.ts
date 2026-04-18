@@ -28,28 +28,28 @@ interface TransactionUpdate {
  * Update a transaction's header fields (description, post_date, num).
  * Split changes require delete + recreate (matching GNUCash behavior).
  */
-export function updateTransaction(
+export async function updateTransaction(
   db: WritableDbAdapter,
   txGuid: string,
   updates: TransactionUpdate
-): void {
-  db.transaction(() => {
+): Promise<void> {
+  await db.transaction(async () => {
     if (updates.description !== undefined) {
-      db.run(
+      await db.run(
         `UPDATE transactions SET description = ? WHERE guid = ?`,
         updates.description,
         txGuid
       );
     }
     if (updates.postDate !== undefined) {
-      db.run(
+      await db.run(
         `UPDATE transactions SET post_date = ? WHERE guid = ?`,
         formatDate(updates.postDate),
         txGuid
       );
     }
     if (updates.num !== undefined) {
-      db.run(
+      await db.run(
         `UPDATE transactions SET num = ? WHERE guid = ?`,
         updates.num,
         txGuid
@@ -62,16 +62,16 @@ export function updateTransaction(
  * Delete a transaction and all its splits.
  * Throws if any split is reconciled (reconcile_state = 'y').
  */
-export function deleteTransaction(
+export async function deleteTransaction(
   db: WritableDbAdapter,
   txGuid: string
-): void {
+): Promise<void> {
   // Check for reconciled splits
-  const reconciled = db
+  const reconciled = (await db
     .prepare(
       `SELECT COUNT(*) AS cnt FROM splits WHERE tx_guid = ? AND reconcile_state = 'y'`
     )
-    .get(txGuid) as { cnt: number } | undefined;
+    .get(txGuid)) as { cnt: number } | undefined;
 
   if (reconciled && reconciled.cnt > 0) {
     throw new Error(
@@ -79,9 +79,9 @@ export function deleteTransaction(
     );
   }
 
-  db.transaction(() => {
-    db.run(`DELETE FROM splits WHERE tx_guid = ?`, txGuid);
-    db.run(`DELETE FROM transactions WHERE guid = ?`, txGuid);
+  await db.transaction(async () => {
+    await db.run(`DELETE FROM splits WHERE tx_guid = ?`, txGuid);
+    await db.run(`DELETE FROM transactions WHERE guid = ?`, txGuid);
   });
 }
 
@@ -92,16 +92,16 @@ export function deleteTransaction(
  *
  * This matches GNUCash's void behavior.
  */
-export function voidTransaction(
+export async function voidTransaction(
   db: WritableDbAdapter,
   txGuid: string,
   reason: string
-): void {
-  db.transaction(() => {
+): Promise<void> {
+  await db.transaction(async () => {
     // Get current transaction description
-    const tx = db
+    const tx = (await db
       .prepare(`SELECT description FROM transactions WHERE guid = ?`)
-      .get(txGuid) as { description: string } | undefined;
+      .get(txGuid)) as { description: string } | undefined;
 
     if (!tx) {
       throw new Error(`Transaction ${txGuid} not found`);
@@ -113,14 +113,14 @@ export function voidTransaction(
     }
 
     // Update description
-    db.run(
+    await db.run(
       `UPDATE transactions SET description = ? WHERE guid = ?`,
       `Voided: ${tx.description}`,
       txGuid
     );
 
     // Store void reason in slots
-    db.run(
+    await db.run(
       `INSERT INTO slots (obj_guid, name, slot_type, string_val)
        VALUES (?, 'void-reason', 3, ?)`,
       txGuid,
@@ -128,12 +128,12 @@ export function voidTransaction(
     );
 
     // Get all splits to store original values and zero them out
-    const splits = db
+    const splits = (await db
       .prepare(
         `SELECT guid, value_num, value_denom, quantity_num, quantity_denom
          FROM splits WHERE tx_guid = ?`
       )
-      .all(txGuid) as {
+      .all(txGuid)) as {
       guid: string;
       value_num: number;
       value_denom: number;
@@ -143,13 +143,13 @@ export function voidTransaction(
 
     for (const split of splits) {
       // Store original values in slots
-      db.run(
+      await db.run(
         `INSERT INTO slots (obj_guid, name, slot_type, string_val)
          VALUES (?, 'void-former-value', 3, ?)`,
         split.guid,
         `${split.value_num}/${split.value_denom}`
       );
-      db.run(
+      await db.run(
         `INSERT INTO slots (obj_guid, name, slot_type, string_val)
          VALUES (?, 'void-former-quantity', 3, ?)`,
         split.guid,
@@ -157,7 +157,7 @@ export function voidTransaction(
       );
 
       // Zero out the split
-      db.run(
+      await db.run(
         `UPDATE splits SET value_num = 0, quantity_num = 0 WHERE guid = ?`,
         split.guid
       );

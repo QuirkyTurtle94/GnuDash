@@ -12,13 +12,13 @@ import { generateGuid } from "../guid";
 /**
  * Create an empty lot for an investment account.
  */
-export function createLot(
+export async function createLot(
   db: WritableDbAdapter,
   accountGuid: string
-): { lotGuid: string } {
+): Promise<{ lotGuid: string }> {
   const lotGuid = generateGuid();
 
-  db.run(
+  await db.run(
     `INSERT INTO lots (guid, account_guid, is_closed) VALUES (?, ?, 0)`,
     lotGuid,
     accountGuid
@@ -30,23 +30,23 @@ export function createLot(
 /**
  * Assign a split to a lot by setting its lot_guid.
  */
-export function assignSplitToLot(
+export async function assignSplitToLot(
   db: WritableDbAdapter,
   splitGuid: string,
   lotGuid: string
-): void {
-  db.run(`UPDATE splits SET lot_guid = ? WHERE guid = ?`, lotGuid, splitGuid);
+): Promise<void> {
+  await db.run(`UPDATE splits SET lot_guid = ? WHERE guid = ?`, lotGuid, splitGuid);
 }
 
 /**
  * Get the current quantity balance of a lot.
  * A balanced (zero) lot means all shares have been sold.
  */
-export function getLotBalance(
+export async function getLotBalance(
   db: WritableDbAdapter,
   lotGuid: string
-): GncNumeric {
-  const row = db
+): Promise<GncNumeric> {
+  const row = (await db
     .prepare(
       `SELECT SUM(quantity_num) AS total_num, quantity_denom
        FROM splits
@@ -54,7 +54,7 @@ export function getLotBalance(
        GROUP BY quantity_denom
        LIMIT 1`
     )
-    .get(lotGuid) as
+    .get(lotGuid)) as
     | { total_num: number; quantity_denom: number }
     | undefined;
 
@@ -66,13 +66,13 @@ export function getLotBalance(
  * Close a lot if its quantity balance is zero.
  * Sets is_closed = 1 in the lots table.
  */
-export function closeLotIfBalanced(
+export async function closeLotIfBalanced(
   db: WritableDbAdapter,
   lotGuid: string
-): boolean {
-  const balance = getLotBalance(db, lotGuid);
+): Promise<boolean> {
+  const balance = await getLotBalance(db, lotGuid);
   if (balance.isZero()) {
-    db.run(`UPDATE lots SET is_closed = 1 WHERE guid = ?`, lotGuid);
+    await db.run(`UPDATE lots SET is_closed = 1 WHERE guid = ?`, lotGuid);
     return true;
   }
   return false;

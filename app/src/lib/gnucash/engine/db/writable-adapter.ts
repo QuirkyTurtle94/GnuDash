@@ -19,18 +19,18 @@ export interface WritableDbAdapter extends DbAdapter {
    * Execute a parameterized write statement (INSERT/UPDATE/DELETE).
    * Returns the number of rows affected.
    */
-  run(sql: string, ...params: unknown[]): RunResult;
+  run(sql: string, ...params: unknown[]): Promise<RunResult>;
 
   /**
    * Execute a batch of raw SQL statements (e.g., CREATE TABLE).
    * No parameter binding — use run() for parameterized queries.
    */
-  exec(sql: string): void;
+  exec(sql: string): Promise<void>;
 
   /**
    * Execute a function within a database transaction.
-   * Uses BEGIN IMMEDIATE for write safety.
+   * Uses BEGIN IMMEDIATE (or the backend's equivalent) for write safety.
    * Automatically COMMITs on success, ROLLBACKs on error.
    */
-  transaction<T>(fn: () => T): T;
+  transaction<T>(fn: () => Promise<T>): Promise<T>;
 }

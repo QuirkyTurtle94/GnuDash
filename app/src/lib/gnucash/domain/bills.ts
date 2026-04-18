@@ -8,16 +8,16 @@ import { parseGnuCashDate } from "../shared/dates";
  * the expected amount from the template transaction splits.
  * Returns an empty array if the schedxactions table doesn't exist.
  */
-export function getUpcomingBills(ctx: ParseContext): UpcomingBill[] {
+export async function getUpcomingBills(ctx: ParseContext): Promise<UpcomingBill[]> {
   const { db } = ctx;
 
-  const tableCheck = db
+  const tableCheck = (await db
     .prepare(`SELECT name FROM sqlite_master WHERE type='table' AND name='schedxactions'`)
-    .get() as { name: string } | undefined;
+    .get()) as { name: string } | undefined;
 
   if (!tableCheck) return [];
 
-  const rows = db
+  const rows = (await db
     .prepare(
       `SELECT
         sx.guid, sx.name, sx.enabled, sx.start_date, sx.last_occur,
@@ -27,7 +27,7 @@ export function getUpcomingBills(ctx: ParseContext): UpcomingBill[] {
       WHERE sx.enabled = 1
       ORDER BY sx.name`
     )
-    .all() as {
+    .all()) as {
     guid: string;
     name: string;
     enabled: number;

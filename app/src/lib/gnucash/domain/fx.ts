@@ -17,11 +17,11 @@ export interface FxRateMap {
  * - Transitive/cross rates (commodity → intermediate → base)
  * Returns an FxRateMap with `toBase()`, `rate()`, and `convert()` methods.
  */
-export function buildFxRateMap(
+export async function buildFxRateMap(
   db: DbAdapter,
   baseCurrencyGuid: string
-): FxRateMap {
-  const allFxPrices = db
+): Promise<FxRateMap> {
+  const allFxPrices = (await db
     .prepare(
       `SELECT p.commodity_guid, p.currency_guid,
               CAST(p.value_num AS REAL) / p.value_denom AS price
@@ -31,7 +31,7 @@ export function buildFxRateMap(
        WHERE c1.namespace = 'CURRENCY' AND c2.namespace = 'CURRENCY'
        ORDER BY p.date DESC`
     )
-    .all() as { commodity_guid: string; currency_guid: string; price: number }[];
+    .all()) as { commodity_guid: string; currency_guid: string; price: number }[];
 
   const rates = new Map<string, number>();
   rates.set(baseCurrencyGuid, 1.0);

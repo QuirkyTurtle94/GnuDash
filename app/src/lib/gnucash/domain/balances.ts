@@ -8,11 +8,11 @@ import { buildFullPath } from "../shared/accounts";
  * Foreign currency accounts are converted via FX rates.
  * Results are sorted: positive balances first (by descending value), then negative.
  */
-export function computeTopBalances(ctx: ParseContext): TopBalance[] {
+export async function computeTopBalances(ctx: ParseContext): Promise<TopBalance[]> {
   const { db, accountMap, commodityMap, baseCurrencyGuid, fxRates, latestPrices } = ctx;
 
   // Investment market values
-  const invRows = db
+  const invRows = (await db
     .prepare(
       `SELECT
         a.guid AS account_guid,
@@ -24,7 +24,7 @@ export function computeTopBalances(ctx: ParseContext): TopBalance[] {
       GROUP BY a.guid
       HAVING shares_held != 0`
     )
-    .all() as { account_guid: string; commodity_guid: string; shares_held: number }[];
+    .all()) as { account_guid: string; commodity_guid: string; shares_held: number }[];
 
   const investmentValueMap = new Map<string, number>();
   for (const row of invRows) {
@@ -33,7 +33,7 @@ export function computeTopBalances(ctx: ParseContext): TopBalance[] {
   }
 
   // Non-investment balances using quantity
-  const nonInvBalances = db
+  const nonInvBalances = (await db
     .prepare(
       `SELECT
         s.account_guid,
@@ -45,7 +45,7 @@ export function computeTopBalances(ctx: ParseContext): TopBalance[] {
         AND a.placeholder = 0
       GROUP BY s.account_guid`
     )
-    .all() as { account_guid: string; commodity_guid: string; balance_in_commodity: number }[];
+    .all()) as { account_guid: string; commodity_guid: string; balance_in_commodity: number }[];
 
   const results: TopBalance[] = [];
 

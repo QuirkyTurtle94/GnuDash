@@ -8,7 +8,7 @@ import { parseGnuCashDate, sqlMonth } from "../shared/dates";
  * (shares × latest price), gain/loss, and 12-month performance.
  * All monetary values are converted to base currency.
  */
-export function computeInvestments(ctx: ParseContext): InvestmentHolding[] {
+export async function computeInvestments(ctx: ParseContext): Promise<InvestmentHolding[]> {
   const { db, commodityMap, prices, latestPrices, latestPriceInfo, fxRates } = ctx;
 
   // Price 12 months ago per commodity
@@ -24,7 +24,7 @@ export function computeInvestments(ctx: ParseContext): InvestmentHolding[] {
     }
   }
 
-  const holdings = db
+  const holdings = (await db
     .prepare(
       `SELECT
         a.guid AS account_guid,
@@ -39,7 +39,7 @@ export function computeInvestments(ctx: ParseContext): InvestmentHolding[] {
       WHERE a.account_type IN ('STOCK', 'MUTUAL')
       GROUP BY a.guid`
     )
-    .all() as {
+    .all()) as {
     account_guid: string;
     account_name: string;
     commodity_guid: string;
@@ -83,10 +83,10 @@ export function computeInvestments(ctx: ParseContext): InvestmentHolding[] {
  * best available price at that month (carrying forward the last known price).
  * Prices and cost basis are converted to base currency.
  */
-export function computeInvestmentValueSeries(ctx: ParseContext): MonthlyInvestmentValue[] {
+export async function computeInvestmentValueSeries(ctx: ParseContext): Promise<MonthlyInvestmentValue[]> {
   const { db, commodityMap, fxRates } = ctx;
 
-  const splits = db
+  const splits = (await db
     .prepare(
       `SELECT
         a.guid AS account_guid,
@@ -102,7 +102,7 @@ export function computeInvestmentValueSeries(ctx: ParseContext): MonthlyInvestme
       WHERE a.account_type IN ('STOCK', 'MUTUAL')
       ORDER BY t.post_date`
     )
-    .all() as { account_guid: string; account_name: string; commodity_guid: string; tx_currency_guid: string; month: string; shares: number; cost: number }[];
+    .all()) as { account_guid: string; account_name: string; commodity_guid: string; tx_currency_guid: string; month: string; shares: number; cost: number }[];
 
   const accountMonthly = new Map<string, Map<string, { shares: number; cost: number; commodity_guid: string; tx_currency_guid: string }>>();
   for (const s of splits) {
@@ -117,12 +117,12 @@ export function computeInvestmentValueSeries(ctx: ParseContext): MonthlyInvestme
     }
   }
 
-  const allPrices = db
+  const allPrices = (await db
     .prepare(
       `SELECT commodity_guid, currency_guid, ${sqlMonth("date", ctx.dialect)} AS month, CAST(value_num AS REAL) / value_denom AS price
       FROM prices ORDER BY date`
     )
-    .all() as { commodity_guid: string; currency_guid: string; month: string; price: number }[];
+    .all()) as { commodity_guid: string; currency_guid: string; month: string; price: number }[];
 
   const priceByMonth = new Map<string, Map<string, { price: number; currencyGuid: string }>>();
   for (const p of allPrices) {

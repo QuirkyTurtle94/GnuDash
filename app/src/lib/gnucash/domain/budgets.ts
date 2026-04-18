@@ -15,19 +15,19 @@ import { sqlYear, sqlMonthNum } from "../shared/dates";
  *
  * Returns null if no budgets table exists or no budgets are defined.
  */
-export function computeBudgetData(ctx: ParseContext): BudgetData | null {
+export async function computeBudgetData(ctx: ParseContext): Promise<BudgetData | null> {
   const { db, accounts, accountMap, commodityMap, fxRates, rootAccount, topExpenseGuids, topIncomeGuids } = ctx;
 
   // Check if budgets table exists
-  const tableCheck = db
+  const tableCheck = (await db
     .prepare(`SELECT name FROM sqlite_master WHERE type='table' AND name='budgets'`)
-    .get() as { name: string } | undefined;
+    .get()) as { name: string } | undefined;
 
   if (!tableCheck) return null;
 
-  const budgetRows = db
+  const budgetRows = (await db
     .prepare(`SELECT guid, name, description, num_periods FROM budgets`)
-    .all() as { guid: string; name: string; description: string; num_periods: number }[];
+    .all()) as { guid: string; name: string; description: string; num_periods: number }[];
 
   if (budgetRows.length === 0) return null;
 
@@ -38,16 +38,16 @@ export function computeBudgetData(ctx: ParseContext): BudgetData | null {
     numPeriods: b.num_periods,
   }));
 
-  const amountRows = db
+  const amountRows = (await db
     .prepare(
       `SELECT ba.budget_guid, ba.account_guid, ba.period_num,
               CAST(ba.amount_num AS REAL) / ba.amount_denom AS amount
        FROM budget_amounts ba`
     )
-    .all() as { budget_guid: string; account_guid: string; period_num: number; amount: number }[];
+    .all()) as { budget_guid: string; account_guid: string; period_num: number; amount: number }[];
 
   // Fetch actuals for all expense/income leaf accounts (with FX conversion)
-  const actualRows = db
+  const actualRows = (await db
     .prepare(
       `SELECT
         s.account_guid,
@@ -61,7 +61,7 @@ export function computeBudgetData(ctx: ParseContext): BudgetData | null {
       WHERE a.account_type IN ('EXPENSE', 'INCOME')
       GROUP BY s.account_guid, ${sqlYear("t.post_date", ctx.dialect)}, ${sqlMonthNum("t.post_date", ctx.dialect)}`
     )
-    .all() as { account_guid: string; commodity_guid: string; month_num: string; year: string; actual: number }[];
+    .all()) as { account_guid: string; commodity_guid: string; month_num: string; year: string; actual: number }[];
 
   const allYears = new Set<number>();
   const actualsMap = new Map<string, Map<string, Map<number, number>>>();

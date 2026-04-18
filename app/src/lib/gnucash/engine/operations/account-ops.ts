@@ -13,33 +13,33 @@ import { ValidationFailedError } from "../types";
 /**
  * Rename an account.
  */
-export function renameAccount(
+export async function renameAccount(
   db: WritableDbAdapter,
   accountGuid: string,
   newName: string
-): void {
+): Promise<void> {
   if (!newName || newName.trim().length === 0) {
     throw new Error("Account name cannot be empty");
   }
-  db.run(`UPDATE accounts SET name = ? WHERE guid = ?`, newName, accountGuid);
+  await db.run(`UPDATE accounts SET name = ? WHERE guid = ?`, newName, accountGuid);
 }
 
 /**
  * Reparent an account under a new parent.
  * Validates no circular reference would be created.
  */
-export function reparentAccount(
+export async function reparentAccount(
   db: WritableDbAdapter,
   ctx: ParseContext,
   accountGuid: string,
   newParentGuid: string
-): void {
+): Promise<void> {
   const errors = validateReparent(accountGuid, newParentGuid, ctx.accountMap);
   if (errors.length > 0) {
     throw new ValidationFailedError(errors);
   }
 
-  db.run(
+  await db.run(
     `UPDATE accounts SET parent_guid = ? WHERE guid = ?`,
     newParentGuid,
     accountGuid
@@ -50,19 +50,19 @@ export function reparentAccount(
  * Delete an account.
  * Validates no splits or child accounts reference it.
  */
-export function deleteAccount(
+export async function deleteAccount(
   db: WritableDbAdapter,
   ctx: ParseContext,
   accountGuid: string
-): void {
-  const errors = validateAccountDeletion(accountGuid, db, ctx.accountMap);
+): Promise<void> {
+  const errors = await validateAccountDeletion(accountGuid, db, ctx.accountMap);
   if (errors.length > 0) {
     throw new ValidationFailedError(errors);
   }
 
-  db.transaction(() => {
-    db.run(`DELETE FROM slots WHERE obj_guid = ?`, accountGuid);
-    db.run(`DELETE FROM accounts WHERE guid = ?`, accountGuid);
+  await db.transaction(async () => {
+    await db.run(`DELETE FROM slots WHERE obj_guid = ?`, accountGuid);
+    await db.run(`DELETE FROM accounts WHERE guid = ?`, accountGuid);
   });
 }
 
@@ -70,7 +70,7 @@ export function deleteAccount(
  * Update an existing account's fields.
  * Only provided fields are updated; omitted fields remain unchanged.
  */
-export function updateAccount(
+export async function updateAccount(
   db: WritableDbAdapter,
   accountGuid: string,
   updates: {
@@ -83,32 +83,32 @@ export function updateAccount(
     hidden?: boolean;
     placeholder?: boolean;
   }
-): void {
-  db.transaction(() => {
+): Promise<void> {
+  await db.transaction(async () => {
     if (updates.name !== undefined) {
       if (!updates.name.trim()) throw new Error("Account name cannot be empty");
-      db.run(`UPDATE accounts SET name = ? WHERE guid = ?`, updates.name.trim(), accountGuid);
+      await db.run(`UPDATE accounts SET name = ? WHERE guid = ?`, updates.name.trim(), accountGuid);
     }
     if (updates.accountType !== undefined) {
-      db.run(`UPDATE accounts SET account_type = ? WHERE guid = ?`, updates.accountType, accountGuid);
+      await db.run(`UPDATE accounts SET account_type = ? WHERE guid = ?`, updates.accountType, accountGuid);
     }
     if (updates.commodityGuid !== undefined) {
-      db.run(`UPDATE accounts SET commodity_guid = ? WHERE guid = ?`, updates.commodityGuid, accountGuid);
+      await db.run(`UPDATE accounts SET commodity_guid = ? WHERE guid = ?`, updates.commodityGuid, accountGuid);
     }
     if (updates.parentGuid !== undefined) {
-      db.run(`UPDATE accounts SET parent_guid = ? WHERE guid = ?`, updates.parentGuid, accountGuid);
+      await db.run(`UPDATE accounts SET parent_guid = ? WHERE guid = ?`, updates.parentGuid, accountGuid);
     }
     if (updates.code !== undefined) {
-      db.run(`UPDATE accounts SET code = ? WHERE guid = ?`, updates.code, accountGuid);
+      await db.run(`UPDATE accounts SET code = ? WHERE guid = ?`, updates.code, accountGuid);
     }
     if (updates.description !== undefined) {
-      db.run(`UPDATE accounts SET description = ? WHERE guid = ?`, updates.description, accountGuid);
+      await db.run(`UPDATE accounts SET description = ? WHERE guid = ?`, updates.description, accountGuid);
     }
     if (updates.hidden !== undefined) {
-      db.run(`UPDATE accounts SET hidden = ? WHERE guid = ?`, updates.hidden ? 1 : 0, accountGuid);
+      await db.run(`UPDATE accounts SET hidden = ? WHERE guid = ?`, updates.hidden ? 1 : 0, accountGuid);
     }
     if (updates.placeholder !== undefined) {
-      db.run(`UPDATE accounts SET placeholder = ? WHERE guid = ?`, updates.placeholder ? 1 : 0, accountGuid);
+      await db.run(`UPDATE accounts SET placeholder = ? WHERE guid = ?`, updates.placeholder ? 1 : 0, accountGuid);
     }
   });
 }
@@ -122,47 +122,47 @@ export function updateAccount(
  * 2. All splits (account_guid updated)
  * 3. All budget_amounts (account_guid updated)
  */
-export function deleteAccountWithReallocation(
+export async function deleteAccountWithReallocation(
   db: WritableDbAdapter,
   accountGuid: string,
   targetAccountGuid: string
-): void {
+): Promise<void> {
   if (accountGuid === targetAccountGuid) {
     throw new Error("Cannot reallocate to the account being deleted");
   }
 
   // Verify the target account exists
-  const target = db.prepare(`SELECT guid FROM accounts WHERE guid = ?`).get(targetAccountGuid);
+  const target = await db.prepare(`SELECT guid FROM accounts WHERE guid = ?`).get(targetAccountGuid);
   if (!target) {
     throw new Error(`Target account ${targetAccountGuid} not found`);
   }
 
-  db.transaction(() => {
+  await db.transaction(async () => {
     // 1. Reparent all direct child accounts to the target
-    db.run(
+    await db.run(
       `UPDATE accounts SET parent_guid = ? WHERE parent_guid = ?`,
       targetAccountGuid,
       accountGuid
     );
 
     // 2. Move all splits to the target account
-    db.run(
+    await db.run(
       `UPDATE splits SET account_guid = ? WHERE account_guid = ?`,
       targetAccountGuid,
       accountGuid
     );
 
     // 3. Move any budget_amounts to the target
-    db.run(
+    await db.run(
       `UPDATE budget_amounts SET account_guid = ? WHERE account_guid = ?`,
       targetAccountGuid,
       accountGuid
     );
 
     // 4. Remove slots attached to this account
-    db.run(`DELETE FROM slots WHERE obj_guid = ?`, accountGuid);
+    await db.run(`DELETE FROM slots WHERE obj_guid = ?`, accountGuid);
 
     // 5. Delete the account itself
-    db.run(`DELETE FROM accounts WHERE guid = ?`, accountGuid);
+    await db.run(`DELETE FROM accounts WHERE guid = ?`, accountGuid);
   });
 }

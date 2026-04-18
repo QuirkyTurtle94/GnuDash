@@ -13,10 +13,10 @@ import { EXCLUDE_CLOSING_JOIN, EXCLUDE_CLOSING_WHERE } from "./closing";
  *
  * @param excludeClosing - If true, exclude year-end book-closing transactions.
  */
-export function computeIncomeBreakdown(
+export async function computeIncomeBreakdown(
   ctx: ParseContext,
   excludeClosing = false,
-): { monthly: MonthlyExpenseByCategory[]; colors: Record<string, string> } {
+): Promise<{ monthly: MonthlyExpenseByCategory[]; colors: Record<string, string> }> {
   const { db, accounts, accountMap, commodityMap, fxRates, rootAccount, topIncomeGuids } = ctx;
 
   if (topIncomeGuids.size === 0) return { monthly: [], colors: {} };
@@ -34,7 +34,7 @@ export function computeIncomeBreakdown(
   const closingJoin = excludeClosing ? EXCLUDE_CLOSING_JOIN : "";
   const closingWhere = excludeClosing ? `AND ${EXCLUDE_CLOSING_WHERE}` : "";
 
-  const rows = db
+  const rows = (await db
     .prepare(
       `SELECT
         s.account_guid,
@@ -50,7 +50,7 @@ export function computeIncomeBreakdown(
       GROUP BY s.account_guid, ${sqlMonth("t.post_date", ctx.dialect)}
       ORDER BY month`
     )
-    .all() as { account_guid: string; commodity_guid: string; month: string; total: number }[];
+    .all()) as { account_guid: string; commodity_guid: string; month: string; total: number }[];
 
   const monthly: MonthlyExpenseByCategory[] = [];
   for (const row of rows) {
@@ -74,12 +74,12 @@ export function computeIncomeBreakdown(
  * Get all individual income transactions for the income table view.
  * Amounts are negated to positive (GNUCash stores income as negative values).
  */
-export function getIncomeTransactions(ctx: ParseContext): ExpenseTransaction[] {
+export async function getIncomeTransactions(ctx: ParseContext): Promise<ExpenseTransaction[]> {
   const { db, accountMap, commodityMap, fxRates, rootAccount, topIncomeGuids } = ctx;
 
   if (topIncomeGuids.size === 0) return [];
 
-  const rows = db
+  const rows = (await db
     .prepare(
       `SELECT
         s.account_guid,
@@ -93,7 +93,7 @@ export function getIncomeTransactions(ctx: ParseContext): ExpenseTransaction[] {
       WHERE a.account_type = 'INCOME'
       ORDER BY t.post_date DESC`
     )
-    .all() as { account_guid: string; commodity_guid: string; post_date: string; description: string; amount: number }[];
+    .all()) as { account_guid: string; commodity_guid: string; post_date: string; description: string; amount: number }[];
 
   const transactions: ExpenseTransaction[] = [];
   for (const row of rows) {

@@ -8,9 +8,9 @@ import type { WritableDbAdapter } from "../../engine/db/writable-adapter";
 
 // ── Test fixtures ──────────────────────────────────────────────
 
-function seedTestDb(db: WritableDbAdapter) {
+async function seedTestDb(db: WritableDbAdapter) {
   // Base currency: GBP
-  db.run(
+  await db.run(
     `INSERT INTO commodities (guid, namespace, mnemonic, fullname, fraction) VALUES (?, ?, ?, ?, ?)`,
     "gbp00000000000000000000000000001",
     "CURRENCY",
@@ -18,7 +18,7 @@ function seedTestDb(db: WritableDbAdapter) {
     "British Pound",
     100
   );
-  db.run(
+  await db.run(
     `INSERT INTO commodities (guid, namespace, mnemonic, fullname, fraction) VALUES (?, ?, ?, ?, ?)`,
     "usd00000000000000000000000000002",
     "CURRENCY",
@@ -26,7 +26,7 @@ function seedTestDb(db: WritableDbAdapter) {
     "US Dollar",
     100
   );
-  db.run(
+  await db.run(
     `INSERT INTO commodities (guid, namespace, mnemonic, fullname, fraction) VALUES (?, ?, ?, ?, ?)`,
     "aapl0000000000000000000000000003",
     "NASDAQ",
@@ -36,7 +36,7 @@ function seedTestDb(db: WritableDbAdapter) {
   );
 
   // Root account
-  db.run(
+  await db.run(
     `INSERT INTO accounts (guid, name, account_type, commodity_guid, parent_guid, placeholder) VALUES (?, ?, ?, ?, ?, ?)`,
     "root0000000000000000000000000001",
     "Root",
@@ -47,14 +47,14 @@ function seedTestDb(db: WritableDbAdapter) {
   );
 
   // Book
-  db.run(
+  await db.run(
     `INSERT INTO books (guid, root_account_guid) VALUES (?, ?)`,
     "book0000000000000000000000000001",
     "root0000000000000000000000000001"
   );
 
   // Bank account (GBP)
-  db.run(
+  await db.run(
     `INSERT INTO accounts (guid, name, account_type, commodity_guid, parent_guid, placeholder) VALUES (?, ?, ?, ?, ?, ?)`,
     "bank0000000000000000000000000001",
     "Current Account",
@@ -65,7 +65,7 @@ function seedTestDb(db: WritableDbAdapter) {
   );
 
   // Expense account (GBP)
-  db.run(
+  await db.run(
     `INSERT INTO accounts (guid, name, account_type, commodity_guid, parent_guid, placeholder) VALUES (?, ?, ?, ?, ?, ?)`,
     "exp00000000000000000000000000001",
     "Groceries",
@@ -76,7 +76,7 @@ function seedTestDb(db: WritableDbAdapter) {
   );
 
   // Income account (GBP)
-  db.run(
+  await db.run(
     `INSERT INTO accounts (guid, name, account_type, commodity_guid, parent_guid, placeholder) VALUES (?, ?, ?, ?, ?, ?)`,
     "inc00000000000000000000000000001",
     "Salary",
@@ -87,7 +87,7 @@ function seedTestDb(db: WritableDbAdapter) {
   );
 
   // USD bank account
-  db.run(
+  await db.run(
     `INSERT INTO accounts (guid, name, account_type, commodity_guid, parent_guid, placeholder) VALUES (?, ?, ?, ?, ?, ?)`,
     "usdb0000000000000000000000000001",
     "USD Account",
@@ -98,7 +98,7 @@ function seedTestDb(db: WritableDbAdapter) {
   );
 
   // Stock account (AAPL)
-  db.run(
+  await db.run(
     `INSERT INTO accounts (guid, name, account_type, commodity_guid, parent_guid, placeholder) VALUES (?, ?, ?, ?, ?, ?)`,
     "stck0000000000000000000000000001",
     "AAPL",
@@ -109,7 +109,7 @@ function seedTestDb(db: WritableDbAdapter) {
   );
 
   // Placeholder account (cannot hold transactions)
-  db.run(
+  await db.run(
     `INSERT INTO accounts (guid, name, account_type, commodity_guid, parent_guid, placeholder) VALUES (?, ?, ?, ?, ?, ?)`,
     "phld0000000000000000000000000001",
     "Assets Group",
@@ -123,10 +123,10 @@ function seedTestDb(db: WritableDbAdapter) {
 let db: WritableDbAdapter;
 let ctx: ParseContext;
 
-beforeEach(() => {
+beforeEach(async () => {
   db = createWritableMemoryDb();
-  seedTestDb(db);
-  ctx = buildParseContext(db);
+  await seedTestDb(db);
+  ctx = await buildParseContext(db);
 });
 
 afterEach(() => {
@@ -137,8 +137,8 @@ afterEach(() => {
 
 describe("TransactionBuilder", () => {
   describe("simple same-currency transaction", () => {
-    it("creates a balanced expense transaction", () => {
-      const result = new TransactionBuilder(db, ctx)
+    it("creates a balanced expense transaction", async () => {
+      const result = await new TransactionBuilder(db, ctx)
         .currency("gbp00000000000000000000000000001")
         .postDate(new Date(2025, 0, 15))
         .description("Tesco Groceries")
@@ -150,7 +150,7 @@ describe("TransactionBuilder", () => {
       expect(result.splitGuids).toHaveLength(2);
 
       // Verify in DB
-      const tx = db.prepare(`SELECT * FROM transactions WHERE guid = ?`).get(result.transactionGuid) as {
+      const tx = (await db.prepare(`SELECT * FROM transactions WHERE guid = ?`).get(result.transactionGuid)) as {
         description: string;
         currency_guid: string;
       };
@@ -158,7 +158,7 @@ describe("TransactionBuilder", () => {
       expect(tx.currency_guid).toBe("gbp00000000000000000000000000001");
 
       // Verify splits
-      const splits = db.prepare(`SELECT * FROM splits WHERE tx_guid = ?`).all(result.transactionGuid) as {
+      const splits = (await db.prepare(`SELECT * FROM splits WHERE tx_guid = ?`).all(result.transactionGuid)) as {
         value_num: number;
         value_denom: number;
         quantity_num: number;
@@ -178,8 +178,8 @@ describe("TransactionBuilder", () => {
       }
     });
 
-    it("creates a salary income transaction", () => {
-      const result = new TransactionBuilder(db, ctx)
+    it("creates a salary income transaction", async () => {
+      const result = await new TransactionBuilder(db, ctx)
         .currency("gbp00000000000000000000000000001")
         .postDate(new Date(2025, 0, 28))
         .description("Salary January")
@@ -187,13 +187,13 @@ describe("TransactionBuilder", () => {
         .addSimpleSplit("inc00000000000000000000000000001", new GncNumeric(-300000, 100))
         .commit();
 
-      const splits = db.prepare(`SELECT value_num FROM splits WHERE tx_guid = ?`).all(result.transactionGuid) as { value_num: number }[];
+      const splits = (await db.prepare(`SELECT value_num FROM splits WHERE tx_guid = ?`).all(result.transactionGuid)) as { value_num: number }[];
       const sum = splits.reduce((s, sp) => s + sp.value_num, 0);
       expect(sum).toBe(0);
     });
 
-    it("handles multi-split transactions (split expense)", () => {
-      const result = new TransactionBuilder(db, ctx)
+    it("handles multi-split transactions (split expense)", async () => {
+      const result = await new TransactionBuilder(db, ctx)
         .currency("gbp00000000000000000000000000001")
         .postDate(new Date(2025, 0, 20))
         .description("Grocery and Restaurant")
@@ -202,15 +202,15 @@ describe("TransactionBuilder", () => {
         .addSimpleSplit("bank0000000000000000000000000001", new GncNumeric(-4500, 100)) // -45.00
         .commit();
 
-      const splits = db.prepare(`SELECT * FROM splits WHERE tx_guid = ?`).all(result.transactionGuid);
+      const splits = await db.prepare(`SELECT * FROM splits WHERE tx_guid = ?`).all(result.transactionGuid);
       expect(splits).toHaveLength(3);
     });
   });
 
   describe("multi-currency transaction", () => {
-    it("creates an FX transaction with different value and quantity", () => {
+    it("creates an FX transaction with different value and quantity", async () => {
       // Transfer 400 GBP → 500 USD
-      const result = new TransactionBuilder(db, ctx)
+      const result = await new TransactionBuilder(db, ctx)
         .currency("gbp00000000000000000000000000001")
         .postDate(new Date(2025, 0, 12))
         .description("USD Transfer")
@@ -226,10 +226,10 @@ describe("TransactionBuilder", () => {
         })
         .commit();
 
-      const splits = db.prepare(
+      const splits = (await db.prepare(
         `SELECT account_guid, value_num, value_denom, quantity_num, quantity_denom
          FROM splits WHERE tx_guid = ?`
-      ).all(result.transactionGuid) as {
+      ).all(result.transactionGuid)) as {
         account_guid: string;
         value_num: number;
         value_denom: number;
@@ -247,9 +247,9 @@ describe("TransactionBuilder", () => {
       expect(usdSplit.quantity_num).toBe(50000); // 500 USD
     });
 
-    it("creates a stock purchase with shares as quantity", () => {
+    it("creates a stock purchase with shares as quantity", async () => {
       // Buy 10 AAPL for 1200 GBP
-      const result = new TransactionBuilder(db, ctx)
+      const result = await new TransactionBuilder(db, ctx)
         .currency("gbp00000000000000000000000000001")
         .postDate(new Date(2025, 0, 10))
         .description("Buy AAPL")
@@ -265,10 +265,10 @@ describe("TransactionBuilder", () => {
         })
         .commit();
 
-      const stockSplit = db.prepare(
+      const stockSplit = (await db.prepare(
         `SELECT value_num, value_denom, quantity_num, quantity_denom
          FROM splits WHERE tx_guid = ? AND account_guid = ?`
-      ).get(result.transactionGuid, "stck0000000000000000000000000001") as {
+      ).get(result.transactionGuid, "stck0000000000000000000000000001")) as {
         value_num: number;
         value_denom: number;
         quantity_num: number;
@@ -285,7 +285,7 @@ describe("TransactionBuilder", () => {
   });
 
   describe("validation", () => {
-    it("rejects unbalanced splits", () => {
+    it("rejects unbalanced splits", async () => {
       const builder = new TransactionBuilder(db, ctx)
         .currency("gbp00000000000000000000000000001")
         .postDate(new Date(2025, 0, 15))
@@ -293,7 +293,7 @@ describe("TransactionBuilder", () => {
         .addSimpleSplit("exp00000000000000000000000000001", new GncNumeric(500, 100))
         .addSimpleSplit("bank0000000000000000000000000001", new GncNumeric(-499, 100));
 
-      expect(() => builder.commit()).toThrow(ValidationFailedError);
+      await expect(builder.commit()).rejects.toThrow(ValidationFailedError);
 
       const errors = builder.validate();
       expect(errors.some(e => e.code === "SPLITS_UNBALANCED")).toBe(true);
@@ -387,11 +387,11 @@ describe("TransactionBuilder", () => {
   });
 
   describe("atomicity", () => {
-    it("rolls back on validation failure (no partial writes)", () => {
-      const txCountBefore = (db.prepare(`SELECT COUNT(*) AS cnt FROM transactions`).get() as { cnt: number }).cnt;
+    it("rolls back on validation failure (no partial writes)", async () => {
+      const txCountBefore = ((await db.prepare(`SELECT COUNT(*) AS cnt FROM transactions`).get()) as { cnt: number }).cnt;
 
       try {
-        new TransactionBuilder(db, ctx)
+        await new TransactionBuilder(db, ctx)
           .currency("gbp00000000000000000000000000001")
           .postDate(new Date(2025, 0, 15))
           .description("Unbalanced")
@@ -402,7 +402,7 @@ describe("TransactionBuilder", () => {
         // expected
       }
 
-      const txCountAfter = (db.prepare(`SELECT COUNT(*) AS cnt FROM transactions`).get() as { cnt: number }).cnt;
+      const txCountAfter = ((await db.prepare(`SELECT COUNT(*) AS cnt FROM transactions`).get()) as { cnt: number }).cnt;
       expect(txCountAfter).toBe(txCountBefore);
     });
   });

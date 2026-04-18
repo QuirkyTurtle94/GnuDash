@@ -71,17 +71,17 @@ export function validateAccountCreation(
  * Validate that an account can be safely deleted.
  * Cannot delete if: has splits, has child accounts.
  */
-export function validateAccountDeletion(
+export async function validateAccountDeletion(
   accountGuid: string,
   db: DbAdapter,
   accountMap: Map<string, GnuCashAccount>
-): ValidationError[] {
+): Promise<ValidationError[]> {
   const errors: ValidationError[] = [];
 
   // Check for splits referencing this account
-  const splitCount = db
+  const splitCount = (await db
     .prepare(`SELECT COUNT(*) AS cnt FROM splits WHERE account_guid = ?`)
-    .get(accountGuid) as { cnt: number } | undefined;
+    .get(accountGuid)) as { cnt: number } | undefined;
 
   if (splitCount && splitCount.cnt > 0) {
     errors.push({

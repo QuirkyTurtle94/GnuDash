@@ -41,10 +41,10 @@ export interface BulkEditTransactionsResult {
  *   - no split in any referenced transaction is reconciled
  *   - any target account exists and its commodity matches the transaction's currency
  */
-export function bulkEditTransactions(
+export async function bulkEditTransactions(
   db: WritableDbAdapter,
   input: BulkEditTransactionsInput,
-): BulkEditTransactionsResult {
+): Promise<BulkEditTransactionsResult> {
   const { transactionGuids, newDescription, newFromAccountGuid, newToAccountGuid } = input;
 
   if (transactionGuids.length === 0) {
@@ -58,10 +58,10 @@ export function bulkEditTransactions(
     throw new Error("bulkEditTransactions: no changes requested");
   }
 
-  return db.transaction(() => {
+  return db.transaction(async () => {
     // 1. Validate every referenced transaction is a simple 2-split transaction
     //    with no reconciled splits, and gather its currency for commodity checks.
-    const txRows = db
+    const txRows = (await db
       .prepare(
         `SELECT t.guid AS tx_guid,
                 t.currency_guid AS currency_guid,
@@ -70,7 +70,7 @@ export function bulkEditTransactions(
          FROM transactions t
          WHERE t.guid IN (${placeholders(transactionGuids.length)})`,
       )
-      .all(...transactionGuids) as {
+      .all(...transactionGuids)) as {
         tx_guid: string;
         currency_guid: string;
         split_count: number;
@@ -101,10 +101,10 @@ export function bulkEditTransactions(
     // 2. For any account reassignment, verify the target account exists and
     //    that its commodity matches every affected transaction's currency.
     if (newFromAccountGuid !== undefined) {
-      assertAccountMatchesCurrencies(db, newFromAccountGuid, txRows, "newFromAccountGuid");
+      await assertAccountMatchesCurrencies(db, newFromAccountGuid, txRows, "newFromAccountGuid");
     }
     if (newToAccountGuid !== undefined) {
-      assertAccountMatchesCurrencies(db, newToAccountGuid, txRows, "newToAccountGuid");
+      await assertAccountMatchesCurrencies(db, newToAccountGuid, txRows, "newToAccountGuid");
     }
 
     // 3. Apply the updates. All of these are pure SQL and safe to do in bulk
@@ -114,7 +114,7 @@ export function bulkEditTransactions(
     let toSplitsUpdated = 0;
 
     if (newDescription !== undefined) {
-      const res = db.run(
+      const res = await db.run(
         `UPDATE transactions SET description = ? WHERE guid IN (${placeholders(transactionGuids.length)})`,
         newDescription,
         ...transactionGuids,
@@ -124,7 +124,7 @@ export function bulkEditTransactions(
 
     if (newFromAccountGuid !== undefined) {
       // "From" = the split with negative value (money leaving the source account).
-      const res = db.run(
+      const res = await db.run(
         `UPDATE splits SET account_guid = ?
          WHERE tx_guid IN (${placeholders(transactionGuids.length)})
            AND value_num < 0`,
@@ -136,7 +136,7 @@ export function bulkEditTransactions(
 
     if (newToAccountGuid !== undefined) {
       // "To" = the split with positive value (money arriving at the destination).
-      const res = db.run(
+      const res = await db.run(
         `UPDATE splits SET account_guid = ?
          WHERE tx_guid IN (${placeholders(transactionGuids.length)})
            AND value_num > 0`,
@@ -162,15 +162,15 @@ function placeholders(n: number): string {
  * Verify that `accountGuid` exists and its commodity matches the currency
  * of every affected transaction. Throws with a descriptive message if not.
  */
-function assertAccountMatchesCurrencies(
+async function assertAccountMatchesCurrencies(
   db: WritableDbAdapter,
   accountGuid: string,
   txRows: { tx_guid: string; currency_guid: string }[],
   fieldName: string,
-): void {
-  const account = db
+): Promise<void> {
+  const account = (await db
     .prepare(`SELECT commodity_guid FROM accounts WHERE guid = ?`)
-    .get(accountGuid) as { commodity_guid: string } | undefined;
+    .get(accountGuid)) as { commodity_guid: string } | undefined;
 
   if (!account) {
     throw new Error(`bulkEditTransactions: ${fieldName} account ${accountGuid} not found`);

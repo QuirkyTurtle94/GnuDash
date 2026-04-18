@@ -92,7 +92,7 @@ export class AccountBuilder {
    * NOTE: After committing, the ParseContext is stale.
    * The caller should rebuild it if they need updated caches.
    */
-  commit(): { accountGuid: string } {
+  async commit(): Promise<{ accountGuid: string }> {
     const errors = this.validate();
     if (errors.length > 0) {
       throw new ValidationFailedError(errors);
@@ -104,13 +104,13 @@ export class AccountBuilder {
     // which is NOT NULL in real GnuCash schemas. Default to 100 if the
     // commodity row is missing or has no fraction (should be rare — the
     // validate() pass above already confirmed the commodity exists).
-    const commodityRow = this.db
+    const commodityRow = (await this.db
       .prepare(`SELECT fraction FROM commodities WHERE guid = ?`)
-      .get(this._commodityGuid) as { fraction: number } | undefined;
+      .get(this._commodityGuid)) as { fraction: number } | undefined;
     const commodityScu = commodityRow?.fraction ?? 100;
 
-    this.db.transaction(() => {
-      this.db.run(
+    await this.db.transaction(async () => {
+      await this.db.run(
         `INSERT INTO accounts (guid, name, account_type, commodity_guid, commodity_scu,
                                non_std_scu, parent_guid, code, description, hidden, placeholder)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,

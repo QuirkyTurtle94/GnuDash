@@ -120,7 +120,7 @@ export class TransactionBuilder {
    * NOTE: After committing, the ParseContext is stale.
    * The caller should rebuild it if they need updated caches.
    */
-  commit(): { transactionGuid: string; splitGuids: string[] } {
+  async commit(): Promise<{ transactionGuid: string; splitGuids: string[] }> {
     const errors = this.validate();
     if (errors.length > 0) {
       throw new ValidationFailedError(errors);
@@ -131,9 +131,9 @@ export class TransactionBuilder {
     const enterDate = formatDate(new Date());
     const postDate = formatDate(this._postDate!);
 
-    this.db.transaction(() => {
+    await this.db.transaction(async () => {
       // Insert transaction header
-      this.db.run(
+      await this.db.run(
         `INSERT INTO transactions (guid, currency_guid, num, post_date, enter_date, description)
          VALUES (?, ?, ?, ?, ?, ?)`,
         txGuid,
@@ -149,7 +149,7 @@ export class TransactionBuilder {
         const splitGuid = generateGuid();
         splitGuids.push(splitGuid);
 
-        this.db.run(
+        await this.db.run(
           `INSERT INTO splits (guid, tx_guid, account_guid, memo, action, reconcile_state,
                                value_num, value_denom, quantity_num, quantity_denom, lot_guid)
            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,

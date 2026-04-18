@@ -5,24 +5,24 @@ import { computeIncomeBreakdown, getIncomeTransactions } from "../../domain/inco
 afterAll(() => closeTestDb());
 
 describe("computeIncomeBreakdown", () => {
-  it("returns monthly data with colors", () => {
-    const result = computeIncomeBreakdown(getTestContext());
+  it("returns monthly data with colors", async () => {
+    const result = await computeIncomeBreakdown(await getTestContext());
     expect(result.monthly.length).toBeGreaterThan(0);
     expect(result.colors).toBeDefined();
   });
 
-  it("snapshot", () => {
-    expect(computeIncomeBreakdown(getTestContext())).toMatchSnapshot();
+  it("snapshot", async () => {
+    expect(await computeIncomeBreakdown(await getTestContext())).toMatchSnapshot();
   });
 });
 
 describe("getIncomeTransactions", () => {
-  it("returns transactions", () => {
-    const txs = getIncomeTransactions(getTestContext());
+  it("returns transactions", async () => {
+    const txs = await getIncomeTransactions(await getTestContext());
     expect(txs.length).toBeGreaterThan(0);
   });
 
-  it("snapshot", () => {
-    expect(getIncomeTransactions(getTestContext())).toMatchSnapshot();
+  it("snapshot", async () => {
+    expect(await getIncomeTransactions(await getTestContext())).toMatchSnapshot();
   });
 });

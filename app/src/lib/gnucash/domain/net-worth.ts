@@ -12,11 +12,11 @@ import { sqlMonth } from "../shared/dates";
  * Uses quantity (not value) for non-investment accounts to correctly handle
  * multi-currency accounts. Investment values fluctuate with price history.
  */
-export function computeNetWorthSeries(ctx: ParseContext): MonthlyNetWorth[] {
+export async function computeNetWorthSeries(ctx: ParseContext): Promise<MonthlyNetWorth[]> {
   const { db, baseCurrencyGuid, fxRates, commodityMap } = ctx;
 
   // Monthly changes for non-investment accounts using quantity + FX conversion
-  const nonInvRows = db
+  const nonInvRows = (await db
     .prepare(
       `SELECT
         ${sqlMonth("t.post_date", ctx.dialect)} AS month,
@@ -33,7 +33,7 @@ export function computeNetWorthSeries(ctx: ParseContext): MonthlyNetWorth[] {
       GROUP BY ${sqlMonth("t.post_date", ctx.dialect)}, a.commodity_guid
       ORDER BY month`
     )
-    .all() as { month: string; commodity_guid: string; asset_change: number; liability_change: number }[];
+    .all()) as { month: string; commodity_guid: string; asset_change: number; liability_change: number }[];
 
   const nonInvByMonth = new Map<string, { asset_change: number; liability_change: number }>();
   for (const row of nonInvRows) {
@@ -46,15 +46,15 @@ export function computeNetWorthSeries(ctx: ParseContext): MonthlyNetWorth[] {
   }
 
   // Investment accounts and their shares over time
-  const invAccounts = db
+  const invAccounts = (await db
     .prepare(
       `SELECT a.guid, a.commodity_guid
        FROM accounts a
        WHERE a.account_type IN ('STOCK', 'MUTUAL')`
     )
-    .all() as { guid: string; commodity_guid: string }[];
+    .all()) as { guid: string; commodity_guid: string }[];
 
-  const invShares = db
+  const invShares = (await db
     .prepare(
       `SELECT
         s.account_guid,
@@ -67,7 +67,7 @@ export function computeNetWorthSeries(ctx: ParseContext): MonthlyNetWorth[] {
       GROUP BY s.account_guid, ${sqlMonth("t.post_date", ctx.dialect)}
       ORDER BY month`
     )
-    .all() as { account_guid: string; month: string; shares_change: number }[];
+    .all()) as { account_guid: string; month: string; shares_change: number }[];
 
   // Build cumulative shares per account
   const sharesMap = new Map<string, Map<string, number>>();
@@ -83,12 +83,12 @@ export function computeNetWorthSeries(ctx: ParseContext): MonthlyNetWorth[] {
   }
 
   // Price lookup by commodity by month (with currency_guid for FX conversion)
-  const allPrices = db
+  const allPrices = (await db
     .prepare(
       `SELECT commodity_guid, currency_guid, date, CAST(value_num AS REAL) / value_denom AS price
        FROM prices ORDER BY date`
     )
-    .all() as { commodity_guid: string; currency_guid: string; date: string; price: number }[];
+    .all()) as { commodity_guid: string; currency_guid: string; date: string; price: number }[];
 
   const pricesByMonth = new Map<string, Map<string, { price: number; currencyGuid: string }>>();
   for (const p of allPrices) {
@@ -171,10 +171,10 @@ function roundHalfUpCents(n: number): number {
  * Without this, float accumulation + a single late rounding can disagree
  * with GnuCash by one minor unit on multi-currency books.
  */
-export function computeCurrentNetWorth(ctx: ParseContext): number {
+export async function computeCurrentNetWorth(ctx: ParseContext): Promise<number> {
   const { db, commodityMap, fxRates } = ctx;
 
-  const nonInvRows = db
+  const nonInvRows = (await db
     .prepare(
       `SELECT
         a.guid AS account_guid,
@@ -186,7 +186,7 @@ export function computeCurrentNetWorth(ctx: ParseContext): number {
         AND a.placeholder = 0
       GROUP BY a.guid, a.commodity_guid`
     )
-    .all() as { account_guid: string; commodity_guid: string; balance: number }[];
+    .all()) as { account_guid: string; commodity_guid: string; balance: number }[];
 
   let nonInvTotal = 0;
   for (const row of nonInvRows) {
@@ -200,7 +200,7 @@ export function computeCurrentNetWorth(ctx: ParseContext): number {
 
   // Investment market value: one row per STOCK/MUTUAL account so each
   // shares × price product can be rounded to cents independently.
-  const invRows = db
+  const invRows = (await db
     .prepare(
       `SELECT a.guid AS account_guid, a.commodity_guid,
               SUM(CAST(s.quantity_num AS REAL) / s.quantity_denom) AS shares
@@ -210,7 +210,7 @@ export function computeCurrentNetWorth(ctx: ParseContext): number {
        GROUP BY a.guid, a.commodity_guid
        HAVING shares != 0`
     )
-    .all() as { account_guid: string; commodity_guid: string; shares: number }[];
+    .all()) as { account_guid: string; commodity_guid: string; shares: number }[];
 
   let investmentTotal = 0;
   for (const row of invRows) {

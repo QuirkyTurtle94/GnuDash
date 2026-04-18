@@ -44,28 +44,37 @@ export function createWritableConnection(filePath: string): WritableDbAdapter {
     prepare(sql: string): PreparedQuery {
       const stmt = db.prepare(sql);
       return {
-        all(...params: unknown[]): unknown[] {
-          return stmt.all(...params);
+        async all(...params: unknown[]): Promise<unknown[]> {
+          return stmt.all(...params) as unknown[];
         },
-        get(...params: unknown[]): unknown | undefined {
+        async get(...params: unknown[]): Promise<unknown | undefined> {
           return stmt.get(...params);
         },
       };
     },
 
-    run(sql: string, ...params: unknown[]): RunResult {
+    async run(sql: string, ...params: unknown[]): Promise<RunResult> {
       const stmt = db.prepare(sql);
       const result = stmt.run(...params);
-      return { changes: result.changes };
+      return { changes: Number(result.changes) };
     },
 
-    exec(sql: string): void {
+    async exec(sql: string): Promise<void> {
       db.exec(sql);
     },
 
-    transaction<T>(fn: () => T): T {
-      const wrapped = db.transaction(fn);
-      return wrapped();
+    async transaction<T>(fn: () => Promise<T>): Promise<T> {
+      // better-sqlite3's db.transaction expects a sync function; for async
+      // work we run BEGIN/COMMIT/ROLLBACK explicitly.
+      db.prepare("BEGIN IMMEDIATE").run();
+      try {
+        const result = await fn();
+        db.prepare("COMMIT").run();
+        return result;
+      } catch (err) {
+        db.prepare("ROLLBACK").run();
+        throw err;
+      }
     },
 
     close(): void {
@@ -214,28 +223,37 @@ export function createWritableMemoryDb(): WritableDbAdapter {
     prepare(sql: string): PreparedQuery {
       const stmt = db.prepare(sql);
       return {
-        all(...params: unknown[]): unknown[] {
-          return stmt.all(...params);
+        async all(...params: unknown[]): Promise<unknown[]> {
+          return stmt.all(...params) as unknown[];
         },
-        get(...params: unknown[]): unknown | undefined {
+        async get(...params: unknown[]): Promise<unknown | undefined> {
           return stmt.get(...params);
         },
       };
     },
 
-    run(sql: string, ...params: unknown[]): RunResult {
+    async run(sql: string, ...params: unknown[]): Promise<RunResult> {
       const stmt = db.prepare(sql);
       const result = stmt.run(...params);
-      return { changes: result.changes };
+      return { changes: Number(result.changes) };
     },
 
-    exec(sql: string): void {
+    async exec(sql: string): Promise<void> {
       db.exec(sql);
     },
 
-    transaction<T>(fn: () => T): T {
-      const wrapped = db.transaction(fn);
-      return wrapped();
+    async transaction<T>(fn: () => Promise<T>): Promise<T> {
+      // better-sqlite3's db.transaction expects a sync function; for async
+      // work we run BEGIN/COMMIT/ROLLBACK explicitly.
+      db.prepare("BEGIN IMMEDIATE").run();
+      try {
+        const result = await fn();
+        db.prepare("COMMIT").run();
+        return result;
+      } catch (err) {
+        db.prepare("ROLLBACK").run();
+        throw err;
+      }
     },
 
     close(): void {

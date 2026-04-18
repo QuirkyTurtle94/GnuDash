@@ -12,13 +12,13 @@ import { EXCLUDE_CLOSING_JOIN, EXCLUDE_CLOSING_WHERE } from "./closing";
  *
  * @param excludeClosing - If true, exclude year-end book-closing transactions.
  */
-export function computeCashFlowSeries(ctx: ParseContext, excludeClosing = false): MonthlyCashFlow[] {
+export async function computeCashFlowSeries(ctx: ParseContext, excludeClosing = false): Promise<MonthlyCashFlow[]> {
   const { db, fxRates, commodityMap } = ctx;
 
   const closingJoin = excludeClosing ? EXCLUDE_CLOSING_JOIN : "";
   const closingWhere = excludeClosing ? `AND ${EXCLUDE_CLOSING_WHERE}` : "";
 
-  const rows = db
+  const rows = (await db
     .prepare(
       `SELECT
         ${sqlMonth("t.post_date", ctx.dialect)} AS month,
@@ -34,7 +34,7 @@ export function computeCashFlowSeries(ctx: ParseContext, excludeClosing = false)
       GROUP BY ${sqlMonth("t.post_date", ctx.dialect)}, a.account_type, a.commodity_guid
       ORDER BY month`
     )
-    .all() as { month: string; account_type: string; commodity_guid: string; total: number }[];
+    .all()) as { month: string; account_type: string; commodity_guid: string; total: number }[];
 
   const byMonth = new Map<string, { income: number; expenses: number }>();
   for (const row of rows) {

@@ -4,8 +4,8 @@ import { getTestContext, closeTestDb } from "./helpers";
 afterAll(() => closeTestDb());
 
 describe("buildParseContext", () => {
-  it("loads accounts, commodities, prices, and derived maps", () => {
-    const ctx = getTestContext();
+  it("loads accounts, commodities, prices, and derived maps", async () => {
+    const ctx = await getTestContext();
 
     expect(ctx.baseCurrencyMnemonic).toBe("GBP");
     expect(ctx.accounts.length).toBeGreaterThan(0);
@@ -16,8 +16,8 @@ describe("buildParseContext", () => {
     expect(ctx.latestPrices.size).toBeGreaterThan(0);
   });
 
-  it("snapshot: full context shape (excluding db)", () => {
-    const ctx = getTestContext();
+  it("snapshot: full context shape (excluding db)", async () => {
+    const ctx = await getTestContext();
     const { db, fxRates, ...rest } = ctx;
 
     // Convert maps/sets to plain objects for snapshot stability

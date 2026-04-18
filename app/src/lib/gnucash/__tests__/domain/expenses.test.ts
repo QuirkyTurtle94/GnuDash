@@ -5,27 +5,27 @@ import { computeExpenseBreakdown, getExpenseTransactions } from "../../domain/ex
 afterAll(() => closeTestDb());
 
 describe("computeExpenseBreakdown", () => {
-  it("returns categories and monthly data", () => {
-    const result = computeExpenseBreakdown(getTestContext());
+  it("returns categories and monthly data", async () => {
+    const result = await computeExpenseBreakdown(await getTestContext());
     expect(result.categories.length).toBeGreaterThan(0);
     expect(result.monthly.length).toBeGreaterThan(0);
     expect(result.colors).toBeDefined();
   });
 
-  it("snapshot", () => {
-    expect(computeExpenseBreakdown(getTestContext())).toMatchSnapshot();
+  it("snapshot", async () => {
+    expect(await computeExpenseBreakdown(await getTestContext())).toMatchSnapshot();
   });
 });
 
 describe("getExpenseTransactions", () => {
-  it("returns transactions", () => {
-    const txs = getExpenseTransactions(getTestContext());
+  it("returns transactions", async () => {
+    const txs = await getExpenseTransactions(await getTestContext());
     expect(txs.length).toBeGreaterThan(0);
     expect(txs[0]).toHaveProperty("date");
     expect(txs[0]).toHaveProperty("amount");
   });
 
-  it("snapshot", () => {
-    expect(getExpenseTransactions(getTestContext())).toMatchSnapshot();
+  it("snapshot", async () => {
+    expect(await getExpenseTransactions(await getTestContext())).toMatchSnapshot();
   });
 });

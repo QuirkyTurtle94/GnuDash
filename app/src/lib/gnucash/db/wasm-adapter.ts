@@ -19,11 +19,11 @@ export function createWasmAdapter(db: WasmDatabase): DbAdapter {
     dialect: "sqlite",
     prepare(sql: string): PreparedQuery {
       return {
-        all(...params: unknown[]): unknown[] {
+        async all(...params: unknown[]): Promise<unknown[]> {
           const bind = params.length > 0 ? (params as BindingSpec) : undefined;
           return db.selectObjects(sql, bind).map((row) => coerceBigInts(row as Record<string, unknown>));
         },
-        get(...params: unknown[]): unknown | undefined {
+        async get(...params: unknown[]): Promise<unknown | undefined> {
           const bind = params.length > 0 ? (params as BindingSpec) : undefined;
           const row = db.selectObject(sql, bind);
           return row ? coerceBigInts(row as Record<string, unknown>) : undefined;

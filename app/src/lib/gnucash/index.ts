@@ -17,29 +17,29 @@ import { hasClosingTransactions } from "./domain/closing";
 import { computeOrphanedPriceGuids } from "./domain/orphan-prices";
 import { formatMonth } from "./shared/dates";
 
-export function parseGnuCashFile(filePath: string, overrideBaseCurrencyGuid?: string): DashboardData {
-  const db = openAndValidate(filePath);
+export async function parseGnuCashFile(filePath: string, overrideBaseCurrencyGuid?: string): Promise<DashboardData> {
+  const db = await openAndValidate(filePath);
 
   try {
-    const ctx = buildParseContext(db, overrideBaseCurrencyGuid);
+    const ctx = await buildParseContext(db, overrideBaseCurrencyGuid);
 
-    const accountTree = buildAccountTree(ctx);
-    const netWorthSeries = computeNetWorthSeries(ctx);
-    const cashFlowSeries = computeCashFlowSeries(ctx);
-    const { categories: expenseBreakdown, monthly: monthlyExpensesByCategory, colors: expenseCategoryColors } = computeExpenseBreakdown(ctx);
-    const investments = computeInvestments(ctx);
-    const investmentValueSeries = computeInvestmentValueSeries(ctx);
-    const topBalances = computeTopBalances(ctx);
-    const expenseTransactions = getExpenseTransactions(ctx);
-    const { monthly: monthlyIncomeByCategory, colors: incomeCategoryColors } = computeIncomeBreakdown(ctx);
-    const incomeTransactions = getIncomeTransactions(ctx);
-    const recentTransactions = getRecentTransactions(ctx);
-    const upcomingBills = getUpcomingBills(ctx);
-    const ledgerTransactions = getLedgerTransactions(ctx);
-    const budgetData = computeBudgetData(ctx);
-    const cashFlowBudgetData = computeCashFlowBudgetData(ctx);
-    const { inflow: monthlyCashInflowByCategory, outflow: monthlyCashOutflowByCategory, inflowColors: cashInflowCategoryColors, outflowColors: cashOutflowCategoryColors } = computeCashFlowByCategory(ctx);
-    const currentNetWorth = computeCurrentNetWorth(ctx);
+    const accountTree = await buildAccountTree(ctx);
+    const netWorthSeries = await computeNetWorthSeries(ctx);
+    const cashFlowSeries = await computeCashFlowSeries(ctx);
+    const { categories: expenseBreakdown, monthly: monthlyExpensesByCategory, colors: expenseCategoryColors } = await computeExpenseBreakdown(ctx);
+    const investments = await computeInvestments(ctx);
+    const investmentValueSeries = await computeInvestmentValueSeries(ctx);
+    const topBalances = await computeTopBalances(ctx);
+    const expenseTransactions = await getExpenseTransactions(ctx);
+    const { monthly: monthlyIncomeByCategory, colors: incomeCategoryColors } = await computeIncomeBreakdown(ctx);
+    const incomeTransactions = await getIncomeTransactions(ctx);
+    const recentTransactions = await getRecentTransactions(ctx);
+    const upcomingBills = await getUpcomingBills(ctx);
+    const ledgerTransactions = await getLedgerTransactions(ctx);
+    const budgetData = await computeBudgetData(ctx);
+    const cashFlowBudgetData = await computeCashFlowBudgetData(ctx);
+    const { inflow: monthlyCashInflowByCategory, outflow: monthlyCashOutflowByCategory, inflowColors: cashInflowCategoryColors, outflowColors: cashOutflowCategoryColors } = await computeCashFlowByCategory(ctx);
+    const currentNetWorth = await computeCurrentNetWorth(ctx);
 
     const now = new Date();
     const currentMonth = formatMonth(now);
@@ -52,7 +52,7 @@ export function parseGnuCashFile(filePath: string, overrideBaseCurrencyGuid?: st
         ? ((currentIncome - currentExpenses) / currentIncome) * 100
         : 0;
 
-    const hasClosing = hasClosingTransactions(ctx);
+    const hasClosing = await hasClosingTransactions(ctx);
 
     let cashFlowSeriesExcludingClosing: typeof cashFlowSeries | undefined;
     let expenseBreakdownExcludingClosing: typeof expenseBreakdown | undefined;
@@ -66,15 +66,15 @@ export function parseGnuCashFile(filePath: string, overrideBaseCurrencyGuid?: st
     let cashOutflowCategoryColorsExcludingClosing: typeof cashOutflowCategoryColors | undefined;
 
     if (hasClosing) {
-      cashFlowSeriesExcludingClosing = computeCashFlowSeries(ctx, true);
-      const excExpense = computeExpenseBreakdown(ctx, true);
+      cashFlowSeriesExcludingClosing = await computeCashFlowSeries(ctx, true);
+      const excExpense = await computeExpenseBreakdown(ctx, true);
       expenseBreakdownExcludingClosing = excExpense.categories;
       monthlyExpensesByCategoryExcludingClosing = excExpense.monthly;
       expenseCategoryColorsExcludingClosing = excExpense.colors;
-      const excIncome = computeIncomeBreakdown(ctx, true);
+      const excIncome = await computeIncomeBreakdown(ctx, true);
       monthlyIncomeByCategoryExcludingClosing = excIncome.monthly;
       incomeCategoryColorsExcludingClosing = excIncome.colors;
-      const excCashFlow = computeCashFlowByCategory(ctx, true);
+      const excCashFlow = await computeCashFlowByCategory(ctx, true);
       monthlyCashInflowByCategoryExcludingClosing = excCashFlow.inflow;
       monthlyCashOutflowByCategoryExcludingClosing = excCashFlow.outflow;
       cashInflowCategoryColorsExcludingClosing = excCashFlow.inflowColors;
@@ -117,7 +117,7 @@ export function parseGnuCashFile(filePath: string, overrideBaseCurrencyGuid?: st
         fraction: c.fraction,
       })),
       prices: ctx.prices,
-      orphanedPriceGuids: Array.from(computeOrphanedPriceGuids(ctx)),
+      orphanedPriceGuids: Array.from(await computeOrphanedPriceGuids(ctx)),
       availableCurrencies: ctx.availableCurrencies,
       hasClosingTransactions: hasClosing,
       cashFlowSeriesExcludingClosing,

@@ -20,16 +20,16 @@ export const REQUIRED_TABLES: Record<string, string[]> = {
   books: ["guid", "root_account_guid"],
 };
 
-export function validateSchema(db: DbAdapter): void {
+export async function validateSchema(db: DbAdapter): Promise<void> {
   for (const [table, columns] of Object.entries(REQUIRED_TABLES)) {
-    const exists = db
+    const exists = await db
       .prepare(`SELECT 1 FROM sqlite_master WHERE type='table' AND name=?`)
       .get(table);
     if (!exists) {
       throw new Error(`Not a valid GNUCash file: missing table "${table}"`);
     }
 
-    const info = db.prepare(`PRAGMA table_info(${table})`).all() as {
+    const info = (await db.prepare(`PRAGMA table_info(${table})`).all()) as {
       name: string;
     }[];
     const columnNames = new Set(info.map((c) => c.name));

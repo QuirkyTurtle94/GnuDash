@@ -14,7 +14,7 @@ import { generateGuid } from "../guid";
  * @param fraction  - Smallest unit (100 for currencies, 10000 for stocks)
  * @param cusip     - Optional CUSIP/ISIN identifier
  */
-export function createCommodity(
+export async function createCommodity(
   db: WritableDbAdapter,
   spec: {
     namespace: string;
@@ -23,7 +23,7 @@ export function createCommodity(
     fraction: number;
     cusip?: string;
   }
-): { commodityGuid: string } {
+): Promise<{ commodityGuid: string }> {
   if (!spec.mnemonic || spec.mnemonic.trim().length === 0) {
     throw new Error("Commodity mnemonic (ticker) is required");
   }
@@ -39,7 +39,7 @@ export function createCommodity(
 
   const commodityGuid = generateGuid();
 
-  db.run(
+  await db.run(
     `INSERT INTO commodities (guid, namespace, mnemonic, fullname, cusip, fraction)
      VALUES (?, ?, ?, ?, ?, ?)`,
     commodityGuid,

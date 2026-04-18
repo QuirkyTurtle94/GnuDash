@@ -4,8 +4,8 @@ import { getTestContext, closeTestDb } from "../helpers";
 afterAll(() => closeTestDb());
 
 describe("buildFxRateMap (via context)", () => {
-  it("converts USD to GBP", () => {
-    const ctx = getTestContext();
+  it("converts USD to GBP", async () => {
+    const ctx = await getTestContext();
     // Find the USD commodity GUID
     const usd = ctx.commodities.find((c) => c.mnemonic === "USD");
     expect(usd).toBeDefined();
@@ -20,14 +20,14 @@ describe("buildFxRateMap (via context)", () => {
     expect(converted).toBeLessThanOrEqual(90);
   });
 
-  it("returns 1 for base currency", () => {
-    const ctx = getTestContext();
+  it("returns 1 for base currency", async () => {
+    const ctx = await getTestContext();
     const rate = ctx.fxRates.rate(ctx.baseCurrencyGuid);
     expect(rate).toBe(1);
   });
 
-  it("snapshot: rates for all commodities", () => {
-    const ctx = getTestContext();
+  it("snapshot: rates for all commodities", async () => {
+    const ctx = await getTestContext();
     const rates: Record<string, number> = {};
     for (const c of ctx.commodities) {
       rates[c.mnemonic] = ctx.fxRates.rate(c.guid);

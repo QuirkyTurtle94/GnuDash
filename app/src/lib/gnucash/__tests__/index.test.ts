@@ -3,8 +3,8 @@ import { parseGnuCashFile } from "../index";
 import { FIXTURE_PATH } from "./helpers";
 
 describe("parseGnuCashFile", () => {
-  it("returns complete DashboardData", () => {
-    const data = parseGnuCashFile(FIXTURE_PATH);
+  it("returns complete DashboardData", async () => {
+    const data = await parseGnuCashFile(FIXTURE_PATH);
 
     expect(data.currency).toBe("GBP");
     expect(data.accounts.length).toBeGreaterThan(0);
@@ -19,8 +19,8 @@ describe("parseGnuCashFile", () => {
     expect(typeof data.savingsRate).toBe("number");
   });
 
-  it("snapshot: full DashboardData", () => {
-    const data = parseGnuCashFile(FIXTURE_PATH);
+  it("snapshot: full DashboardData", async () => {
+    const data = await parseGnuCashFile(FIXTURE_PATH);
     expect(data).toMatchSnapshot();
   });
 });

@@ -9,10 +9,10 @@ import { parseGnuCashDate, formatISODate } from "../shared/dates";
  * with each split's amount (in transaction currency) and quantity (in account commodity).
  * Ordered by post_date descending.
  */
-export function getLedgerTransactions(ctx: ParseContext): LedgerTransaction[] {
+export async function getLedgerTransactions(ctx: ParseContext): Promise<LedgerTransaction[]> {
   const { db, accountMap, commodityMap } = ctx;
 
-  const rows = db
+  const rows = (await db
     .prepare(
       `SELECT
         t.guid AS tx_guid,
@@ -30,7 +30,7 @@ export function getLedgerTransactions(ctx: ParseContext): LedgerTransaction[] {
       JOIN splits s ON s.tx_guid = t.guid
       ORDER BY t.post_date DESC, t.guid, s.value_num DESC`
     )
-    .all() as {
+    .all()) as {
     tx_guid: string;
     post_date: string;
     description: string;
@@ -93,11 +93,11 @@ export function getLedgerTransactions(ctx: ParseContext): LedgerTransaction[] {
  * side of the split) for categorisation. Used by the dashboard's recent
  * transactions widget.
  */
-export function getRecentTransactions(ctx: ParseContext): RecentTransaction[] {
+export async function getRecentTransactions(ctx: ParseContext): Promise<RecentTransaction[]> {
   const { db, accountMap } = ctx;
 
   // Fix N+1: use subquery for counter-account instead of per-row query
-  const rows = db
+  const rows = (await db
     .prepare(
       `SELECT
         t.post_date,
@@ -116,7 +116,7 @@ export function getRecentTransactions(ctx: ParseContext): RecentTransaction[] {
       ORDER BY t.post_date DESC
       LIMIT 50`
     )
-    .all() as {
+    .all()) as {
     post_date: string;
     description: string;
     value_num: number;

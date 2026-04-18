@@ -51,14 +51,14 @@ interface SplitRatioRow {
  * day, commodity and currency has a value/quantity ratio within
  * {@link PRICE_MATCH_TOLERANCE} of the stored price.
  */
-export function computeOrphanedPriceGuids(ctx: ParseContext): Set<string> {
+export async function computeOrphanedPriceGuids(ctx: ParseContext): Promise<Set<string>> {
   const linkedPrices = ctx.prices.filter(isTransactionLinkedPrice);
   if (linkedPrices.length === 0) return new Set();
 
   // Pull every split that could plausibly have produced an implied price —
   // i.e. ones with a non-zero quantity. Joining transactions gives us the
   // tx-level currency and post-date needed for the lookup key.
-  const rows = ctx.db
+  const rows = (await ctx.db
     .prepare(
       `SELECT t.post_date, t.currency_guid, s.account_guid,
               s.value_num, s.value_denom, s.quantity_num, s.quantity_denom
@@ -66,7 +66,7 @@ export function computeOrphanedPriceGuids(ctx: ParseContext): Set<string> {
        JOIN transactions t ON s.tx_guid = t.guid
        WHERE s.quantity_num != 0`,
     )
-    .all() as SplitRatioRow[];
+    .all()) as SplitRatioRow[];
 
   // Bucket the split ratios by (commodity, currency, day) for O(1) matching.
   const bucket = new Map<string, number[]>();

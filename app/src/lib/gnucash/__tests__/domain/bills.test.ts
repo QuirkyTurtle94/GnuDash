@@ -5,14 +5,14 @@ import { getUpcomingBills } from "../../domain/bills";
 afterAll(() => closeTestDb());
 
 describe("getUpcomingBills", () => {
-  it("returns upcoming bills", () => {
-    const bills = getUpcomingBills(getTestContext());
+  it("returns upcoming bills", async () => {
+    const bills = await getUpcomingBills(await getTestContext());
     expect(bills.length).toBeGreaterThan(0);
     expect(bills[0]).toHaveProperty("name");
     expect(bills[0]).toHaveProperty("nextDate");
   });
 
-  it("snapshot", () => {
-    expect(getUpcomingBills(getTestContext())).toMatchSnapshot();
+  it("snapshot", async () => {
+    expect(await getUpcomingBills(await getTestContext())).toMatchSnapshot();
   });
 });

@@ -3,19 +3,19 @@ import type { ParseContext } from "../context";
 import { sqlYear, sqlMonthNum } from "../shared/dates";
 import { addUnbudgetedRows } from "./budgets";
 
-export function computeCashFlowBudgetData(ctx: ParseContext): CashFlowBudgetData | null {
+export async function computeCashFlowBudgetData(ctx: ParseContext): Promise<CashFlowBudgetData | null> {
   const { db, accounts, accountMap, rootAccount } = ctx;
 
   // Check if budgets table exists
-  const tableCheck = db
+  const tableCheck = (await db
     .prepare(`SELECT name FROM sqlite_master WHERE type='table' AND name='budgets'`)
-    .get() as { name: string } | undefined;
+    .get()) as { name: string } | undefined;
 
   if (!tableCheck) return null;
 
-  const budgetRows = db
+  const budgetRows = (await db
     .prepare(`SELECT guid, name, description, num_periods FROM budgets`)
-    .all() as { guid: string; name: string; description: string; num_periods: number }[];
+    .all()) as { guid: string; name: string; description: string; num_periods: number }[];
 
   if (budgetRows.length === 0) return null;
 
@@ -26,18 +26,18 @@ export function computeCashFlowBudgetData(ctx: ParseContext): CashFlowBudgetData
     numPeriods: b.num_periods,
   }));
 
-  const amountRows = db
+  const amountRows = (await db
     .prepare(
       `SELECT ba.budget_guid, ba.account_guid, ba.period_num,
               CAST(ba.amount_num AS REAL) / ba.amount_denom AS amount
        FROM budget_amounts ba`
     )
-    .all() as { budget_guid: string; account_guid: string; period_num: number; amount: number }[];
+    .all()) as { budget_guid: string; account_guid: string; period_num: number; amount: number }[];
 
   // Query actuals: for every split on a BANK/CASH account, find counterpart splits.
   // The counterpart's negated value is the cash flow amount.
   // Exclude EQUITY counterparts (opening balances).
-  const actualRows = db
+  const actualRows = (await db
     .prepare(
       `SELECT
         cp.account_guid AS counterpart_guid,
@@ -53,7 +53,7 @@ export function computeCashFlowBudgetData(ctx: ParseContext): CashFlowBudgetData
         AND cpa.account_type != 'EQUITY'
       GROUP BY cp.account_guid, ${sqlYear("t.post_date", ctx.dialect)}, ${sqlMonthNum("t.post_date", ctx.dialect)}`
     )
-    .all() as { counterpart_guid: string; month_num: string; year: string; cash_amount: number }[];
+    .all()) as { counterpart_guid: string; month_num: string; year: string; cash_amount: number }[];
 
   const allYears = new Set<number>();
   // actualsMap: counterpart_guid -> year -> period -> amount

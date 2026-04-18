@@ -5,25 +5,25 @@ import { computeNetWorthSeries, computeCurrentNetWorth } from "../../domain/net-
 afterAll(() => closeTestDb());
 
 describe("computeNetWorthSeries", () => {
-  it("returns monthly data", () => {
-    const series = computeNetWorthSeries(getTestContext());
+  it("returns monthly data", async () => {
+    const series = await computeNetWorthSeries(await getTestContext());
     expect(series.length).toBeGreaterThan(0);
     expect(series[0]).toHaveProperty("month");
     expect(series[0]).toHaveProperty("netWorth");
   });
 
-  it("snapshot", () => {
-    expect(computeNetWorthSeries(getTestContext())).toMatchSnapshot();
+  it("snapshot", async () => {
+    expect(await computeNetWorthSeries(await getTestContext())).toMatchSnapshot();
   });
 });
 
 describe("computeCurrentNetWorth", () => {
-  it("returns a number", () => {
-    const nw = computeCurrentNetWorth(getTestContext());
+  it("returns a number", async () => {
+    const nw = await computeCurrentNetWorth(await getTestContext());
     expect(typeof nw).toBe("number");
   });
 
-  it("snapshot", () => {
-    expect(computeCurrentNetWorth(getTestContext())).toMatchSnapshot();
+  it("snapshot", async () => {
+    expect(await computeCurrentNetWorth(await getTestContext())).toMatchSnapshot();
   });
 });

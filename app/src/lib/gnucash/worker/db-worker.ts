@@ -85,20 +85,20 @@ async function initFromBuffer(buffer: ArrayBuffer, writable: boolean): Promise<v
   if (writable) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     writableAdapter = createWritableWasmAdapter(db as any);
-    validateSchema(writableAdapter);
-    ctx = buildParseContext(writableAdapter);
+    await validateSchema(writableAdapter);
+    ctx = await buildParseContext(writableAdapter);
   } else {
     writableAdapter = null;
     const adapter = createWasmAdapter(db);
-    validateSchema(adapter);
-    ctx = buildParseContext(adapter);
+    await validateSchema(adapter);
+    ctx = await buildParseContext(adapter);
   }
 }
 
 /**
  * Opens an existing database from OPFS (session restore).
  */
-function initFromOpfs(writable: boolean): void {
+async function initFromOpfs(writable: boolean): Promise<void> {
   closeDb();
   isWritable = writable;
 
@@ -112,13 +112,13 @@ function initFromOpfs(writable: boolean): void {
   if (writable) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     writableAdapter = createWritableWasmAdapter(db as any);
-    validateSchema(writableAdapter);
-    ctx = buildParseContext(writableAdapter);
+    await validateSchema(writableAdapter);
+    ctx = await buildParseContext(writableAdapter);
   } else {
     writableAdapter = null;
     const adapter = createWasmAdapter(db);
-    validateSchema(adapter);
-    ctx = buildParseContext(adapter);
+    await validateSchema(adapter);
+    ctx = await buildParseContext(adapter);
   }
 }
 
@@ -126,7 +126,7 @@ function initFromOpfs(writable: boolean): void {
  * Creates an in-memory SQLite DB from parsed GNUCash XML data.
  * Always read-only — no OPFS persistence.
  */
-function initFromXmlData(data: GnuCashXmlData): void {
+async function initFromXmlData(data: GnuCashXmlData): Promise<void> {
   closeDb();
   isWritable = false;
   writableAdapter = null;
@@ -229,8 +229,8 @@ function initFromXmlData(data: GnuCashXmlData): void {
   }
 
   const adapter = createWasmAdapter(db);
-  validateSchema(adapter);
-  ctx = buildParseContext(adapter);
+  await validateSchema(adapter);
+  ctx = await buildParseContext(adapter);
 }
 
 function closeDb(): void {
@@ -243,26 +243,26 @@ function closeDb(): void {
   }
 }
 
-function getFullDashboardData(): DashboardData {
+async function getFullDashboardData(): Promise<DashboardData> {
   if (!ctx) throw new Error("No database loaded");
 
-  const accountTree = buildAccountTree(ctx);
-  const netWorthSeries = computeNetWorthSeries(ctx);
-  const cashFlowSeries = computeCashFlowSeries(ctx);
-  const { categories: expenseBreakdown, monthly: monthlyExpensesByCategory, colors: expenseCategoryColors } = computeExpenseBreakdown(ctx);
-  const investments = computeInvestments(ctx);
-  const investmentValueSeries = computeInvestmentValueSeries(ctx);
-  const topBalances = computeTopBalances(ctx);
-  const expenseTransactions = getExpenseTransactions(ctx);
-  const { monthly: monthlyIncomeByCategory, colors: incomeCategoryColors } = computeIncomeBreakdown(ctx);
-  const incomeTransactions = getIncomeTransactions(ctx);
-  const recentTransactions = getRecentTransactions(ctx);
-  const upcomingBills = getUpcomingBills(ctx);
-  const ledgerTransactions = getLedgerTransactions(ctx);
-  const budgetData = computeBudgetData(ctx);
-  const cashFlowBudgetData = computeCashFlowBudgetData(ctx);
-  const { inflow: monthlyCashInflowByCategory, outflow: monthlyCashOutflowByCategory, inflowColors: cashInflowCategoryColors, outflowColors: cashOutflowCategoryColors } = computeCashFlowByCategory(ctx);
-  const currentNetWorth = computeCurrentNetWorth(ctx);
+  const accountTree = await buildAccountTree(ctx);
+  const netWorthSeries = await computeNetWorthSeries(ctx);
+  const cashFlowSeries = await computeCashFlowSeries(ctx);
+  const { categories: expenseBreakdown, monthly: monthlyExpensesByCategory, colors: expenseCategoryColors } = await computeExpenseBreakdown(ctx);
+  const investments = await computeInvestments(ctx);
+  const investmentValueSeries = await computeInvestmentValueSeries(ctx);
+  const topBalances = await computeTopBalances(ctx);
+  const expenseTransactions = await getExpenseTransactions(ctx);
+  const { monthly: monthlyIncomeByCategory, colors: incomeCategoryColors } = await computeIncomeBreakdown(ctx);
+  const incomeTransactions = await getIncomeTransactions(ctx);
+  const recentTransactions = await getRecentTransactions(ctx);
+  const upcomingBills = await getUpcomingBills(ctx);
+  const ledgerTransactions = await getLedgerTransactions(ctx);
+  const budgetData = await computeBudgetData(ctx);
+  const cashFlowBudgetData = await computeCashFlowBudgetData(ctx);
+  const { inflow: monthlyCashInflowByCategory, outflow: monthlyCashOutflowByCategory, inflowColors: cashInflowCategoryColors, outflowColors: cashOutflowCategoryColors } = await computeCashFlowByCategory(ctx);
+  const currentNetWorth = await computeCurrentNetWorth(ctx);
 
   const now = new Date();
   const currentMonth = formatMonth(now);
@@ -274,7 +274,7 @@ function getFullDashboardData(): DashboardData {
       ? ((currentIncome - currentExpenses) / currentIncome) * 100
       : 0;
 
-  const hasClosing = hasClosingTransactions(ctx);
+  const hasClosing = await hasClosingTransactions(ctx);
 
   // If closing transactions exist, also compute versions with them excluded
   let cashFlowSeriesExcludingClosing: typeof cashFlowSeries | undefined;
@@ -289,15 +289,15 @@ function getFullDashboardData(): DashboardData {
   let cashOutflowCategoryColorsExcludingClosing: typeof cashOutflowCategoryColors | undefined;
 
   if (hasClosing) {
-    cashFlowSeriesExcludingClosing = computeCashFlowSeries(ctx, true);
-    const excExpense = computeExpenseBreakdown(ctx, true);
+    cashFlowSeriesExcludingClosing = await computeCashFlowSeries(ctx, true);
+    const excExpense = await computeExpenseBreakdown(ctx, true);
     expenseBreakdownExcludingClosing = excExpense.categories;
     monthlyExpensesByCategoryExcludingClosing = excExpense.monthly;
     expenseCategoryColorsExcludingClosing = excExpense.colors;
-    const excIncome = computeIncomeBreakdown(ctx, true);
+    const excIncome = await computeIncomeBreakdown(ctx, true);
     monthlyIncomeByCategoryExcludingClosing = excIncome.monthly;
     incomeCategoryColorsExcludingClosing = excIncome.colors;
-    const excCashFlow = computeCashFlowByCategory(ctx, true);
+    const excCashFlow = await computeCashFlowByCategory(ctx, true);
     monthlyCashInflowByCategoryExcludingClosing = excCashFlow.inflow;
     monthlyCashOutflowByCategoryExcludingClosing = excCashFlow.outflow;
     cashInflowCategoryColorsExcludingClosing = excCashFlow.inflowColors;
@@ -340,7 +340,7 @@ function getFullDashboardData(): DashboardData {
       fraction: c.fraction,
     })),
     prices: ctx.prices,
-    orphanedPriceGuids: Array.from(computeOrphanedPriceGuids(ctx)),
+    orphanedPriceGuids: Array.from(await computeOrphanedPriceGuids(ctx)),
     availableCurrencies: ctx.availableCurrencies,
     hasClosingTransactions: hasClosing,
     cashFlowSeriesExcludingClosing,
@@ -367,11 +367,11 @@ function getFullDashboardData(): DashboardData {
  * A price is implied when a split's value (in tx currency) differs from its
  * quantity (in the account's commodity). Price = value / quantity.
  */
-function recordImpliedPrices(
+async function recordImpliedPrices(
   adapter: WritableDbAdapter,
   context: ParseContext,
   payload: CreateTransactionPayload,
-): void {
+): Promise<void> {
   const txDate = new Date(payload.postDate + "T12:00:00");
 
   for (const split of payload.splits) {
@@ -389,7 +389,7 @@ function recordImpliedPrices(
     const priceDenom = 1000000;
     const priceNum = Math.round((valueAbs / quantityAbs) * priceDenom);
 
-    addPrice(
+    await addPrice(
       adapter,
       account.commodity_guid,     // commodity being priced (stock or foreign currency)
       payload.currencyGuid,       // priced in transaction currency
@@ -405,7 +405,7 @@ function recordImpliedPrices(
  * Handle a createTransaction mutation.
  * Uses the accounting engine to validate and commit, then returns fresh dashboard data.
  */
-function handleCreateTransaction(payload: CreateTransactionPayload): DashboardData {
+async function handleCreateTransaction(payload: CreateTransactionPayload): Promise<DashboardData> {
   if (!ctx) throw new Error("No database loaded");
   if (!writableAdapter) throw new Error("Database is not open in read-write mode");
 
@@ -427,13 +427,13 @@ function handleCreateTransaction(payload: CreateTransactionPayload): DashboardDa
     });
   }
 
-  builder.commit();
+  await builder.commit();
 
   // Record implied prices for stock/FX transactions
-  recordImpliedPrices(writableAdapter, ctx, payload);
+  await recordImpliedPrices(writableAdapter, ctx, payload);
 
   // Rebuild context to pick up the new transaction and prices
-  ctx = buildParseContext(writableAdapter);
+  ctx = await buildParseContext(writableAdapter);
 
   // Return fully refreshed dashboard data
   return getFullDashboardData();
@@ -442,12 +442,12 @@ function handleCreateTransaction(payload: CreateTransactionPayload): DashboardDa
 /**
  * Handle a deleteTransaction mutation.
  */
-function handleDeleteTransaction(payload: DeleteTransactionPayload): DashboardData {
+async function handleDeleteTransaction(payload: DeleteTransactionPayload): Promise<DashboardData> {
   if (!ctx) throw new Error("No database loaded");
   if (!writableAdapter) throw new Error("Database is not open in read-write mode");
 
-  deleteTransaction(writableAdapter, payload.transactionGuid);
-  ctx = buildParseContext(writableAdapter);
+  await deleteTransaction(writableAdapter, payload.transactionGuid);
+  ctx = await buildParseContext(writableAdapter);
   return getFullDashboardData();
 }
 
@@ -456,15 +456,15 @@ function handleDeleteTransaction(payload: DeleteTransactionPayload): DashboardDa
  * Deletes the old transaction and creates a new one with updated data.
  * This matches GNUCash's behavior where split changes require delete + recreate.
  */
-function handleEditTransaction(payload: EditTransactionPayload): DashboardData {
+async function handleEditTransaction(payload: EditTransactionPayload): Promise<DashboardData> {
   if (!ctx) throw new Error("No database loaded");
   if (!writableAdapter) throw new Error("Database is not open in read-write mode");
 
   // Delete the original transaction first
-  deleteTransaction(writableAdapter, payload.originalGuid);
+  await deleteTransaction(writableAdapter, payload.originalGuid);
 
   // Rebuild context after delete so the builder sees current state
-  ctx = buildParseContext(writableAdapter);
+  ctx = await buildParseContext(writableAdapter);
 
   // Create the replacement transaction
   const builder = new TransactionBuilder(writableAdapter, ctx)
@@ -485,12 +485,12 @@ function handleEditTransaction(payload: EditTransactionPayload): DashboardData {
     });
   }
 
-  builder.commit();
+  await builder.commit();
 
   // Record implied prices for stock/FX transactions
-  recordImpliedPrices(writableAdapter, ctx, payload);
+  await recordImpliedPrices(writableAdapter, ctx, payload);
 
-  ctx = buildParseContext(writableAdapter);
+  ctx = await buildParseContext(writableAdapter);
   return getFullDashboardData();
 }
 
@@ -498,26 +498,26 @@ function handleEditTransaction(payload: EditTransactionPayload): DashboardData {
  * Handle a bulkEditTransactions mutation. Applies rename and/or account
  * reassignment across multiple single-split transactions atomically.
  */
-function handleBulkEditTransactions(payload: BulkEditTransactionsPayload): DashboardData {
+async function handleBulkEditTransactions(payload: BulkEditTransactionsPayload): Promise<DashboardData> {
   if (!ctx) throw new Error("No database loaded");
   if (!writableAdapter) throw new Error("Database is not open in read-write mode");
 
-  bulkEditTransactions(writableAdapter, {
+  await bulkEditTransactions(writableAdapter, {
     transactionGuids: payload.transactionGuids,
     newDescription: payload.newDescription,
     newFromAccountGuid: payload.newFromAccountGuid,
     newToAccountGuid: payload.newToAccountGuid,
   });
 
-  ctx = buildParseContext(writableAdapter);
+  ctx = await buildParseContext(writableAdapter);
   return getFullDashboardData();
 }
 
-function handleCreateAccount(payload: CreateAccountPayload): DashboardData {
+async function handleCreateAccount(payload: CreateAccountPayload): Promise<DashboardData> {
   if (!ctx) throw new Error("No database loaded");
   if (!writableAdapter) throw new Error("Database is not open in read-write mode");
 
-  new AccountBuilder(writableAdapter, ctx)
+  await new AccountBuilder(writableAdapter, ctx)
     .name(payload.name)
     .type(payload.accountType as AccountType)
     .commodity(payload.commodityGuid)
@@ -528,15 +528,15 @@ function handleCreateAccount(payload: CreateAccountPayload): DashboardData {
     .placeholder(payload.placeholder ?? false)
     .commit();
 
-  ctx = buildParseContext(writableAdapter);
+  ctx = await buildParseContext(writableAdapter);
   return getFullDashboardData();
 }
 
-function handleUpdateAccount(payload: UpdateAccountPayload): DashboardData {
+async function handleUpdateAccount(payload: UpdateAccountPayload): Promise<DashboardData> {
   if (!ctx) throw new Error("No database loaded");
   if (!writableAdapter) throw new Error("Database is not open in read-write mode");
 
-  updateAccount(writableAdapter, payload.accountGuid, {
+  await updateAccount(writableAdapter, payload.accountGuid, {
     name: payload.name,
     accountType: payload.accountType,
     commodityGuid: payload.commodityGuid,
@@ -547,24 +547,24 @@ function handleUpdateAccount(payload: UpdateAccountPayload): DashboardData {
     placeholder: payload.placeholder,
   });
 
-  ctx = buildParseContext(writableAdapter);
+  ctx = await buildParseContext(writableAdapter);
   return getFullDashboardData();
 }
 
-function handleDeleteAccount(payload: DeleteAccountPayload): DashboardData {
+async function handleDeleteAccount(payload: DeleteAccountPayload): Promise<DashboardData> {
   if (!ctx) throw new Error("No database loaded");
   if (!writableAdapter) throw new Error("Database is not open in read-write mode");
 
-  deleteAccountWithReallocation(writableAdapter, payload.accountGuid, payload.targetAccountGuid);
-  ctx = buildParseContext(writableAdapter);
+  await deleteAccountWithReallocation(writableAdapter, payload.accountGuid, payload.targetAccountGuid);
+  ctx = await buildParseContext(writableAdapter);
   return getFullDashboardData();
 }
 
-function handleCreateCommodity(payload: CreateCommodityPayload): DashboardData {
+async function handleCreateCommodity(payload: CreateCommodityPayload): Promise<DashboardData> {
   if (!ctx) throw new Error("No database loaded");
   if (!writableAdapter) throw new Error("Database is not open in read-write mode");
 
-  createCommodity(writableAdapter, {
+  await createCommodity(writableAdapter, {
     namespace: payload.namespace,
     mnemonic: payload.mnemonic,
     fullname: payload.fullname,
@@ -572,19 +572,19 @@ function handleCreateCommodity(payload: CreateCommodityPayload): DashboardData {
     cusip: payload.cusip,
   });
 
-  ctx = buildParseContext(writableAdapter);
+  ctx = await buildParseContext(writableAdapter);
   return getFullDashboardData();
 }
 
 /** Handle adding a new price entry. */
-function handleAddPrice(payload: AddPricePayload): DashboardData {
+async function handleAddPrice(payload: AddPricePayload): Promise<DashboardData> {
   if (!ctx) throw new Error("No database loaded");
   if (!writableAdapter) throw new Error("Database is not open in read-write mode");
 
   const priceDenom = 1000000;
   const priceNum = Math.round(payload.value * priceDenom);
 
-  addPrice(
+  await addPrice(
     writableAdapter,
     payload.commodityGuid,
     payload.currencyGuid,
@@ -594,21 +594,21 @@ function handleAddPrice(payload: AddPricePayload): DashboardData {
     payload.type ?? "last",
   );
 
-  ctx = buildParseContext(writableAdapter);
+  ctx = await buildParseContext(writableAdapter);
   return getFullDashboardData();
 }
 
 /** Handle editing an existing price (delete + recreate). */
-function handleEditPrice(payload: EditPricePayload): DashboardData {
+async function handleEditPrice(payload: EditPricePayload): Promise<DashboardData> {
   if (!ctx) throw new Error("No database loaded");
   if (!writableAdapter) throw new Error("Database is not open in read-write mode");
 
-  deletePrice(writableAdapter, payload.originalGuid);
+  await deletePrice(writableAdapter, payload.originalGuid);
 
   const priceDenom = 1000000;
   const priceNum = Math.round(payload.value * priceDenom);
 
-  addPrice(
+  await addPrice(
     writableAdapter,
     payload.commodityGuid,
     payload.currencyGuid,
@@ -618,22 +618,22 @@ function handleEditPrice(payload: EditPricePayload): DashboardData {
     payload.type ?? "last",
   );
 
-  ctx = buildParseContext(writableAdapter);
+  ctx = await buildParseContext(writableAdapter);
   return getFullDashboardData();
 }
 
 /** Handle deleting a price entry. */
-function handleDeletePrice(payload: DeletePricePayload): DashboardData {
+async function handleDeletePrice(payload: DeletePricePayload): Promise<DashboardData> {
   if (!ctx) throw new Error("No database loaded");
   if (!writableAdapter) throw new Error("Database is not open in read-write mode");
 
-  deletePrice(writableAdapter, payload.priceGuid);
+  await deletePrice(writableAdapter, payload.priceGuid);
 
-  ctx = buildParseContext(writableAdapter);
+  ctx = await buildParseContext(writableAdapter);
   return getFullDashboardData();
 }
 
-const domainFunctions: Record<DomainFunction, () => unknown> = {
+const domainFunctions: Record<DomainFunction, () => Promise<unknown>> = {
   buildAccountTree: () => buildAccountTree(ctx!),
   computeNetWorthSeries: () => computeNetWorthSeries(ctx!),
   computeCurrentNetWorth: () => computeCurrentNetWorth(ctx!),
@@ -669,7 +669,7 @@ self.onmessage = async (e: MessageEvent<WorkerRequest>) => {
 
     case "init-xml": {
       try {
-        initFromXmlData(msg.xmlData);
+        await initFromXmlData(msg.xmlData);
         console.log("[db-worker] DB created from XML data (read-only)");
         post({ type: "ready" });
       } catch (err) {
@@ -680,7 +680,7 @@ self.onmessage = async (e: MessageEvent<WorkerRequest>) => {
 
     case "init-opfs": {
       try {
-        initFromOpfs(msg.writable ?? false);
+        await initFromOpfs(msg.writable ?? false);
         console.log("[db-worker] DB restored from OPFS", isWritable ? "(read-write)" : "(read-only)");
         post({ type: "ready" });
       } catch (err) {
@@ -694,7 +694,7 @@ self.onmessage = async (e: MessageEvent<WorkerRequest>) => {
         if (!ctx) throw new Error("No database loaded");
         const fn = domainFunctions[msg.fn];
         if (!fn) throw new Error(`Unknown domain function: ${msg.fn}`);
-        const data = fn();
+        const data = await fn();
         post({ type: "result", id: msg.id, data });
       } catch (err) {
         post({ type: "error", id: msg.id, message: (err as Error).message });
@@ -708,37 +708,37 @@ self.onmessage = async (e: MessageEvent<WorkerRequest>) => {
         let data: unknown;
         switch (msg.action) {
           case "createTransaction":
-            data = handleCreateTransaction(msg.payload as CreateTransactionPayload);
+            data = await handleCreateTransaction(msg.payload as CreateTransactionPayload);
             break;
           case "deleteTransaction":
-            data = handleDeleteTransaction(msg.payload as DeleteTransactionPayload);
+            data = await handleDeleteTransaction(msg.payload as DeleteTransactionPayload);
             break;
           case "editTransaction":
-            data = handleEditTransaction(msg.payload as EditTransactionPayload);
+            data = await handleEditTransaction(msg.payload as EditTransactionPayload);
             break;
           case "bulkEditTransactions":
-            data = handleBulkEditTransactions(msg.payload as BulkEditTransactionsPayload);
+            data = await handleBulkEditTransactions(msg.payload as BulkEditTransactionsPayload);
             break;
           case "createAccount":
-            data = handleCreateAccount(msg.payload as CreateAccountPayload);
+            data = await handleCreateAccount(msg.payload as CreateAccountPayload);
             break;
           case "updateAccount":
-            data = handleUpdateAccount(msg.payload as UpdateAccountPayload);
+            data = await handleUpdateAccount(msg.payload as UpdateAccountPayload);
             break;
           case "deleteAccount":
-            data = handleDeleteAccount(msg.payload as DeleteAccountPayload);
+            data = await handleDeleteAccount(msg.payload as DeleteAccountPayload);
             break;
           case "createCommodity":
-            data = handleCreateCommodity(msg.payload as CreateCommodityPayload);
+            data = await handleCreateCommodity(msg.payload as CreateCommodityPayload);
             break;
           case "addPrice":
-            data = handleAddPrice(msg.payload as AddPricePayload);
+            data = await handleAddPrice(msg.payload as AddPricePayload);
             break;
           case "editPrice":
-            data = handleEditPrice(msg.payload as EditPricePayload);
+            data = await handleEditPrice(msg.payload as EditPricePayload);
             break;
           case "deletePrice":
-            data = handleDeletePrice(msg.payload as DeletePricePayload);
+            data = await handleDeletePrice(msg.payload as DeletePricePayload);
             break;
           default:
             throw new Error(`Unknown mutation action: ${msg.action}`);
@@ -754,8 +754,8 @@ self.onmessage = async (e: MessageEvent<WorkerRequest>) => {
       try {
         if (!ctx) throw new Error("No database loaded");
         // Rebuild parse context with the new base currency, reusing existing db adapter
-        ctx = buildParseContext(ctx.db, msg.currencyGuid);
-        const data = getFullDashboardData();
+        ctx = await buildParseContext(ctx.db, msg.currencyGuid);
+        const data = await getFullDashboardData();
         post({ type: "result", id: msg.id, data });
       } catch (err) {
         post({ type: "error", id: msg.id, message: (err as Error).message });

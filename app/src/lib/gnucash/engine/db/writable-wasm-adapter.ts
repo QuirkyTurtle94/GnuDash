@@ -51,31 +51,31 @@ export function createWritableWasmAdapter(
     dialect: "sqlite",
     prepare(sql: string): PreparedQuery {
       return {
-        all(...params: unknown[]): unknown[] {
+        async all(...params: unknown[]): Promise<unknown[]> {
           const bind = params.length > 0 ? (params as unknown[]) : undefined;
           return db.selectObjects(sql, bind);
         },
-        get(...params: unknown[]): unknown | undefined {
+        async get(...params: unknown[]): Promise<unknown | undefined> {
           const bind = params.length > 0 ? (params as unknown[]) : undefined;
           return db.selectObject(sql, bind);
         },
       };
     },
 
-    run(sql: string, ...params: unknown[]): RunResult {
+    async run(sql: string, ...params: unknown[]): Promise<RunResult> {
       const bind = params.length > 0 ? (params as unknown[]) : undefined;
       db.exec({ sql, bind });
       return { changes: db.changes() };
     },
 
-    exec(sql: string): void {
+    async exec(sql: string): Promise<void> {
       db.exec({ sql });
     },
 
-    transaction<T>(fn: () => T): T {
+    async transaction<T>(fn: () => Promise<T>): Promise<T> {
       db.exec({ sql: "BEGIN IMMEDIATE" });
       try {
-        const result = fn();
+        const result = await fn();
         db.exec({ sql: "COMMIT" });
         return result;
       } catch (err) {

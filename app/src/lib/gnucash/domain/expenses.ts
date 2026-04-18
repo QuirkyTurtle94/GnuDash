@@ -16,10 +16,10 @@ import { EXCLUDE_CLOSING_JOIN, EXCLUDE_CLOSING_WHERE } from "./closing";
  *
  * @param excludeClosing - If true, exclude year-end book-closing transactions.
  */
-export function computeExpenseBreakdown(
+export async function computeExpenseBreakdown(
   ctx: ParseContext,
   excludeClosing = false,
-): { categories: ExpenseCategory[]; monthly: MonthlyExpenseByCategory[]; colors: Record<string, string> } {
+): Promise<{ categories: ExpenseCategory[]; monthly: MonthlyExpenseByCategory[]; colors: Record<string, string> }> {
   const { db, accounts, accountMap, commodityMap, fxRates, rootAccount, topExpenseGuids } = ctx;
 
   if (topExpenseGuids.size === 0) return { categories: [], monthly: [], colors: {} };
@@ -38,7 +38,7 @@ export function computeExpenseBreakdown(
   const closingJoin = excludeClosing ? EXCLUDE_CLOSING_JOIN : "";
   const closingWhere = excludeClosing ? `AND ${EXCLUDE_CLOSING_WHERE}` : "";
 
-  const rows = db
+  const rows = (await db
     .prepare(
       `SELECT
         s.account_guid,
@@ -54,7 +54,7 @@ export function computeExpenseBreakdown(
       GROUP BY s.account_guid, ${sqlMonth("t.post_date", ctx.dialect)}
       ORDER BY month`
     )
-    .all() as { account_guid: string; commodity_guid: string; month: string; total: number }[];
+    .all()) as { account_guid: string; commodity_guid: string; month: string; total: number }[];
 
   const monthly: MonthlyExpenseByCategory[] = [];
   const allTimeTotals = new Map<string, number>();
@@ -88,12 +88,12 @@ export function computeExpenseBreakdown(
  * Each row represents one split on an EXPENSE account, with the full
  * category path and amount in base currency.
  */
-export function getExpenseTransactions(ctx: ParseContext): ExpenseTransaction[] {
+export async function getExpenseTransactions(ctx: ParseContext): Promise<ExpenseTransaction[]> {
   const { db, accountMap, commodityMap, fxRates, rootAccount, topExpenseGuids } = ctx;
 
   if (topExpenseGuids.size === 0) return [];
 
-  const rows = db
+  const rows = (await db
     .prepare(
       `SELECT
         s.account_guid,
@@ -107,7 +107,7 @@ export function getExpenseTransactions(ctx: ParseContext): ExpenseTransaction[] 
       WHERE a.account_type = 'EXPENSE'
       ORDER BY t.post_date DESC`
     )
-    .all() as { account_guid: string; commodity_guid: string; post_date: string; description: string; amount: number }[];
+    .all()) as { account_guid: string; commodity_guid: string; post_date: string; description: string; amount: number }[];
 
   const transactions: ExpenseTransaction[] = [];
   for (const row of rows) {

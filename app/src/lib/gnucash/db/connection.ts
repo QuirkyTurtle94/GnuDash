@@ -13,10 +13,10 @@ function wrapBetterSqlite(db: Database.Database): DbAdapter {
     prepare(sql: string): PreparedQuery {
       const stmt = db.prepare(sql);
       return {
-        all(...params: unknown[]): unknown[] {
+        async all(...params: unknown[]): Promise<unknown[]> {
           return stmt.all(...params) as unknown[];
         },
-        get(...params: unknown[]): unknown | undefined {
+        async get(...params: unknown[]): Promise<unknown | undefined> {
           return stmt.get(...params);
         },
       };
@@ -27,12 +27,12 @@ function wrapBetterSqlite(db: Database.Database): DbAdapter {
   };
 }
 
-export function openAndValidate(filePath: string): DbAdapter {
+export async function openAndValidate(filePath: string): Promise<DbAdapter> {
   const db = new Database(filePath, { readonly: true });
   const adapter = wrapBetterSqlite(db);
 
   try {
-    validateSchema(adapter);
+    await validateSchema(adapter);
   } catch (e) {
     db.close();
     throw e;

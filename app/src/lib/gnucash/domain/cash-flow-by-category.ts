@@ -24,15 +24,15 @@ import { EXCLUDE_CLOSING_JOIN, EXCLUDE_CLOSING_WHERE } from "./closing";
  *
  * @param excludeClosing – exclude year-end book-closing transactions
  */
-export function computeCashFlowByCategory(
+export async function computeCashFlowByCategory(
   ctx: ParseContext,
   excludeClosing = false,
-): {
+): Promise<{
   inflow: MonthlyExpenseByCategory[];
   outflow: MonthlyExpenseByCategory[];
   inflowColors: Record<string, string>;
   outflowColors: Record<string, string>;
-} {
+}> {
   const { db, accounts, accountMap, commodityMap, fxRates, rootAccount } = ctx;
 
   const closingJoin = excludeClosing ? EXCLUDE_CLOSING_JOIN : "";
@@ -40,7 +40,7 @@ export function computeCashFlowByCategory(
 
   // Fetch every (bank-split, counterparty-split) pair.
   // We process proportional distribution in JS.
-  const rows = db
+  const rows = (await db
     .prepare(
       `SELECT
         cs.guid AS cs_guid,
@@ -60,7 +60,7 @@ export function computeCashFlowByCategory(
       ${closingWhere}
       ORDER BY cs.guid`
     )
-    .all() as {
+    .all()) as {
       cs_guid: string;
       cs_quantity: number;
       cs_commodity_guid: string;

@@ -6,9 +6,14 @@
  * through thin wrappers, so domain logic stays backend-agnostic.
  */
 
+/**
+ * All adapter I/O is async. SQLite-backed adapters (WASM, better-sqlite3)
+ * wrap their sync results in Promise.resolve; Postgres is async natively.
+ * This uniform shape lets domain code use `await` regardless of backend.
+ */
 export interface PreparedQuery {
-  all(...params: unknown[]): unknown[];
-  get(...params: unknown[]): unknown | undefined;
+  all(...params: unknown[]): Promise<unknown[]>;
+  get(...params: unknown[]): Promise<unknown | undefined>;
 }
 
 /**
@@ -22,5 +27,6 @@ export type SqlDialect = "sqlite" | "postgres";
 export interface DbAdapter {
   readonly dialect: SqlDialect;
   prepare(sql: string): PreparedQuery;
-  close(): void;
+  /** Fire-and-forget cleanup — callers may ignore the return value. */
+  close(): void | Promise<void>;
 }

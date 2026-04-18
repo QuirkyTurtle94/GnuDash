@@ -10,17 +10,17 @@ import { buildFullPath } from "../shared/accounts";
  * Investment accounts (STOCK/MUTUAL) are valued at latest market price.
  * Foreign currency accounts are converted via FX rates.
  */
-export function buildAccountTree(ctx: ParseContext): AccountNode[] {
+export async function buildAccountTree(ctx: ParseContext): Promise<AccountNode[]> {
   const { db, accounts, accountMap, commodityMap, baseCurrencyGuid, fxRates, latestPrices, latestPriceInfo, rootAccount } = ctx;
 
   // Per-account balances using quantity (native commodity)
-  const balanceRows = db
+  const balanceRows = (await db
     .prepare(
       `SELECT s.account_guid, SUM(CAST(s.quantity_num AS REAL) / s.quantity_denom) AS balance
        FROM splits s
        GROUP BY s.account_guid`
     )
-    .all() as { account_guid: string; balance: number }[];
+    .all()) as { account_guid: string; balance: number }[];
   const rawBalanceMap = new Map(balanceRows.map((b) => [b.account_guid, b.balance]));
 
   function toBaseCurrency(accountGuid: string, rawBalance: number): number {

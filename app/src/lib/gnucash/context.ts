@@ -39,38 +39,38 @@ export interface ParseContext {
  * Build a parse context from a database.
  * @param overrideBaseCurrencyGuid - Optional currency GUID to use instead of auto-detected base currency.
  */
-export function buildParseContext(db: DbAdapter, overrideBaseCurrencyGuid?: string): ParseContext {
-  const accounts = db
+export async function buildParseContext(db: DbAdapter, overrideBaseCurrencyGuid?: string): Promise<ParseContext> {
+  const accounts = (await db
     .prepare(
       `SELECT guid, name, account_type, commodity_guid, parent_guid,
               code, description, hidden, placeholder
        FROM accounts`
     )
-    .all() as GnuCashAccount[];
+    .all()) as GnuCashAccount[];
 
-  const commodities = db
+  const commodities = (await db
     .prepare(
       `SELECT guid, namespace, mnemonic, fullname, cusip, fraction
        FROM commodities`
     )
-    .all() as GnuCashCommodity[];
+    .all()) as GnuCashCommodity[];
 
-  const prices = db
+  const prices = (await db
     .prepare(
       `SELECT guid, commodity_guid, currency_guid, date, source, type,
               value_num, value_denom
        FROM prices
        ORDER BY date DESC`
     )
-    .all() as GnuCashPrice[];
+    .all()) as GnuCashPrice[];
 
   const accountMap = new Map(accounts.map((a) => [a.guid, a]));
   const commodityMap = new Map(commodities.map((c) => [c.guid, c]));
 
   // Detect base currency from root account
-  const book = db
+  const book = (await db
     .prepare(`SELECT root_account_guid FROM books LIMIT 1`)
-    .get() as { root_account_guid: string } | undefined;
+    .get()) as { root_account_guid: string } | undefined;
 
   const rootAccount = book
     ? accounts.find((a) => a.guid === book.root_account_guid)
@@ -95,7 +95,7 @@ export function buildParseContext(db: DbAdapter, overrideBaseCurrencyGuid?: stri
 
     // Fallback currency detection if root doesn't have a CURRENCY commodity
     if (baseCommodity && baseCommodity.namespace !== "CURRENCY") {
-      const row = db
+      const row = (await db
         .prepare(
           `SELECT c.mnemonic
            FROM accounts a
@@ -105,12 +105,12 @@ export function buildParseContext(db: DbAdapter, overrideBaseCurrencyGuid?: stri
            ORDER BY COUNT(*) DESC
            LIMIT 1`
         )
-        .get() as { mnemonic: string } | undefined;
+        .get()) as { mnemonic: string } | undefined;
       if (row) baseCurrencyMnemonic = row.mnemonic;
     }
   }
 
-  const fxRates = buildFxRateMap(db, baseCurrencyGuid);
+  const fxRates = await buildFxRateMap(db, baseCurrencyGuid);
 
   // Build latest price maps: normalized to base + raw info
   const latestPrices = new Map<string, number>();

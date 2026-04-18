@@ -29,7 +29,7 @@ function formatDate(date: Date): string {
  * @param source        - Price source (default: "user:price")
  * @param type          - Price type (default: "last")
  */
-export function addPrice(
+export async function addPrice(
   db: WritableDbAdapter,
   commodityGuid: string,
   currencyGuid: string,
@@ -37,10 +37,10 @@ export function addPrice(
   value: GncNumeric,
   source: string = "user:price",
   type: string = "last"
-): { priceGuid: string } {
+): Promise<{ priceGuid: string }> {
   const priceGuid = generateGuid();
 
-  db.run(
+  await db.run(
     `INSERT INTO prices (guid, commodity_guid, currency_guid, date, source, type, value_num, value_denom)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
     priceGuid,
@@ -59,9 +59,9 @@ export function addPrice(
 /**
  * Delete a price entry.
  */
-export function deletePrice(
+export async function deletePrice(
   db: WritableDbAdapter,
   priceGuid: string
-): void {
-  db.run(`DELETE FROM prices WHERE guid = ?`, priceGuid);
+): Promise<void> {
+  await db.run(`DELETE FROM prices WHERE guid = ?`, priceGuid);
 }
