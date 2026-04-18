@@ -1,7 +1,14 @@
 /**
  * GNUCash SQLite schema DDL, extracted from create-fixture.ts.
- * Used by the XML-to-SQLite bridge to create an in-memory DB
- * that matches the schema the domain layer expects.
+ * Used by the XML-to-SQLite bridge and the Postgres-dump restore path
+ * to create an in-memory DB that matches the schema the domain layer expects.
+ *
+ * NOT NULL policy mirrors GNUCASH_POSTGRES_DDL (see postgres-schema.ts):
+ * real .gnucash files have NULL in `accounts.commodity_guid` on template
+ * accounts, so we cannot make that stricter here without the PG-dump
+ * restore path rejecting its own data. The XML parser still writes
+ * defaulted values explicitly, so the relaxation doesn't change XML-path
+ * behaviour — it just stops the dump-restore path from tripping.
  */
 export const GNUCASH_SCHEMA_DDL = `
   CREATE TABLE books (
@@ -24,9 +31,9 @@ export const GNUCASH_SCHEMA_DDL = `
     guid TEXT PRIMARY KEY,
     name TEXT NOT NULL,
     account_type TEXT NOT NULL,
-    commodity_guid TEXT NOT NULL,
-    commodity_scu INTEGER NOT NULL DEFAULT 100,
-    non_std_scu INTEGER NOT NULL DEFAULT 0,
+    commodity_guid TEXT,
+    commodity_scu INTEGER DEFAULT 100,
+    non_std_scu INTEGER DEFAULT 0,
     parent_guid TEXT,
     code TEXT DEFAULT '',
     description TEXT DEFAULT '',
