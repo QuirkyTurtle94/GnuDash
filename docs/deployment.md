@@ -1,32 +1,50 @@
 # Deployment Guide
 
-GnuDash supports two deployment modes:
+GnuDash ships in two distinct shapes. Pick one before following the rest of this guide — they are deployed differently, have different infrastructure requirements, and offer different features.
 
-| Mode | Output | Backends | When to use |
-|---|---|---|---|
-| **Static** (`NEXT_OUTPUT=export npm run build`) | `app/out/` — plain HTML/JS/WASM | Local (OPFS) only | Cloudflare Pages, Netlify, nginx, any static host |
-| **Standalone** (default `npm run build`) | `app/.next/standalone/` — Node.js server | Local (OPFS) **and** Server (Postgres) | Self-hosted behind Node, Docker, VPS — when you want a shared Postgres book across devices |
+## Two versions: Local vs Server
 
-The Server (Postgres) backend is tracked by [issue #48](https://github.com/QuirkyTurtle94/GnuDash/issues/48). Until that lands, both modes behave identically from the user's perspective — the default flip to `standalone` just enables the API routes the Postgres backend needs.
+|  | **Local** | **Server (Postgres)** |
+|---|---|---|
+| **Where the book lives** | Your browser's [Origin Private File System](https://developer.mozilla.org/en-US/docs/Web/API/File_System_API/Origin_private_file_system) (per-browser, per-device) | A Postgres database you run |
+| **What runs server-side** | Static HTML/JS/WASM files — any web server | A Node.js standalone app + Postgres |
+| **Cross-device sharing** | No (each browser has its own copy) | Yes (every device hits the same DB) |
+| **Import a `.gnucash` file** | Yes | Yes |
+| **Edit / save changes** | Yes (written to OPFS) | Yes (written to Postgres, cached locally) |
+| **Read-only view of an existing GnuCash Postgres DB** | No | Yes |
+| **Auto-reconnect across browser restarts** | Via OPFS (per browser) | Via OPFS-cached credentials |
+| **Build command** | `NEXT_OUTPUT=export npm run build` → `app/out/` | `npm run build` → `app/.next/standalone/` |
+| **Host requirements** | Any static file server with custom response headers | Node.js 20+ runtime, Postgres 12+, reverse proxy with TLS for non-localhost |
+| **Example hosts** | nginx, Cloudflare Pages, Netlify, Vercel, Synology, GitHub Pages (with a caveat) | Docker host, VPS, home server, any Linux box with Node |
+| **Public demo** | [gnudash.pages.dev](https://gnudash.pages.dev) | — (self-host only) |
 
-If you have an existing static deployment (Cloudflare Pages, Netlify, the nginx Dockerfile in this repo), follow the commands in each section below — they already set `NEXT_OUTPUT=export` so nothing changes for you.
+### Which should I pick?
 
-## Important: Required HTTP Headers
+- **"I want the easy one, just me using it on my laptop"** → Local. Deploy to Cloudflare Pages or run the static Docker image.
+- **"I want to see my books on my phone too, or on another laptop"** → Server. Stand up Postgres and the standalone app.
+- **"I already have GnuCash desktop writing to Postgres and just want a web dashboard"** → Server, using the existing-GnuCash-DB read-only mode.
+- **"I'm not sure, but I want to decide later"** → Start Local. You can re-deploy in Server mode any time; the Local session just won't migrate automatically (re-import the file).
 
-Wherever you deploy, your server **must** set these two headers on all responses:
+---
+
+## Common: HTTP headers required on every deployment
+
+Both modes need these response headers on every request:
 
 ```
 Cross-Origin-Opener-Policy: same-origin
 Cross-Origin-Embedder-Policy: require-corp
 ```
 
-These are required for [`SharedArrayBuffer`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/SharedArrayBuffer) support, which the SQLite WASM engine uses for OPFS persistence. Without them, file uploads will fail with a Worker error.
+They enable [`SharedArrayBuffer`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/SharedArrayBuffer), which the in-browser SQLite WASM engine needs for OPFS persistence. Without them, file uploads fail with a Worker error.
+
+Each section below spells out how the headers are set for its path.
 
 ---
 
-## Local Development
+## Common: local development
 
-The simplest way to run GnuDash. Requires [Node.js](https://nodejs.org/) 20+.
+The dev server covers both modes — the API routes are live so you can test the Server backend without building.
 
 ```bash
 git clone https://github.com/QuirkyTurtle94/GnuDash.git
@@ -35,42 +53,40 @@ npm install
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000). The dev server sets the required headers automatically via `next.config.ts`.
+Open [http://localhost:3000](http://localhost:3000). The dev server sets COOP/COEP automatically via `next.config.ts`.
 
 ### Linux: "Too many open files" error
 
-On Linux (e.g. Ubuntu), you may see this crash when running `npm run dev`:
+Ubuntu and similar ship with a 1024 open-file-descriptor limit that Turbopack can exceed:
 
 ```
 FATAL: An unexpected Turbopack error occurred.
 Error [TurbopackInternalError]: Too many open files (os error 24)
 ```
 
-This happens because the Next.js dev server (Turbopack) opens file watchers across the project tree, and Linux distributions often ship with a low default limit on open file descriptors (typically 1024). Between the source files, `node_modules`, and Turbopack's internal bookkeeping, the dev server can exceed that limit.
-
-**Quick fix** — raise the limit for your current shell session:
+**Quick fix** — for the current shell only:
 
 ```bash
 ulimit -n 65536
 npm run dev
 ```
 
-**Permanent fix** — add these lines to `/etc/security/limits.conf` (requires sudo) so the change persists across reboots:
+**Permanent fix** — add to `/etc/security/limits.conf` (requires sudo):
 
 ```
 * soft nofile 65536
 * hard nofile 65536
 ```
 
-Then log out and back in (or reboot) for the new limits to take effect. You can verify with `ulimit -n`.
-
-> **Why this isn't needed on macOS or Docker:** macOS sets a much higher default limit (tens of thousands), and the Docker images used for production builds don't run a file watcher at all — they just serve the static build output via nginx.
+Log out and back in, verify with `ulimit -n`. Not needed on macOS (much higher default) or in production Docker images (no watcher).
 
 ---
 
-## Static Build
+# Part 1 — Deploying the Local version
 
-For any of the static hosts below (nginx, Cloudflare Pages, Netlify, a plain CDN), build with `NEXT_OUTPUT=export`:
+Produces a `app/out/` directory of static files. No Node.js at runtime, no database, no API. Any static file server works as long as it can set the two COOP/COEP headers.
+
+## 1.1 Static build
 
 ```bash
 cd app
@@ -78,19 +94,11 @@ npm install
 NEXT_OUTPUT=export npm run build
 ```
 
-This produces a static export in `app/out/` containing everything needed to serve the site.
+The `NEXT_OUTPUT=export` flag is required — without it the build produces the standalone Node.js bundle for the Server version, which static hosts can't serve. The build wrapper (`scripts/next-build.mjs`) also hides the Server tab from the upload screen in this mode so users don't hit a tab whose Connect button would 404.
 
-Without the env var, the build instead produces a standalone Node.js bundle in `app/.next/standalone/` which is what the Server (Postgres) backend needs — but the static hosts below cannot serve it.
+## 1.2 Docker (nginx — recommended)
 
----
-
-## Docker (Recommended)
-
-The recommended way to self-host. Uses a two-stage build: Node builds the static site, nginx serves it with all required headers pre-configured.
-
-### Dockerfile
-
-A `Dockerfile` is included in both the repo root (build context = repo) and `app/` (build context = app directory).
+Included `Dockerfile` (repo root) does the build + nginx packaging with COOP/COEP pre-configured:
 
 ```bash
 # From the app/ directory
@@ -99,13 +107,11 @@ docker build -t gnudash .
 docker run -p 8080:80 --restart unless-stopped gnudash
 ```
 
-Open [http://localhost:8080](http://localhost:8080).
-
-The `-p 8080:80` flag maps port 80 inside the container to port 8080 on your host. You can change `8080` to any port you like — for example, `-p 3000:80` to serve on port 3000, or `-p 80:80` if nothing else is using port 80. The container always listens on port 80 internally.
+Open [http://localhost:8080](http://localhost:8080). Change `-p 8080:80` to remap the host port; `80` inside the container is fixed.
 
 ### Docker Compose
 
-Create a `docker-compose.yml` in the repo root:
+Minimal compose for just the Local-mode nginx container (distinct from the `docker-compose.yml` at the repo root, which is for Server mode):
 
 ```yaml
 services:
@@ -114,31 +120,22 @@ services:
       context: ./app
       dockerfile: Dockerfile
     ports:
-      - "8080:80"  # Change 8080 to any port you prefer
+      - "8080:80"
     restart: unless-stopped
 ```
 
-Then:
+`docker compose up -d`, and the nginx config inside the container handles headers, MIME, and SPA fallback automatically.
 
-```bash
-docker compose up -d
-```
+## 1.3 Cloudflare Pages
 
-The nginx configuration inside the container handles the COOP/COEP headers, MIME types, routing, and static asset caching automatically.
-
----
-
-## Cloudflare Pages
-
-1. Go to [Cloudflare Dashboard](https://dash.cloudflare.com) > **Workers & Pages** > **Create**
-2. Select **Pages** > **Connect to Git**
-3. Pick your repository and branch
-4. Configure the build:
+1. [Cloudflare Dashboard](https://dash.cloudflare.com) → **Workers & Pages** → **Create** → **Pages** → **Connect to Git**
+2. Pick the repo and branch.
+3. Build config:
    - **Build command**: `cd app && npm install && NEXT_OUTPUT=export npm run build`
    - **Build output directory**: `app/out`
-5. Deploy
+4. Deploy.
 
-The required headers are handled automatically by the `_headers` file in `app/public/`, which gets copied into the build output:
+Headers are handled by `app/public/_headers` (already in the repo), which gets copied into the build output:
 
 ```
 /*
@@ -146,17 +143,15 @@ The required headers are handled automatically by the `_headers` file in `app/pu
   Cross-Origin-Embedder-Policy: require-corp
 ```
 
-No additional configuration needed.
+No extra configuration.
 
----
+## 1.4 Vercel
 
-## Vercel
+1. Import the repo on [Vercel](https://vercel.com).
+2. Set the **Root Directory** to `app`.
+3. Override the default build for a static deployment: **Build Command** = `NEXT_OUTPUT=export npm run build`, **Output Directory** = `out`. (Leave them at defaults only if you want the Server version — see Part 2.)
 
-1. Import your repository on [Vercel](https://vercel.com)
-2. Set the **Root Directory** to `app`
-3. Vercel will auto-detect Next.js and build it. If you want a pure-static deployment (no Postgres backend), set the **Build Command** to `NEXT_OUTPUT=export npm run build` and **Output Directory** to `out`. Otherwise Vercel will deploy the standalone Node.js output, which supports both backends.
-
-Add the required headers by creating `app/vercel.json`:
+Add headers via `app/vercel.json`:
 
 ```json
 {
@@ -172,203 +167,163 @@ Add the required headers by creating `app/vercel.json`:
 }
 ```
 
-> **Note**: COEP `require-corp` can interfere with Vercel's analytics and preview toolbar. If you encounter issues, this may require `credentialless` instead of `require-corp`, though browser support varies.
+> COEP `require-corp` can conflict with Vercel's analytics / preview toolbar. If it does, try `credentialless` — browser support varies.
 
----
+## 1.5 Netlify
 
-## Netlify
-
-1. Import your repository on [Netlify](https://netlify.com)
-2. Configure the build:
+1. Import the repo.
+2. Build config:
    - **Base directory**: `app`
    - **Build command**: `NEXT_OUTPUT=export npm run build`
    - **Publish directory**: `app/out`
 
-Add the required headers by creating `app/public/_headers` (already included in the repo):
+Headers come from `app/public/_headers` (same file used by Cloudflare Pages).
 
-```
-/*
-  Cross-Origin-Opener-Policy: same-origin
-  Cross-Origin-Embedder-Policy: require-corp
-```
+## 1.6 Coolify
 
-Netlify reads the `_headers` file from the publish directory, same as Cloudflare Pages.
+Self-hosted PaaS; GnuDash deploys as a Docker container.
 
----
+1. New resource → **Dockerfile** build pack → point at the repo.
+2. **Dockerfile location**: `app/Dockerfile` (or `/Dockerfile` for repo-root context).
+3. **Exposed port**: `80`.
+4. Save and deploy.
 
-## Coolify
+The repo-root Dockerfile forces `NEXT_OUTPUT=export` inside the build, so this stays on the Local-mode static path regardless of the default.
 
-[Coolify](https://coolify.io) is a self-hosted PaaS. GnuDash deploys as a Docker container.
+## 1.7 Synology NAS (Container Manager)
 
-1. Create a new resource, select **Dockerfile** as the build pack
-2. Point it at your repository
-3. Set the **Dockerfile location** to `app/Dockerfile` (or `/Dockerfile` if using repo root context)
-4. Set the **exposed port** to `80`
-5. Save and deploy
+Container Manager + Docker Compose, no CLI required.
 
-The Dockerfile handles everything — the build, the nginx config, and the required headers. Git webhooks will trigger automatic redeployments on push.
+**Prerequisites:** DSM 7.0+, Container Manager installed from Package Center.
 
----
-
-## Synology NAS
-
-You can run GnuDash on a Synology NAS using Container Manager (Docker). No command line needed.
-
-### Prerequisites
-
-- A Synology NAS running DSM 7.0 or later
-- **Container Manager** installed from Package Center (it's free — open Package Center, search "Container Manager", and click Install)
-
-### Step-by-step
-
-1. **Open Container Manager** from your Synology desktop
-
-2. **Go to the "Project" section** in the left sidebar
-
-3. **Click "Create"**
-   - Give the project a name: `gnudash`
-   - Set the path to any folder (e.g. create a new folder called `docker/gnudash` in File Station first)
-
-4. **Paste this Docker Compose config** in the editor:
-
+1. Container Manager → **Project** → **Create**. Name it `gnudash` and pick a path (e.g. `docker/gnudash`).
+2. Paste this compose:
    ```yaml
    services:
      gnudash:
        image: nginx:alpine
        ports:
-         - "8080:80"  # Change 8080 to any free port on your NAS
+         - "8080:80"
        restart: unless-stopped
        volumes:
          - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
          - ./site:/usr/share/nginx/html:ro
    ```
-
-5. **Click "Next"**, then **"Done"** to create the project (it will fail to start — that's expected, we need to add the files first)
-
-6. **Build the site on your computer** (you need Node.js installed):
-
+3. Click **Next** → **Done**. It'll fail to start — that's expected.
+4. On your computer:
    ```bash
    git clone https://github.com/QuirkyTurtle94/GnuDash.git
    cd GnuDash/app
    npm install
    NEXT_OUTPUT=export npm run build
    ```
+5. Copy via File Station:
+   - `GnuDash/app/out/*` → `site/` inside the project folder
+   - `GnuDash/app/nginx.conf` → next to `docker-compose.yml`
+6. Back to Container Manager → Project → **Start**.
+7. Open `http://YOUR-NAS-IP:8080`.
 
-7. **Copy files to your NAS** using File Station or a network share:
-   - Copy the entire contents of `GnuDash/app/out/` into the `site/` folder inside your project directory
-   - Copy `GnuDash/app/nginx.conf` into the project directory (next to `docker-compose.yml`)
+**Updating:** repeat steps 4–5 and restart the container.
 
-   Your project folder should look like:
-   ```
-   docker/gnudash/
-   ├── docker-compose.yml   (created by Container Manager)
-   ├── nginx.conf           (copied from the repo)
-   └── site/                (contents of app/out/)
-       ├── index.html
-       ├── _next/
-       ├── _headers
-       └── ...
-   ```
-
-8. **Go back to Container Manager** > **Project** > **gnudash** > click **"Start"**
-
-9. **Open GnuDash** at `http://YOUR-NAS-IP:8080`
-
-### Updating
-
-When a new version of GnuDash is released, repeat steps 6-7 (rebuild and copy the files), then restart the container in Container Manager.
-
-### Alternative: Build on the NAS
-
-If you'd prefer the NAS to build the Docker image itself (no need to copy files manually), your NAS needs enough RAM (2GB+ free) and you'll use SSH:
-
-1. SSH into your NAS: `ssh admin@YOUR-NAS-IP`
-2. Clone and build (the repo-root `Dockerfile` forces `NEXT_OUTPUT=export` so this keeps producing a static nginx image):
-   ```bash
-   cd /volume1/docker
-   git clone https://github.com/QuirkyTurtle94/GnuDash.git
-   cd GnuDash/app
-   docker build -t gnudash .
-   docker run -d -p 8080:80 --restart unless-stopped --name gnudash gnudash
-   ```
-3. Open `http://YOUR-NAS-IP:8080`
-
-To update: `cd /volume1/docker/GnuDash && git pull && cd app && docker build -t gnudash . && docker stop gnudash && docker rm gnudash && docker run -d -p 8080:80 --restart unless-stopped --name gnudash gnudash`
-
----
-
-## Any Static Host
-
-If your host isn't listed above, the process is the same:
-
-1. Build the site: `cd app && npm install && NEXT_OUTPUT=export npm run build`
-2. Upload the contents of `app/out/` to your host
-3. Configure your server to set the two required headers (COOP and COEP)
-4. Ensure your server serves `index.html` for client-side routes (SPA fallback)
-
-If you can't set custom headers (e.g. GitHub Pages), the app will still load but file uploads will fail because `SharedArrayBuffer` won't be available.
-
----
-
-## Self-hosted Server (Postgres) backend
-
-The Server backend runs your book against a Postgres database you control, so the same data is reachable from every browser that can reach the server. Every write is applied to a local SQLite WASM cache first (keeps the dashboard fast) and round-tripped to Postgres before the UI shows the "saved" state. Credentials are persisted in your browser's Origin Private File System so page reloads auto-reconnect without re-prompting.
-
-> **Build-mode dependency.** This requires the **standalone** Node.js build. A static export (nginx / Cloudflare Pages / Netlify) doesn't have the `/api/pg/*` routes and the upload screen only shows the Local tab in that mode. If you want self-hostable, cross-device access, follow the steps below; if you only want the familiar local-file dashboard, stay on the static path from the sections earlier in this guide.
-
-### Quickstart with Docker Compose (easiest)
-
-From the repo root:
+**Alternative — build on the NAS via SSH** (needs 2 GB+ free RAM):
 
 ```bash
-docker compose up -d
-# → gnudash on http://localhost:3000, Postgres on localhost:5432
+ssh admin@YOUR-NAS-IP
+cd /volume1/docker
+git clone https://github.com/QuirkyTurtle94/GnuDash.git
+cd GnuDash/app
+docker build -t gnudash .
+docker run -d -p 8080:80 --restart unless-stopped --name gnudash gnudash
 ```
 
-Compose builds the app from the included `Dockerfile.standalone`, starts a `postgres:16-alpine` container, waits for it to be healthy, and runs the app. Open http://localhost:3000 and pick the **Server (Postgres)** tab on the upload screen. Defaults match compose:
+## 1.8 Any static host
+
+If your host isn't listed:
+
+1. Build: `cd app && npm install && NEXT_OUTPUT=export npm run build`.
+2. Upload `app/out/` contents.
+3. Configure the host to send COOP and COEP on every response.
+4. Configure SPA-fallback to `index.html` for client-side routes.
+
+Hosts that don't let you set custom headers (GitHub Pages being the classic offender): the app loads, but file uploads fail because `SharedArrayBuffer` is unavailable.
+
+---
+
+# Part 2 — Deploying the Server (Postgres) version
+
+Produces `app/.next/standalone/server.js` and needs a real Node.js runtime plus a Postgres database. The Server version enables cross-device access, auto-reconnect from OPFS-persisted credentials, and read-only interop with existing GnuCash desktop Postgres databases.
+
+**All non-localhost Server deployments must be behind TLS** — the browser posts the Postgres password in each request body, so plain HTTP leaks it on the wire. See §2.4.
+
+## 2.1 Quickstart — Docker Compose (recommended)
+
+The repo ships a `docker-compose.yml` that builds the app from `Dockerfile.standalone`, boots `postgres:16-alpine`, waits for the DB healthcheck, and runs the app:
+
+```bash
+git clone https://github.com/QuirkyTurtle94/GnuDash.git
+cd GnuDash
+docker compose up -d
+open http://localhost:3000
+```
+
+On the upload screen, pick **Server (Postgres)**. Defaults match the compose file:
 
 ```
 host=localhost  port=5432  user=gnudash  password=gnudash  database=gnudash
 book id=default
 ```
 
-Drop a `.gnucash` file to bootstrap the book and you're in.
+Drop a `.gnucash` file to bootstrap the book and you're in. Subsequent reloads auto-reconnect from the OPFS-cached credentials.
 
-**Overrides before first `up`** (or in a `.env` next to `docker-compose.yml`):
+**Overrides** (set in the shell or a `.env` beside `docker-compose.yml` before first `up`):
 
 | env var | default | purpose |
 |---|---|---|
 | `POSTGRES_USER` | `gnudash` | DB role name |
-| `POSTGRES_PASSWORD` | `gnudash` | DB password (change for anything non-toy) |
+| `POSTGRES_PASSWORD` | `gnudash` | DB password (**change for anything non-toy**) |
 | `POSTGRES_DB` | `gnudash` | DB name |
-| `POSTGRES_PORT` | `5432` | Host-side port mapping |
+| `POSTGRES_PORT` | `5432` | Host-side port mapping for Postgres |
 | `GNUDASH_PORT` | `3000` | Host-side port for the app |
 
-### Running only Postgres (dev-server against it)
+**Managing data:**
 
-If you'd rather point `npm run dev` at a containerised Postgres:
+- `docker compose down` — stops containers, keeps the Postgres volume (so your book survives).
+- `./scripts/db-reset.sh` — stops **and** drops the `gnudash_pgdata` volume. Used when a previous import left the DB in a bad state or when you're switching between fixture books.
+
+## 2.2 Compose variant — Postgres only (dev server against it)
+
+If you'd rather run the app via `npm run dev` and only want containerised Postgres:
 
 ```bash
 docker compose up -d postgres
 cd app && npm install && npm run dev
 ```
 
-Dev mode includes the API routes and hot-reloads on source changes.
+Dev mode includes the API routes and hot-reloads on source changes. The connection defaults on the upload screen match the compose file.
 
-### Running without Docker
+## 2.3 Running without Docker
+
+For VPS / bare-metal deployments where you manage Postgres separately:
 
 ```bash
 cd app
 npm install
-npm run build          # produces app/.next/standalone/server.js
-node .next/standalone/server.js
+npm run build                       # produces app/.next/standalone/
+NODE_ENV=production node .next/standalone/server.js
 ```
 
-You'll need Postgres reachable separately — install locally, rent a managed instance, or point at an existing one.
+You'll need Postgres reachable — install locally (`apt install postgresql`, `brew install postgresql`, managed instance, etc.) and create a DB + role for gnudash.
 
-### Reverse proxy + TLS (required for any non-localhost deployment)
+Minimal Postgres bootstrap for a standalone install:
 
-The browser posts the Postgres password in each request body, so the app **must** sit behind TLS unless it's on localhost. Minimal nginx example:
+```sql
+CREATE ROLE gnudash WITH LOGIN PASSWORD 'replace-me';
+CREATE DATABASE gnudash OWNER gnudash;
+```
+
+## 2.4 Reverse proxy + TLS (required for non-localhost)
+
+**Minimal nginx.** Terminates TLS, forwards to the Node app on 3000, sets COOP/COEP, raises body size for imports:
 
 ```nginx
 server {
@@ -378,7 +333,6 @@ server {
   ssl_certificate     /etc/letsencrypt/live/gnudash.example.com/fullchain.pem;
   ssl_certificate_key /etc/letsencrypt/live/gnudash.example.com/privkey.pem;
 
-  # Cross-Origin-* headers so SharedArrayBuffer works (SQLite WASM needs it).
   add_header Cross-Origin-Opener-Policy "same-origin" always;
   add_header Cross-Origin-Embedder-Policy "require-corp" always;
 
@@ -387,13 +341,12 @@ server {
     proxy_set_header Host $host;
     proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
     proxy_set_header X-Forwarded-Proto $scheme;
-    # File imports can be large — raise this from the nginx default of 1m.
-    client_max_body_size 200m;
+    client_max_body_size 200m;    # .gnucash imports can be big
   }
 }
 ```
 
-Caddy is even simpler — it handles certs automatically:
+**Caddy** — auto-provisions Let's Encrypt certs:
 
 ```caddy
 gnudash.example.com {
@@ -406,26 +359,51 @@ gnudash.example.com {
 }
 ```
 
-If the app is on the open internet, consider also putting it behind an auth reverse proxy (oauth2-proxy, Authelia, Cloudflare Access) so the login to your Postgres isn't just a password field on a public form.
+If the app is reachable from the open internet, consider also putting it behind an auth reverse proxy (oauth2-proxy, Authelia, Cloudflare Access, Tailscale Funnel with ACL) — the Server backend has no login gate of its own; it just trusts whoever can type the Postgres password.
 
-### Pointing gnudash at an existing GnuCash desktop database (read-only)
+## 2.5 Security considerations
 
-If you already have a GnuCash book saved to Postgres, you can load it in gnudash without re-importing:
+- **Credentials are stored plaintext in OPFS.** Needed for auto-reconnect. OPFS is sandboxed per origin (no other website can read it) but any JS on this origin can. Treat this origin like any app that handles its own creds.
+- **Use a dedicated Postgres user.** Don't reuse the gnudash password anywhere else.
+- **TLS is mandatory for non-localhost.** See §2.4.
+- **Close GnuCash desktop** before connecting to a database it's currently writing to — see §2.6.
+
+## 2.6 Read-only access to an existing GnuCash desktop database
+
+If you already have GnuCash desktop saving to Postgres, you can load the book directly in gnudash without re-importing via `.gnucash` file:
 
 1. On the Server tab, choose **Existing GnuCash database (read-only)**.
-2. Fill in the connection fields and set `schema` to whatever GnuCash desktop writes to (usually `public`).
-3. Connect — gnudash shows a persistent amber banner and every edit affordance is disabled.
+2. Fill in host/port/user/password/database.
+3. Set **Schema** to whatever GnuCash writes to (almost always `public`).
+4. Connect.
 
-**Close GnuCash desktop before you load the book here.** gnudash doesn't take the DBI session lock, so concurrent access between the two apps can corrupt data. The read-only mode is a safety rail, not an interlock.
+An amber banner persists across the dashboard reminding you the session is read-only. Every edit affordance is disabled.
 
-### Storage model
+**Close GnuCash desktop before loading the book here.** gnudash doesn't take the DBI session lock, so concurrent access between the two apps can corrupt data. The read-only UI is a safety rail, not a lock.
 
-Each gnudash-managed book lives in its own Postgres schema named `book_{bookId}` (default: `book_default`). Tables in the schema mirror GnuCash's own layout but are **not byte-for-byte identical**: we only declare the columns the gnudash engine reads or writes, and the NOT NULL policy is deliberately looser so real `.gnucash` imports don't fail. That's why the "existing GnuCash database" path is read-only — write-through to a foreign schema requires column-discovery logic we haven't shipped yet.
+The gnudash-managed storage mode and the existing-DB mode are independent — you can have a gnudash book in a schema named `book_mine` alongside a GnuCash-owned schema named `public` in the same database.
 
-### Troubleshooting
+## 2.7 Storage model
 
-- **"Invalid schema name" on Connect.** The `book id` / `schema` field accepts only `[a-z][a-z0-9_]*`, up to 63 chars. `public`, `book_alice`, `default` all work; hyphens, uppercase, semicolons don't.
-- **Import fails on `column "X" does not exist`.** You're hitting a column our PG DDL doesn't declare on import. Expected to be drift-proof as of PR 82 (we filter source columns); if you see a new one, file an issue with the GnuCash file's schema (`sqlite3 file.gnucash ".schema <tablename>"`).
-- **"SharedArrayBuffer is not defined" in the console.** Your reverse proxy isn't serving the COOP/COEP headers. See the nginx / Caddy snippets above.
-- **"Connection refused" on Connect with Compose.** Inside Docker use `host=postgres`; from a browser hitting the exposed port use `host=localhost`. If you changed `POSTGRES_PORT`, use that port, not 5432.
-- **Data looks stale after a server restart.** OPFS caches the last dump; reload the page to re-fetch from Postgres.
+Each gnudash-managed book lives in its own Postgres schema named `book_{bookId}` (default: `book_default`). The `{bookId}` is whatever you type in the **Book id** field on the upload screen — this is where the multi-tenant / per-user hook lives if you ever want to expose the app beyond one person. Tables inside a `book_*` schema mirror GnuCash's SQLite layout *but are not byte-for-byte identical*; the NOT-NULL policy is deliberately looser so real `.gnucash` imports don't fail on columns GnuCash's own schema allows to be NULL.
+
+That schema divergence is why the existing-GnuCash-DB mode is read-only — write-through to a schema gnudash doesn't own requires column-discovery logic that isn't shipped yet.
+
+## 2.8 Troubleshooting
+
+- **"Invalid schema name" / "Invalid book id" on Connect.** The field accepts `[a-z_][a-z0-9_]*`, up to 63 chars. `public`, `book_alice`, `default` all work; hyphens, uppercase, semicolons, leading digits don't.
+- **Import fails on `column "X" does not exist`.** You're hitting a column our PG DDL doesn't declare on import. As of PR #82 we filter source columns to what the target schema has — if you see a new one, file an issue with the output of `sqlite3 your.gnucash ".schema <tablename>"`.
+- **"SharedArrayBuffer is not defined" in the browser console.** The reverse proxy isn't adding COOP/COEP headers. Re-check §2.4.
+- **"Connection refused" from inside the compose network.** Use `host=postgres` (the service name), not `localhost`. From a browser hitting the exposed host port, use `localhost` with whatever `POSTGRES_PORT` you set.
+- **Dashboard looks stale after the server restarts.** OPFS caches the last dump; reload the page to re-fetch.
+- **"Book exists but is missing required tables".** Status probe found a partial schema — usually the remnant of a failed import on an older build. Drop it from psql (`DROP SCHEMA book_default CASCADE`) and re-import.
+- **Forgot the password / rotated it.** Clear gnudash's site data in your browser (removes the OPFS-cached creds), then reconnect with the new password on the upload screen.
+
+---
+
+## Comparison at a glance: when Local is fine, when Server pays off
+
+- You're the only user, you use one browser, you want a fast setup → **Local.** 5-minute Cloudflare Pages deploy, done.
+- You switch between phone and laptop, or have multiple users → **Server.** One Postgres, one Node process, point every browser at it.
+- You want GnuCash-desktop compatibility for writes → neither yet; read-only interop (§2.6) is the state of the art until the schema-parity refactor lands.
+- You want to just look at your GnuCash-desktop Postgres data in a browser → **Server**, read-only mode. No `.gnucash` export / import cycle.
