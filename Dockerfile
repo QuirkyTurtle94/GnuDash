@@ -3,6 +3,10 @@ WORKDIR /app
 COPY app/package*.json ./
 RUN npm ci
 COPY app/ ./
+# Force static export: this image serves the build output through nginx and
+# has no Node runtime. The default build target (standalone) is used by the
+# Postgres-backend deployment path instead — see docs/deployment.md.
+ENV NEXT_OUTPUT=export
 RUN npm run build
 
 FROM nginx:alpine@sha256:582c496ccf79d8aa6f8203a79d32aaf7ffd8b13362c60a701a2f9ac64886c93d

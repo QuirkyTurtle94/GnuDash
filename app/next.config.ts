@@ -1,7 +1,15 @@
 import type { NextConfig } from "next";
 
+// Default build target is the standalone Node.js server, which the Postgres
+// backend (issue #48) needs for its API routes. Set `NEXT_OUTPUT=export` at
+// build time to produce the legacy static `out/` bundle for nginx / Cloudflare
+// Pages / Netlify / any other host that serves pure static files. Static
+// export does NOT support the Postgres backend — see docs/deployment.md.
+const output: NextConfig["output"] =
+  process.env.NEXT_OUTPUT === "export" ? "export" : "standalone";
+
 const nextConfig: NextConfig = {
-  output: "export",
+  output,
   images: {
     unoptimized: true,
   },

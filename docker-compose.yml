@@ -1,0 +1,55 @@
+# Postgres for the optional Server backend (issue #48).
+#
+# Local-only users should IGNORE this file — the legacy static build served via
+# nginx (repo-root Dockerfile) does not need Postgres. This compose file exists
+# for users who want the self-hostable Server backend, which stores each book
+# in its own Postgres schema so a single database can cover multi-device usage.
+#
+# Usage:
+#   docker compose up -d postgres     # start the DB only
+#   docker compose down               # stop (keeps volume)
+#   ./scripts/db-reset.sh             # stop AND drop the data volume
+#
+# Connect from the upload screen's "Server" tab with:
+#   host=localhost port=5432 user=gnudash password=gnudash database=gnudash
+#
+# Production deployments MUST override the default password via env / secrets.
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: gnudash-postgres
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-gnudash}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-gnudash}
+      POSTGRES_DB: ${POSTGRES_DB:-gnudash}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - gnudash_pgdata:/var/lib/postgresql/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-gnudash} -d ${POSTGRES_DB:-gnudash}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # Uncomment to run the GnuDash app in standalone mode alongside Postgres.
+  # Requires a standalone Dockerfile (not yet added — MVP expects users to run
+  # `npm run dev` locally or self-host the Next.js output themselves).
+  #
+  # gnudash-app:
+  #   build:
+  #     context: ./app
+  #     dockerfile: Dockerfile.standalone
+  #   ports:
+  #     - "3000:3000"
+  #   depends_on:
+  #     postgres:
+  #       condition: service_healthy
+  #   environment:
+  #     NODE_ENV: production
+
+volumes:
+  gnudash_pgdata:
+    name: gnudash_pgdata
