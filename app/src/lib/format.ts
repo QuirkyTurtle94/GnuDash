@@ -13,6 +13,14 @@ export function formatCurrency(
   currency: string,
   options?: { compact?: boolean; decimals?: number }
 ): string {
+  // Intl.NumberFormat's currency mode throws RangeError on anything that isn't
+  // a valid ISO 4217 code, which happens when callers accidentally feed it a
+  // STOCK/MUTUAL ticker mnemonic. Fall back to `formatAmount`, which already
+  // handles the non-currency-commodity path (plain number + suffix).
+  if (!KNOWN_CURRENCIES.has(currency)) {
+    return formatAmount(value, currency, options?.decimals);
+  }
+
   const locale = CURRENCY_LOCALE_MAP[currency] ?? "en-GB";
 
   if (options?.compact) {
