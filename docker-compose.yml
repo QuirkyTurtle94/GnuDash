@@ -6,14 +6,19 @@
 # in its own Postgres schema so a single database can cover multi-device usage.
 #
 # Usage:
-#   docker compose up -d postgres     # start the DB only
-#   docker compose down               # stop (keeps volume)
-#   ./scripts/db-reset.sh             # stop AND drop the data volume
+#   docker compose up -d postgres            # start the DB only
+#   docker compose up -d                     # start the DB AND the app
+#   docker compose down                      # stop (keeps volume)
+#   ./scripts/db-reset.sh                    # stop AND drop the data volume
 #
-# Connect from the upload screen's "Server" tab with:
-#   host=localhost port=5432 user=gnudash password=gnudash database=gnudash
+# After `docker compose up -d`, open http://localhost:3000, pick the
+# "Server (Postgres)" tab on the upload screen and connect with:
+#   host=postgres port=5432 user=gnudash password=gnudash database=gnudash
+#   (host `localhost` also works from the browser for port-mapped access)
 #
-# Production deployments MUST override the default password via env / secrets.
+# Production deployments MUST override the default password via env / secrets
+# and put the app behind a reverse proxy that terminates TLS — see
+# docs/deployment.md for worked examples.
 
 services:
   postgres:
@@ -34,21 +39,19 @@ services:
       timeout: 5s
       retries: 10
 
-  # Uncomment to run the GnuDash app in standalone mode alongside Postgres.
-  # Requires a standalone Dockerfile (not yet added — MVP expects users to run
-  # `npm run dev` locally or self-host the Next.js output themselves).
-  #
-  # gnudash-app:
-  #   build:
-  #     context: ./app
-  #     dockerfile: Dockerfile.standalone
-  #   ports:
-  #     - "3000:3000"
-  #   depends_on:
-  #     postgres:
-  #       condition: service_healthy
-  #   environment:
-  #     NODE_ENV: production
+  gnudash-app:
+    build:
+      context: .
+      dockerfile: Dockerfile.standalone
+    container_name: gnudash-app
+    ports:
+      - "${GNUDASH_PORT:-3000}:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+    restart: unless-stopped
 
 volumes:
   gnudash_pgdata:

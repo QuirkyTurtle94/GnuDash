@@ -20,6 +20,12 @@ const API_DIR = "src/app/api";
 const PARKED_DIR = ".api-parked-for-export";
 const shouldPark = process.env.NEXT_OUTPUT === "export";
 
+// Expose the build target to the client bundle so the upload UI can hide the
+// Server (Postgres) tab when the API routes aren't going to exist at runtime.
+// `NEXT_PUBLIC_*` vars are inlined into the client bundle at build time by
+// Next.js, so this survives the static export as a constant string.
+process.env.NEXT_PUBLIC_HAS_SERVER_BACKEND = shouldPark ? "false" : "true";
+
 let parked = false;
 if (shouldPark && existsSync(API_DIR)) {
   renameSync(API_DIR, PARKED_DIR);

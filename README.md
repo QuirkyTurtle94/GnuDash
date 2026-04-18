@@ -29,7 +29,18 @@ To clear your data, use the dashboard's clear/reset option or clear your browser
 
 If you want the same book accessible from every device you use — phone, laptop, work machine — you can self-host GnuDash against your own Postgres database instead of relying on the per-browser OPFS cache. Pick **Server (Postgres)** on the upload screen, point it at your database, and GnuDash mirrors the book into a dedicated schema there. Writes round-trip to Postgres before the UI shows the "saved" state; reads hit a local SQLite WASM cache so the dashboard stays fast.
 
-This mode requires the standalone Node.js build (the public pages deployment is still fully static) and is fully documented in the [Deployment Guide](docs/deployment.md).
+You can also point GnuDash at an existing GnuCash desktop Postgres database in **read-only** mode — useful if you just want a browser dashboard over data you're already writing from the desktop app.
+
+This mode requires the standalone Node.js build (the static `gnudash.pages.dev` deployment stays fully local-only). The fastest way to try it:
+
+```bash
+git clone https://github.com/QuirkyTurtle94/GnuDash.git
+cd GnuDash
+docker compose up -d                     # gnudash + Postgres together
+open http://localhost:3000
+```
+
+Full walkthrough — reverse-proxy / TLS, existing-GnuCash read-only mode, troubleshooting — in the [Deployment Guide](docs/deployment.md).
 
 ## Features
 
