@@ -322,6 +322,9 @@ export interface LedgerTransaction {
   splits: LedgerSplit[];
 }
 
+/** GnuCash recurrence period type. Stored on the `recurrences` row attached to a budget. */
+export type BudgetPeriodType = "day" | "week" | "month" | "year";
+
 /** Metadata about a GNUCash budget. */
 export interface BudgetInfo {
   guid: string;
@@ -329,6 +332,24 @@ export interface BudgetInfo {
   description: string;
   /** Number of budget periods (typically 12 for monthly budgets) */
   numPeriods: number;
+  /**
+   * Recurrence period type from the `recurrences` row (`obj_guid = budget.guid`).
+   * Falls back to "month" when no recurrence row is present so the view layer
+   * always has a valid type to render. Writers always emit a recurrence row.
+   */
+  periodType: BudgetPeriodType;
+  /**
+   * Recurrence multiplier — e.g. periodType="month" + mult=3 means quarterly periods.
+   * Defaults to 1 when the recurrence row is missing.
+   */
+  recurrenceMult: number;
+  /**
+   * First period's start date (ISO YYYY-MM-DD). Derived from
+   * `recurrences.recurrence_period_start` (GnuCash stores it as YYYYMMDD or
+   * YYYY-MM-DD HH:MM:SS depending on backend). Empty string when no
+   * recurrence row is present.
+   */
+  recurrenceStart: string;
 }
 
 /** A single row in the budget view, representing one account's budgeted vs actual amounts. */
@@ -369,6 +390,19 @@ export interface BudgetDataForBudget {
   incomeCategories: BudgetCategoryRow[];
 }
 
+/**
+ * One row from the `budget_amounts` table. Amounts are in the account's own
+ * commodity (no FX conversion), stored as an exact rational so the editor
+ * can round-trip values without precision loss.
+ */
+export interface RawBudgetCell {
+  accountGuid: string;
+  /** 0-indexed period (period 0 = first period). */
+  periodNum: number;
+  amountNum: number;
+  amountDenom: number;
+}
+
 /** All budget data across all GNUCash budgets in the file. */
 export interface BudgetData {
   budgets: BudgetInfo[];
@@ -379,6 +413,12 @@ export interface BudgetData {
   incomeCategories: BudgetCategoryRow[];
   /** Years that have actual transaction data, sorted descending (most recent first) */
   availableYears: number[];
+  /**
+   * Raw `budget_amounts` rows keyed by budget guid, in the account's own
+   * commodity (no FX). Feeds the special-functions budget editor, which
+   * needs exact rational amounts to round-trip edits without precision loss.
+   */
+  rawAmountsByBudget: Record<string, RawBudgetCell[]>;
 }
 
 export interface CashFlowBudgetForBudget {

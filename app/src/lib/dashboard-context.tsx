@@ -10,7 +10,7 @@ import {
 } from "react";
 import type { DashboardData } from "@/lib/types/gnucash";
 import { GnuCashWorkerClient } from "@/lib/gnucash/worker/client";
-import type { CreateTransactionPayload, DeleteTransactionPayload, EditTransactionPayload, BulkEditTransactionsPayload, CreateAccountPayload, UpdateAccountPayload, DeleteAccountPayload, CreateCommodityPayload, AddPricePayload, EditPricePayload, DeletePricePayload, PostgresConnectionInfo, PostgresDumpPayload } from "@/lib/gnucash/worker/messages";
+import type { CreateTransactionPayload, DeleteTransactionPayload, EditTransactionPayload, BulkEditTransactionsPayload, CreateAccountPayload, UpdateAccountPayload, DeleteAccountPayload, CreateCommodityPayload, AddPricePayload, EditPricePayload, DeletePricePayload, CreateBudgetPayload, UpdateBudgetPayload, DeleteBudgetPayload, SetBudgetAmountPayload, ClearBudgetAmountPayload, PostgresConnectionInfo, PostgresDumpPayload } from "@/lib/gnucash/worker/messages";
 import { generateDemoData } from "@/lib/demo-data";
 import { deleteFromOPFS } from "@/lib/gnucash/worker/opfs";
 import {
@@ -110,6 +110,12 @@ interface DashboardContextType {
   addPrice: (payload: AddPricePayload) => Promise<void>;
   editPrice: (payload: EditPricePayload) => Promise<void>;
   deletePrice: (payload: DeletePricePayload) => Promise<void>;
+  /** Create a budget and return its GUID so the UI can navigate into the editor. */
+  createBudget: (payload: CreateBudgetPayload) => Promise<string>;
+  updateBudget: (payload: UpdateBudgetPayload) => Promise<void>;
+  deleteBudget: (payload: DeleteBudgetPayload) => Promise<void>;
+  setBudgetAmount: (payload: SetBudgetAmountPayload) => Promise<void>;
+  clearBudgetAmount: (payload: ClearBudgetAmountPayload) => Promise<void>;
   exportFile: () => Promise<void>;
   setCurrency: (currencyGuid: string) => Promise<void>;
 }
@@ -621,6 +627,43 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
     setData(await client.deletePrice(payload));
   }
 
+  /**
+   * Create a budget and return its GUID so the caller can navigate into the
+   * editor. Resolves after the write has been flushed to Postgres (sync
+   * client) or persisted to OPFS (local backend).
+   */
+  async function createBudgetFn(payload: CreateBudgetPayload): Promise<string> {
+    if (!isWritable) throw new Error("Database is not open in read-write mode");
+    const client = getClient();
+    const { budgetGuid, ...dashboardData } = await client.createBudget(payload);
+    setData(dashboardData);
+    return budgetGuid;
+  }
+
+  async function updateBudgetFn(payload: UpdateBudgetPayload) {
+    if (!isWritable) throw new Error("Database is not open in read-write mode");
+    const client = getClient();
+    setData(await client.updateBudget(payload));
+  }
+
+  async function deleteBudgetFn(payload: DeleteBudgetPayload) {
+    if (!isWritable) throw new Error("Database is not open in read-write mode");
+    const client = getClient();
+    setData(await client.deleteBudget(payload));
+  }
+
+  async function setBudgetAmountFn(payload: SetBudgetAmountPayload) {
+    if (!isWritable) throw new Error("Database is not open in read-write mode");
+    const client = getClient();
+    setData(await client.setBudgetAmount(payload));
+  }
+
+  async function clearBudgetAmountFn(payload: ClearBudgetAmountPayload) {
+    if (!isWritable) throw new Error("Database is not open in read-write mode");
+    const client = getClient();
+    setData(await client.clearBudgetAmount(payload));
+  }
+
   async function setCurrencyFn(currencyGuid: string) {
     const client = getClient();
     const dashboardData = await client.setCurrency(currencyGuid);
@@ -641,7 +684,7 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
 
   return (
     <DashboardContext.Provider
-      value={{ data, isLoading, error, uploadedAt, isWritable, isXmlSource, backend, postgresBookId, postgresSchemaOverride, toggleWritable, uploadFile, openPostgresBook, importFileToPostgres, reuploadPostgresBook, openExistingGnuCashBook, loadDemo, clearData, createTransaction, deleteTransaction: deleteTransactionFn, editTransaction, bulkEditTransactions: bulkEditTransactionsFn, createAccount: createAccountFn, updateAccount: updateAccountFn, deleteAccountWithReallocation: deleteAccountWithReallocationFn, createCommodity: createCommodityFn, addPrice: addPriceFn, editPrice: editPriceFn, deletePrice: deletePriceFn, exportFile, setCurrency: setCurrencyFn }}
+      value={{ data, isLoading, error, uploadedAt, isWritable, isXmlSource, backend, postgresBookId, postgresSchemaOverride, toggleWritable, uploadFile, openPostgresBook, importFileToPostgres, reuploadPostgresBook, openExistingGnuCashBook, loadDemo, clearData, createTransaction, deleteTransaction: deleteTransactionFn, editTransaction, bulkEditTransactions: bulkEditTransactionsFn, createAccount: createAccountFn, updateAccount: updateAccountFn, deleteAccountWithReallocation: deleteAccountWithReallocationFn, createCommodity: createCommodityFn, addPrice: addPriceFn, editPrice: editPriceFn, deletePrice: deletePriceFn, createBudget: createBudgetFn, updateBudget: updateBudgetFn, deleteBudget: deleteBudgetFn, setBudgetAmount: setBudgetAmountFn, clearBudgetAmount: clearBudgetAmountFn, exportFile, setCurrency: setCurrencyFn }}
     >
       {children}
     </DashboardContext.Provider>

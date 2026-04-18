@@ -14,6 +14,14 @@ import {
   deleteAccount,
 } from "../../engine/operations/account-ops";
 import { addPrice, deletePrice } from "../../engine/operations/price-ops";
+import {
+  createBudget,
+  updateBudget,
+  deleteBudget,
+  setBudgetAmount,
+  clearBudgetAmount,
+} from "../../engine/operations/budget-ops";
+import { loadBudgetInfos } from "../../domain/budgets";
 import { bulkEditTransactions } from "../../engine/operations/bulk-ops";
 import {
   createLot,
@@ -621,5 +629,177 @@ describe("bulk-ops", () => {
       if (s.value_num < 0) expect(s.account_guid).toBe(SAVINGS);
       else expect(s.account_guid).toBe(ENTERTAINMENT);
     }
+  });
+});
+
+// ── Budget Operations ───────────────────────────────────────────
+//
+// Exercise the full CRUD shape the special-functions editor depends on:
+// create → set amount → clear amount → update meta → delete. Each test
+// rechecks the backing tables directly so regressions in the SQL layer
+// surface here rather than at the UI.
+
+describe("budget-ops", () => {
+  const EXPENSE = "exp00000000000000000000000000001";
+
+  it("createBudget writes budget + recurrence rows and returns the new GUID", () => {
+    const { budgetGuid } = createBudget(db, {
+      name: "2026",
+      description: "Annual",
+      numPeriods: 12,
+      periodType: "month",
+      recurrenceMult: 1,
+      recurrenceStart: "2026-01-01",
+    });
+
+    const budget = db
+      .prepare(`SELECT guid, name, description, num_periods FROM budgets WHERE guid = ?`)
+      .get(budgetGuid) as { guid: string; name: string; description: string; num_periods: number };
+    expect(budget).toMatchObject({ name: "2026", description: "Annual", num_periods: 12 });
+
+    const rec = db
+      .prepare(
+        `SELECT recurrence_mult, recurrence_period_type, recurrence_period_start
+         FROM recurrences WHERE obj_guid = ?`,
+      )
+      .get(budgetGuid) as {
+        recurrence_mult: number;
+        recurrence_period_type: string;
+        recurrence_period_start: string;
+      };
+    // recurrence_period_start stored in GnuCash compact YYYYMMDD form.
+    expect(rec).toMatchObject({
+      recurrence_mult: 1,
+      recurrence_period_type: "month",
+      recurrence_period_start: "20260101",
+    });
+  });
+
+  it("loadBudgetInfos attaches recurrence fields to BudgetInfo", () => {
+    const { budgetGuid } = createBudget(db, {
+      name: "Quarterly",
+      description: "",
+      numPeriods: 4,
+      periodType: "month",
+      recurrenceMult: 3,
+      recurrenceStart: "2026-01-01",
+    });
+    const infos = loadBudgetInfos(db);
+    const info = infos.find((b) => b.guid === budgetGuid);
+    expect(info).toBeDefined();
+    expect(info).toMatchObject({
+      name: "Quarterly",
+      numPeriods: 4,
+      periodType: "month",
+      recurrenceMult: 3,
+      // Normalised back to ISO for the view layer.
+      recurrenceStart: "2026-01-01",
+    });
+  });
+
+  it("setBudgetAmount upserts idempotently — second call replaces the first row", () => {
+    const { budgetGuid } = createBudget(db, {
+      name: "x", description: "", numPeriods: 12,
+      periodType: "month", recurrenceMult: 1, recurrenceStart: "2026-01-01",
+    });
+    setBudgetAmount(db, budgetGuid, EXPENSE, 0, 50000, 100);
+    setBudgetAmount(db, budgetGuid, EXPENSE, 0, 75000, 100);
+    const rows = db
+      .prepare(
+        `SELECT amount_num, amount_denom FROM budget_amounts
+         WHERE budget_guid = ? AND account_guid = ? AND period_num = ?`,
+      )
+      .all(budgetGuid, EXPENSE, 0) as { amount_num: number; amount_denom: number }[];
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toEqual({ amount_num: 75000, amount_denom: 100 });
+  });
+
+  it("clearBudgetAmount removes only the targeted cell", () => {
+    const { budgetGuid } = createBudget(db, {
+      name: "x", description: "", numPeriods: 12,
+      periodType: "month", recurrenceMult: 1, recurrenceStart: "2026-01-01",
+    });
+    setBudgetAmount(db, budgetGuid, EXPENSE, 0, 1000, 100);
+    setBudgetAmount(db, budgetGuid, EXPENSE, 1, 2000, 100);
+    clearBudgetAmount(db, budgetGuid, EXPENSE, 0);
+    const rows = db
+      .prepare(`SELECT period_num FROM budget_amounts WHERE budget_guid = ?`)
+      .all(budgetGuid) as { period_num: number }[];
+    expect(rows.map((r) => r.period_num)).toEqual([1]);
+  });
+
+  it("updateBudget shrinks num_periods and drops amounts beyond the new range", () => {
+    const { budgetGuid } = createBudget(db, {
+      name: "x", description: "", numPeriods: 12,
+      periodType: "month", recurrenceMult: 1, recurrenceStart: "2026-01-01",
+    });
+    setBudgetAmount(db, budgetGuid, EXPENSE, 5, 1000, 100);
+    setBudgetAmount(db, budgetGuid, EXPENSE, 10, 2000, 100);
+
+    updateBudget(db, budgetGuid, {
+      name: "half-year",
+      description: "",
+      numPeriods: 6,
+      periodType: "month",
+      recurrenceMult: 1,
+      recurrenceStart: "2026-01-01",
+    });
+
+    const rows = db
+      .prepare(`SELECT period_num FROM budget_amounts WHERE budget_guid = ?`)
+      .all(budgetGuid) as { period_num: number }[];
+    // period 10 is beyond the new 6-period range and should be dropped;
+    // period 5 survives.
+    expect(rows.map((r) => r.period_num)).toEqual([5]);
+
+    const budget = db
+      .prepare(`SELECT name, num_periods FROM budgets WHERE guid = ?`)
+      .get(budgetGuid) as { name: string; num_periods: number };
+    expect(budget).toMatchObject({ name: "half-year", num_periods: 6 });
+  });
+
+  it("updateBudget inserts a recurrence row when one is missing (legacy file)", () => {
+    // Simulate a file written by an older tool that has a budget but no
+    // matching recurrence row — the update path must INSERT rather than silently
+    // ignore, otherwise period shape is lost.
+    db.run(
+      `INSERT INTO budgets (guid, name, description, num_periods) VALUES (?, ?, ?, ?)`,
+      "legacy00000000000000000000000001",
+      "Legacy",
+      "",
+      12,
+    );
+    updateBudget(db, "legacy00000000000000000000000001", {
+      name: "Legacy",
+      description: "",
+      numPeriods: 12,
+      periodType: "year",
+      recurrenceMult: 1,
+      recurrenceStart: "2026-01-01",
+    });
+    const rec = db
+      .prepare(`SELECT recurrence_period_type FROM recurrences WHERE obj_guid = ?`)
+      .get("legacy00000000000000000000000001") as { recurrence_period_type: string };
+    expect(rec.recurrence_period_type).toBe("year");
+  });
+
+  it("deleteBudget cascades to amounts and recurrence rows", () => {
+    const { budgetGuid } = createBudget(db, {
+      name: "x", description: "", numPeriods: 12,
+      periodType: "month", recurrenceMult: 1, recurrenceStart: "2026-01-01",
+    });
+    setBudgetAmount(db, budgetGuid, EXPENSE, 0, 1000, 100);
+
+    deleteBudget(db, budgetGuid);
+
+    expect(
+      db.prepare(`SELECT 1 FROM budgets WHERE guid = ?`).get(budgetGuid),
+    ).toBeUndefined();
+    expect(
+      db.prepare(`SELECT 1 FROM budget_amounts WHERE budget_guid = ?`).get(budgetGuid),
+    ).toBeUndefined();
+    expect(
+      db.prepare(`SELECT 1 FROM recurrences WHERE obj_guid = ?`).get(budgetGuid),
+    ).toBeUndefined();
   });
 });
