@@ -17,7 +17,7 @@ import type {
   BudgetData,
   DashboardData,
 } from "@/lib/types/gnucash";
-import type { WorkerRequest, WorkerResponse, DomainFunction, MutationAction, CreateTransactionPayload, DeleteTransactionPayload, EditTransactionPayload, BulkEditTransactionsPayload, CreateAccountPayload, UpdateAccountPayload, DeleteAccountPayload, CreateCommodityPayload, AddPricePayload, EditPricePayload, DeletePricePayload } from "./messages";
+import type { WorkerRequest, WorkerResponse, DomainFunction, MutationAction, CreateTransactionPayload, DeleteTransactionPayload, EditTransactionPayload, BulkEditTransactionsPayload, CreateAccountPayload, UpdateAccountPayload, DeleteAccountPayload, CreateCommodityPayload, AddPricePayload, EditPricePayload, DeletePricePayload, PostgresConnectionInfo, PostgresDumpPayload } from "./messages";
 import { parseGnuCashXml } from "../xml/parser";
 
 type PendingRequest = {
@@ -190,6 +190,43 @@ export class GnuCashWorkerClient {
       };
 
       this.send({ type: "init", fileBuffer: buffer, writable }, [buffer]);
+    });
+  }
+
+  /**
+   * Open a book from a Postgres dump payload. The caller (typically the
+   * upload flow's server-connect panel) has already fetched the gzipped dump
+   * from `/api/pg/book/dump` and decompressed it to a `PostgresDumpPayload`.
+   * The worker rebuilds an in-memory SQLite WASM cache from the dump and
+   * wraps it with a writable adapter that cache-and-syncs every mutation to
+   * the same Postgres schema.
+   *
+   * Unlike `openFile`, there is no format detection and no OPFS write — the
+   * server is the source of truth, and reloading the page re-fetches from it.
+   */
+  async openFromPostgresDump(
+    dump: PostgresDumpPayload,
+    connection: PostgresConnectionInfo,
+    bookId: string,
+  ): Promise<void> {
+    await this.wasmReady;
+
+    return new Promise<void>((resolve, reject) => {
+      const prevHandler = this.worker.onmessage;
+      this.worker.onmessage = (e: MessageEvent<WorkerResponse>) => {
+        const msg = e.data;
+        if (msg.type === "ready") {
+          this.worker.onmessage = prevHandler;
+          resolve();
+        } else if (msg.type === "init-error") {
+          this.worker.onmessage = prevHandler;
+          reject(new Error(msg.message));
+        } else {
+          this.handleMessage(msg);
+        }
+      };
+
+      this.send({ type: "init-pg-dump", dump, connection, bookId });
     });
   }
 

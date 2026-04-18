@@ -5,10 +5,34 @@
 
 import type { GnuCashXmlData } from "../xml/types";
 
+/** Connection params for the Postgres backend (#48). Mirrors `PgConnection`
+ *  in `lib/pg/connect.ts` but lives here so worker modules never need to
+ *  import from the server-only `pg/connect` module. */
+export interface PostgresConnectionInfo {
+  host: string;
+  port: number;
+  user: string;
+  password: string;
+  database: string;
+  ssl?: boolean;
+}
+
+/** Shape of the payload `/api/pg/book/dump` returns (after gunzip). */
+export interface PostgresDumpPayload {
+  version: 1;
+  tables: Record<string, Record<string, unknown>[]>;
+}
+
 export type WorkerRequest =
   | { type: "init"; fileBuffer: ArrayBuffer; writable?: boolean }
   | { type: "init-xml"; xmlData: GnuCashXmlData }
   | { type: "init-opfs"; fileName: string; writable?: boolean }
+  | {
+      type: "init-pg-dump";
+      dump: PostgresDumpPayload;
+      connection: PostgresConnectionInfo;
+      bookId: string;
+    }
   | { type: "query"; id: string; fn: DomainFunction }
   | { type: "mutation"; id: string; action: MutationAction; payload: unknown }
   | { type: "set-currency"; id: string; currencyGuid: string }
