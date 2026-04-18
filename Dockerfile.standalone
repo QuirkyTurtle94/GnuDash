@@ -1,0 +1,47 @@
+# Standalone Node.js image for the Server (Postgres) backend.
+#
+# Build context = repo root:
+#   docker build -f Dockerfile.standalone -t gnudash-standalone .
+#
+# or via docker-compose.yml (uncomment the `gnudash-app` service there).
+#
+# The image ships the Next.js standalone bundle built with `npm run build`
+# (which is the default — no NEXT_OUTPUT=export). It includes the /api/pg/*
+# routes needed by the Server backend; the static-only nginx Dockerfile
+# (./Dockerfile) does NOT — use this file for self-hosted Postgres setups.
+
+FROM --platform=$BUILDPLATFORM node:20-alpine@sha256:f598378b5240225e6beab68fa9f356db1fb8efe55173e6d4d8153113bb8f333c AS build
+
+WORKDIR /app
+# Copy the app package manifests first so npm ci can be cached across builds
+# that only touch source.
+COPY app/package*.json ./
+RUN npm ci
+
+COPY app/ ./
+
+# Default build target is "standalone" (see app/next.config.ts) which produces
+# a self-contained bundle at app/.next/standalone/. NEXT_OUTPUT is explicitly
+# unset here so nothing accidentally flips us to the static-export path.
+RUN npm run build
+
+
+FROM node:20-alpine@sha256:f598378b5240225e6beab68fa9f356db1fb8efe55173e6d4d8153113bb8f333c AS runtime
+
+WORKDIR /app
+ENV NODE_ENV=production
+# Next.js listens on $PORT (defaults to 3000 in the standalone server).
+ENV PORT=3000
+ENV HOSTNAME=0.0.0.0
+
+# The standalone output bundles only the runtime deps Next traced, so we
+# don't need a separate `npm ci --omit=dev` — just copy the pre-wired tree.
+COPY --from=build /app/.next/standalone/ ./
+# Static assets and the public/ folder aren't bundled into standalone/; copy
+# them in alongside so the server can serve them at their expected paths.
+COPY --from=build /app/.next/static/ ./.next/static/
+COPY --from=build /app/public/ ./public/
+
+EXPOSE 3000
+# server.js is the entrypoint Next.js generates inside the standalone bundle.
+CMD ["node", "server.js"]

@@ -24,6 +24,18 @@ type TabId = "local" | "server";
 const DEFAULT_TAB: TabId = "local";
 
 /**
+ * Whether the Server (Postgres) backend is reachable in this build. `false`
+ * for static-export builds where `/api/pg/*` routes were parked out by
+ * scripts/next-build.mjs, `true` for standalone builds (and dev servers,
+ * which default to true via Next.js env handling).
+ *
+ * Inlined at build time, so the upload UI can pretend the Server tab never
+ * existed rather than showing a tab whose Connect button would 404.
+ */
+const HAS_SERVER_BACKEND =
+  process.env.NEXT_PUBLIC_HAS_SERVER_BACKEND !== "false";
+
+/**
  * Upload wizard shown when no book is loaded. The two backend choices
  * (Local OPFS / Server Postgres) live behind tabs so the familiar drag-drop
  * experience stays the default for the public pages deployment, and
@@ -42,6 +54,9 @@ export function FileUpload() {
   // cascading render but there isn't a cleaner way short of
   // useSyncExternalStore, which is overkill for a single tab preference.
   useEffect(() => {
+    // Static-export builds don't have the Server backend at all, so every
+    // saved preference collapses to Local. Skip the hydration entirely.
+    if (!HAS_SERVER_BACKEND) return;
     try {
       // Session-level backend marker wins: a user returning after a failed
       // Postgres auto-reconnect should land on the Server tab even if they'd
@@ -70,6 +85,33 @@ export function FileUpload() {
       // Non-fatal — the tab choice just won't persist.
     }
   };
+
+  // Static-export builds collapse to the single Local panel — rendering the
+  // tab shell at all would be misleading because the Server panel has no
+  // API routes to talk to. Standalone builds and dev servers show both.
+  if (!HAS_SERVER_BACKEND) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-[#F4F5F7] p-4 sm:p-8">
+        <div className="w-full max-w-lg">
+          <div className="mb-6 text-center sm:mb-8">
+            <Image
+              src="/logo.png"
+              alt="GnuDash"
+              width={900}
+              height={600}
+              className="mx-auto mb-4 rounded-2xl"
+              loading="eager"
+              style={{ width: "auto", height: "auto" }}
+            />
+            <p className="mt-2 text-sm text-[#6F767E]">
+              Upload your .gnucash file to view your financial dashboard.
+            </p>
+          </div>
+          <LocalUploadPanel />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-[#F4F5F7] p-4 sm:p-8">
