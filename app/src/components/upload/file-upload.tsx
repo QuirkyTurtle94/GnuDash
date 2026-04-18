@@ -4,9 +4,26 @@ import { useCallback, useState } from "react";
 import Image from "next/image";
 import { Upload, Loader2, Play } from "lucide-react";
 import { useDashboard } from "@/lib/dashboard-context";
+import { BackendSelector } from "./backend-selector";
+import { LoginForm } from "./login-form";
 
 export function FileUpload() {
-  const { uploadFile, loadDemo, isLoading, error } = useDashboard();
+  const {
+    uploadFile,
+    loadDemo,
+    isLoading,
+    error,
+    backend,
+    setBackend,
+    needsLogin,
+    serverModeAvailable,
+    login,
+  } = useDashboard();
+
+  // Server mode + no session → login form owns the screen.
+  if (serverModeAvailable && backend === "api" && needsLogin) {
+    return <LoginForm login={login} />;
+  }
   const [isDragging, setIsDragging] = useState(false);
   const [readOnly, setReadOnly] = useState(false);
 
@@ -77,6 +94,10 @@ export function FileUpload() {
             Upload your .gnucash file to view your financial dashboard
           </p>
         </div>
+
+        {serverModeAvailable && (
+          <BackendSelector backend={backend} onChange={setBackend} />
+        )}
 
         <div
           onClick={handleClick}
@@ -149,7 +170,9 @@ export function FileUpload() {
         )}
 
         <p className="mt-6 text-center text-xs text-[#9A9FA5]">
-          Your financial data never leaves your device. Everything runs locally in your browser.
+          {backend === "api"
+            ? "Your data is stored on the server in Postgres — available from any device you sign into."
+            : "Your financial data never leaves your device. Everything runs locally in your browser."}
         </p>
       </div>
     </div>

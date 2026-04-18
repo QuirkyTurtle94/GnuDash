@@ -19,6 +19,16 @@ const STORAGE_VERSION = "v14"; // bumped: WASM migration
 const VERSION_KEY = "gnucash-dashboard-version";
 const UPLOADED_AT_KEY = "gnucash-dashboard-uploaded-at";
 const WRITABLE_KEY = "gnucash-dashboard-writable";
+const BACKEND_KEY = "gnucash-dashboard-backend";
+
+/**
+ * Compile-time flag: server-mode builds expose the "Server (Postgres)"
+ * option on the upload page. Local builds stay OPFS-only — nothing to
+ * toggle, no login flow.
+ */
+const SERVER_MODE = process.env.NEXT_PUBLIC_SERVER_MODE === "1";
+
+export type BookBackend = "opfs" | "api";
 
 interface DashboardContextType {
   data: DashboardData | null;
@@ -27,6 +37,15 @@ interface DashboardContextType {
   uploadedAt: Date | null;
   isWritable: boolean;
   isXmlSource: boolean;
+  /** Where the current book lives. */
+  backend: BookBackend;
+  /** True iff server backend is selected but no active session. */
+  needsLogin: boolean;
+  /** Whether the current build supports the API backend at all. */
+  serverModeAvailable: boolean;
+  setBackend: (b: BookBackend) => void;
+  login: (passphrase: string) => Promise<void>;
+  logout: () => Promise<void>;
   toggleWritable: () => Promise<void>;
   uploadFile: (file: File, writable?: boolean) => Promise<void>;
   loadDemo: () => Promise<void>;
@@ -55,25 +74,64 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
   const [uploadedAt, setUploadedAt] = useState<Date | null>(null);
   const [isWritable, setIsWritable] = useState(false);
   const [isXmlSource, setIsXmlSource] = useState(false);
+  const [backend, setBackendState] = useState<BookBackend>("opfs");
+  const [needsLogin, setNeedsLogin] = useState(false);
   const clientRef = useRef<BookClient | null>(null);
+  const backendRef = useRef<BookBackend>("opfs");
 
+  /**
+   * Build (or reuse) a BookClient for the currently-selected backend.
+   * `setBackend` disposes the previous client before flipping state so
+   * this always returns one pointed at the current backend.
+   */
   function getClient(): BookClient {
     if (!clientRef.current) {
-      clientRef.current = createBookClient();
+      clientRef.current = createBookClient({ backend: backendRef.current });
     }
     return clientRef.current;
   }
 
-  // On mount: try OPFS first, then fall back to sessionStorage
+  /**
+   * Ping /api/auth/me to tell "not logged in" apart from "logged in but
+   * no book yet" — the former surfaces the login form, the latter surfaces
+   * the upload form.
+   */
+  async function probeSession(): Promise<boolean> {
+    try {
+      const res = await fetch("/api/auth/me", {
+        method: "GET",
+        credentials: "same-origin",
+      });
+      return res.ok;
+    } catch {
+      return false;
+    }
+  }
+
+  // On mount: pick backend from sessionStorage, probe session if api,
+  // then try to restore a previously-opened book.
   useEffect(() => {
     let cancelled = false;
 
-    async function restore() {
-      // Check if previously opened as writable
-      const storedWritable = sessionStorage.getItem(WRITABLE_KEY) === "true";
+    async function boot() {
+      const stored = sessionStorage.getItem(BACKEND_KEY);
+      const chosen: BookBackend =
+        SERVER_MODE && stored === "api" ? "api" : "opfs";
+      if (cancelled) return;
+      backendRef.current = chosen;
+      setBackendState(chosen);
 
-      // Try restoring a previously-persisted session (OPFS in local mode)
+      if (chosen === "api") {
+        const authed = await probeSession();
+        if (cancelled) return;
+        if (!authed) {
+          setNeedsLogin(true);
+          return;
+        }
+      }
+
       try {
+        const storedWritable = sessionStorage.getItem(WRITABLE_KEY) === "true";
         const client = getClient();
         await client.waitForReady();
         const loaded = await client.restoreSession(storedWritable);
@@ -81,41 +139,45 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
           const dashboardData = await client.getFullDashboardData();
           if (!cancelled) {
             setData(dashboardData);
-            setIsWritable(storedWritable);
+            setIsWritable(chosen === "api" ? true : storedWritable);
             const stored = sessionStorage.getItem(UPLOADED_AT_KEY);
             if (stored) setUploadedAt(new Date(stored));
             return;
           }
         }
       } catch {
-        // OPFS not available or no persisted file -- fall through
+        // Restoration failure isn't fatal — user can upload a fresh file.
       }
 
-      // Fall back to sessionStorage
-      if (cancelled) return;
-      try {
-        const storedVersion = sessionStorage.getItem(VERSION_KEY);
-        if (storedVersion !== STORAGE_VERSION) {
-          sessionStorage.removeItem(STORAGE_KEY);
-          sessionStorage.setItem(VERSION_KEY, STORAGE_VERSION);
-          return;
+      // Fall back to the sessionStorage data cache (OPFS only).
+      if (chosen === "opfs") {
+        try {
+          const storedVersion = sessionStorage.getItem(VERSION_KEY);
+          if (storedVersion !== STORAGE_VERSION) {
+            sessionStorage.removeItem(STORAGE_KEY);
+            sessionStorage.setItem(VERSION_KEY, STORAGE_VERSION);
+            return;
+          }
+          const stored = sessionStorage.getItem(STORAGE_KEY);
+          if (stored && !cancelled) {
+            setData(JSON.parse(stored));
+            const storedAt = sessionStorage.getItem(UPLOADED_AT_KEY);
+            if (storedAt) setUploadedAt(new Date(storedAt));
+          }
+        } catch {
+          // ignore parse errors
         }
-        const stored = sessionStorage.getItem(STORAGE_KEY);
-        if (stored) {
-          setData(JSON.parse(stored));
-          const storedAt = sessionStorage.getItem(UPLOADED_AT_KEY);
-          if (storedAt) setUploadedAt(new Date(storedAt));
-        }
-      } catch {
-        // ignore parse errors
       }
     }
 
-    restore();
-    return () => { cancelled = true; };
+    boot();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Persist to sessionStorage when data changes (fast restore cache)
+  // Cache DashboardData in sessionStorage for fast restore on the OPFS path.
   useEffect(() => {
     if (data) {
       try {
@@ -127,7 +189,79 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
     }
   }, [data]);
 
+  function setBackend(b: BookBackend) {
+    if (b === backend) return;
+    if (clientRef.current) {
+      clientRef.current.close();
+      clientRef.current = null;
+    }
+    backendRef.current = b;
+    setBackendState(b);
+    sessionStorage.setItem(BACKEND_KEY, b);
+    setData(null);
+    setError(null);
+    setUploadedAt(null);
+    setIsWritable(false);
+    setIsXmlSource(false);
+    sessionStorage.removeItem(STORAGE_KEY);
+    sessionStorage.removeItem(UPLOADED_AT_KEY);
+    sessionStorage.removeItem(WRITABLE_KEY);
+    if (b === "api") {
+      probeSession().then((authed) => setNeedsLogin(!authed));
+    } else {
+      setNeedsLogin(false);
+    }
+  }
+
+  async function login(passphrase: string): Promise<void> {
+    const res = await fetch("/api/auth/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "same-origin",
+      body: JSON.stringify({ passphrase }),
+    });
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      throw new Error(body.error ?? `Login failed (${res.status})`);
+    }
+    setNeedsLogin(false);
+    try {
+      const client = getClient();
+      await client.waitForReady();
+      const loaded = await client.restoreSession(true);
+      if (loaded) {
+        const dashboardData = await client.getFullDashboardData();
+        setData(dashboardData);
+        setIsWritable(true);
+        setUploadedAt(new Date());
+      }
+    } catch {
+      // No existing book is fine — user will upload one.
+    }
+  }
+
+  async function logout(): Promise<void> {
+    try {
+      await fetch("/api/auth/logout", {
+        method: "POST",
+        credentials: "same-origin",
+      });
+    } finally {
+      if (clientRef.current) {
+        clientRef.current.close();
+        clientRef.current = null;
+      }
+      setData(null);
+      setUploadedAt(null);
+      setIsWritable(false);
+      setIsXmlSource(false);
+      setNeedsLogin(true);
+    }
+  }
+
   async function toggleWritable() {
+    // API mode is always writable once authed; no-op here.
+    if (backend === "api") return;
     const newWritable = !isWritable;
     try {
       const client = getClient();
@@ -157,11 +291,18 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
       setData(dashboardData);
       setUploadedAt(now);
       setIsXmlSource(isXml);
-      setIsWritable(isXml ? false : writable);
+      const effectiveWritable =
+        backend === "api" ? true : isXml ? false : writable;
+      setIsWritable(effectiveWritable);
       sessionStorage.setItem(UPLOADED_AT_KEY, now.toISOString());
-      sessionStorage.setItem(WRITABLE_KEY, String(isXml ? false : writable));
+      sessionStorage.setItem(WRITABLE_KEY, String(effectiveWritable));
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Upload failed");
+      const msg = err instanceof Error ? err.message : "Upload failed";
+      // A 401 mid-upload means the session expired; bounce back to login.
+      if (/401|unauthori[sz]ed/i.test(msg) && backend === "api") {
+        setNeedsLogin(true);
+      }
+      setError(msg);
     } finally {
       setIsLoading(false);
     }
@@ -191,7 +332,6 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
     sessionStorage.removeItem(STORAGE_KEY);
     sessionStorage.removeItem(UPLOADED_AT_KEY);
     sessionStorage.removeItem(WRITABLE_KEY);
-    // Close the worker DB but keep the worker alive
     if (clientRef.current) {
       clientRef.current.close();
       clientRef.current = null;
@@ -292,7 +432,7 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
 
   return (
     <DashboardContext.Provider
-      value={{ data, isLoading, error, uploadedAt, isWritable, isXmlSource, toggleWritable, uploadFile, loadDemo, clearData, createTransaction, deleteTransaction: deleteTransactionFn, editTransaction, bulkEditTransactions: bulkEditTransactionsFn, createAccount: createAccountFn, updateAccount: updateAccountFn, deleteAccountWithReallocation: deleteAccountWithReallocationFn, createCommodity: createCommodityFn, addPrice: addPriceFn, editPrice: editPriceFn, deletePrice: deletePriceFn, exportFile, setCurrency: setCurrencyFn }}
+      value={{ data, isLoading, error, uploadedAt, isWritable, isXmlSource, backend, needsLogin, serverModeAvailable: SERVER_MODE, setBackend, login, logout, toggleWritable, uploadFile, loadDemo, clearData, createTransaction, deleteTransaction: deleteTransactionFn, editTransaction, bulkEditTransactions: bulkEditTransactionsFn, createAccount: createAccountFn, updateAccount: updateAccountFn, deleteAccountWithReallocation: deleteAccountWithReallocationFn, createCommodity: createCommodityFn, addPrice: addPriceFn, editPrice: editPriceFn, deletePrice: deletePriceFn, exportFile, setCurrency: setCurrencyFn }}
     >
       {children}
     </DashboardContext.Provider>
