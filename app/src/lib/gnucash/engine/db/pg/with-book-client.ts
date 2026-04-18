@@ -9,13 +9,18 @@ import "server-only";
  *     tenant left it as. The security review flags this explicitly
  *     (§1.4 TOCTOU). Every request goes through this helper; no one else
  *     calls `checkoutClient` directly.
- *   - `set_config($1, $2, true)` parameterises the value. We still validate
+ *   - `set_config($1, $2, false)` parameterises the value. We still validate
  *     the schema name with a strict regex (see `schema-name.ts`) so a
- *     regression can't slip an injection string through.
- *   - `RESET ALL` fires in `finally`, including on error paths. On any
- *     query error during the callback we destroy the client (pg.Pool
- *     will create a fresh one on the next checkout) — this prevents
- *     half-aborted transaction state from bleeding between tenants.
+ *     regression can't slip an injection string through. We use session-
+ *     level (is_local=false) rather than transaction-local: domain reads
+ *     aren't always wrapped in BEGIN/COMMIT, and Postgres silently ignores
+ *     a transaction-local set when called outside a transaction block.
+ *   - `RESET ALL` fires in `finally`, including on error paths. That's
+ *     what prevents session-level state from bleeding between tenants —
+ *     once the client returns to the pool, search_path is back to default.
+ *   - On any query error during the callback we destroy the client (pg.Pool
+ *     will create a fresh one on the next checkout) — belt-and-braces in
+ *     case RESET ALL itself couldn't run (e.g. the connection is wedged).
  */
 import type { WritableDbAdapter } from "../writable-adapter";
 import { checkoutClient } from "./pg-pool";
@@ -36,7 +41,7 @@ export async function withBookClient<T>(
   const client = await checkoutClient();
   let errored = false;
   try {
-    await client.query("SELECT set_config($1, $2, true)", [
+    await client.query("SELECT set_config($1, $2, false)", [
       "search_path",
       `${schemaName}, public`,
     ]);
