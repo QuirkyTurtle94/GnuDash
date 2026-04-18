@@ -10,14 +10,24 @@ import {
 } from "react";
 import type { DashboardData } from "@/lib/types/gnucash";
 import { GnuCashWorkerClient } from "@/lib/gnucash/worker/client";
-import type { CreateTransactionPayload, DeleteTransactionPayload, EditTransactionPayload, BulkEditTransactionsPayload, CreateAccountPayload, UpdateAccountPayload, DeleteAccountPayload, CreateCommodityPayload, AddPricePayload, EditPricePayload, DeletePricePayload } from "@/lib/gnucash/worker/messages";
+import type { CreateTransactionPayload, DeleteTransactionPayload, EditTransactionPayload, BulkEditTransactionsPayload, CreateAccountPayload, UpdateAccountPayload, DeleteAccountPayload, CreateCommodityPayload, AddPricePayload, EditPricePayload, DeletePricePayload, PostgresConnectionInfo, PostgresDumpPayload } from "@/lib/gnucash/worker/messages";
 import { generateDemoData } from "@/lib/demo-data";
+import { deleteFromOPFS } from "@/lib/gnucash/worker/opfs";
+import {
+  saveServerConfig,
+  type ServerConfig,
+} from "@/lib/storage/server-config";
 
 const STORAGE_KEY = "gnucash-dashboard-data";
-const STORAGE_VERSION = "v14"; // bumped: WASM migration
+// Bumped to v15 when the Postgres backend landed (#48) — the new `backend`
+// dimension means a v14-cached DashboardData may misrepresent its origin.
+const STORAGE_VERSION = "v15";
 const VERSION_KEY = "gnucash-dashboard-version";
 const UPLOADED_AT_KEY = "gnucash-dashboard-uploaded-at";
 const WRITABLE_KEY = "gnucash-dashboard-writable";
+const BACKEND_KEY = "gnucash-dashboard-backend";
+
+export type Backend = "local" | "postgres";
 
 interface DashboardContextType {
   data: DashboardData | null;
@@ -26,8 +36,32 @@ interface DashboardContextType {
   uploadedAt: Date | null;
   isWritable: boolean;
   isXmlSource: boolean;
+  /** Whether the active book is stored locally (OPFS) or on a Postgres server. */
+  backend: Backend;
+  /** The book id of the currently open Postgres book, or null when on local backend. */
+  postgresBookId: string | null;
   toggleWritable: () => Promise<void>;
   uploadFile: (file: File, writable?: boolean) => Promise<void>;
+  /**
+   * Open a book from a Postgres server: fetch the dump, restore into the
+   * worker's in-memory SQLite cache, and switch the backend to "postgres".
+   * Persists the connection to OPFS (plaintext — see server-config.ts) so a
+   * future PR can auto-reconnect.
+   */
+  openPostgresBook: (
+    connection: PostgresConnectionInfo,
+    bookId: string,
+  ) => Promise<void>;
+  /**
+   * Upload a .gnucash file (SQLite or XML) to a Postgres server and then
+   * open the resulting book. XML files are converted to SQLite client-side
+   * first (via the existing worker pipeline) before upload.
+   */
+  importFileToPostgres: (
+    file: File,
+    connection: PostgresConnectionInfo,
+    bookId: string,
+  ) => Promise<void>;
   loadDemo: () => Promise<void>;
   clearData: () => void;
   createTransaction: (payload: CreateTransactionPayload) => Promise<void>;
@@ -54,6 +88,8 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
   const [uploadedAt, setUploadedAt] = useState<Date | null>(null);
   const [isWritable, setIsWritable] = useState(false);
   const [isXmlSource, setIsXmlSource] = useState(false);
+  const [backend, setBackend] = useState<Backend>("local");
+  const [postgresBookId, setPostgresBookId] = useState<string | null>(null);
   const clientRef = useRef<GnuCashWorkerClient | null>(null);
 
   function getClient(): GnuCashWorkerClient {
@@ -63,15 +99,30 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
     return clientRef.current;
   }
 
-  // On mount: try OPFS first, then fall back to sessionStorage
+  // On mount: try OPFS first, then fall back to sessionStorage.
+  //
+  // The Postgres backend's auto-reconnect path lives in a follow-up PR; for
+  // now if the previous session was on Postgres we simply fall through to
+  // the upload screen (the Server tab's defaultValue is wired to the saved
+  // preference so the user lands back there).
   useEffect(() => {
     let cancelled = false;
 
     async function restore() {
-      // Check if previously opened as writable
       const storedWritable = sessionStorage.getItem(WRITABLE_KEY) === "true";
+      const storedBackend =
+        (sessionStorage.getItem(BACKEND_KEY) as Backend | null) ?? "local";
 
-      // Try loading from OPFS via the Worker
+      // Postgres sessions don't persist anything usable on the client, so
+      // skip the OPFS + session-storage restore paths outright and let the
+      // upload screen render. The Server tab preselect handles UX continuity.
+      if (storedBackend === "postgres") {
+        // Drop any local-mode caches that a previous local session may have
+        // left behind — we're in Postgres land now.
+        sessionStorage.removeItem(STORAGE_KEY);
+        return;
+      }
+
       try {
         const client = getClient();
         await client.waitForReady();
@@ -157,10 +208,133 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
       setUploadedAt(now);
       setIsXmlSource(isXml);
       setIsWritable(isXml ? false : writable);
+      setBackend("local");
+      setPostgresBookId(null);
       sessionStorage.setItem(UPLOADED_AT_KEY, now.toISOString());
       sessionStorage.setItem(WRITABLE_KEY, String(isXml ? false : writable));
+      sessionStorage.setItem(BACKEND_KEY, "local");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Upload failed");
+    } finally {
+      setIsLoading(false);
+    }
+  }
+
+  /**
+   * Load an existing book from a Postgres server. The server's gzipped dump
+   * is fetched, decompressed by the browser (via `Content-Encoding: gzip`),
+   * parsed, and handed to the worker which rebuilds a local SQLite WASM
+   * cache and wires up the write-through adapter from PR 4. Persists the
+   * connection to OPFS so a future PR 8 load can auto-reconnect.
+   */
+  async function openPostgresBook(
+    connection: PostgresConnectionInfo,
+    bookId: string,
+  ) {
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      const client = getClient();
+      await client.waitForReady();
+
+      const res = await fetch("/api/pg/book/dump", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ connection, bookId }),
+      });
+      if (!res.ok) {
+        const body = (await res.json().catch(() => ({}))) as { error?: string };
+        throw new Error(body.error ?? `Dump failed: HTTP ${res.status}`);
+      }
+      // The browser auto-decompresses `Content-Encoding: gzip` responses,
+      // so `.json()` yields the parsed payload directly.
+      const dump = (await res.json()) as PostgresDumpPayload;
+
+      await client.openFromPostgresDump(dump, connection, bookId);
+      const dashboardData = await client.getFullDashboardData();
+      const now = new Date();
+
+      // A local-backend session on this origin may have left a SQLite file in
+      // OPFS; with Postgres as the source of truth it would only cause a
+      // stale restore on next load. Clear it.
+      await deleteFromOPFS().catch(() => {});
+
+      setData(dashboardData);
+      setUploadedAt(now);
+      setIsXmlSource(false);
+      setIsWritable(true);
+      setBackend("postgres");
+      setPostgresBookId(bookId);
+      sessionStorage.setItem(UPLOADED_AT_KEY, now.toISOString());
+      sessionStorage.setItem(WRITABLE_KEY, "true");
+      sessionStorage.setItem(BACKEND_KEY, "postgres");
+
+      // Persist the connection so a page refresh can reconnect without
+      // prompting. Plaintext on disk — see server-config.ts security note.
+      const cfg: ServerConfig = { ...connection, bookId };
+      await saveServerConfig(cfg).catch(() => {
+        // If OPFS is unavailable the PG session is still fully usable —
+        // the user will just have to re-enter credentials next time.
+      });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Open failed");
+    } finally {
+      setIsLoading(false);
+    }
+  }
+
+  /**
+   * Upload a .gnucash file into a Postgres book. XML files are routed
+   * through the worker's existing in-memory SQLite conversion and exported
+   * as a SQLite buffer before upload, so the server-side import route only
+   * has to handle one format. After a successful import, the freshly
+   * populated book is loaded via `openPostgresBook`.
+   */
+  async function importFileToPostgres(
+    file: File,
+    connection: PostgresConnectionInfo,
+    bookId: string,
+  ) {
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      const client = getClient();
+      await client.waitForReady();
+
+      // Parse the file client-side into the worker's in-memory SQLite, then
+      // export it as a clean SQLite buffer. This collapses (raw SQLite,
+      // gzipped SQLite, raw XML, gzipped XML) into one wire format.
+      //
+      // `openFile` in SQLite mode writes to OPFS for local persistence; we
+      // don't want that here, so we explicitly delete the file after.
+      await client.openFile(file, true);
+      const sqliteBuffer = await client.exportDatabase();
+      await deleteFromOPFS().catch(() => {});
+
+      const form = new FormData();
+      form.append("file", new Blob([sqliteBuffer]), file.name);
+      form.append("connection", JSON.stringify(connection));
+      form.append("bookId", bookId);
+
+      const importRes = await fetch("/api/pg/book/import", {
+        method: "POST",
+        body: form,
+      });
+      if (!importRes.ok) {
+        const body = (await importRes.json().catch(() => ({}))) as {
+          error?: string;
+        };
+        throw new Error(
+          body.error ?? `Import failed: HTTP ${importRes.status}`,
+        );
+      }
+
+      // Load the authoritative server state into the worker.
+      await openPostgresBook(connection, bookId);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Import failed");
     } finally {
       setIsLoading(false);
     }
@@ -187,9 +361,12 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
     setUploadedAt(null);
     setIsWritable(false);
     setIsXmlSource(false);
+    setBackend("local");
+    setPostgresBookId(null);
     sessionStorage.removeItem(STORAGE_KEY);
     sessionStorage.removeItem(UPLOADED_AT_KEY);
     sessionStorage.removeItem(WRITABLE_KEY);
+    sessionStorage.removeItem(BACKEND_KEY);
     // Close the worker DB but keep the worker alive
     if (clientRef.current) {
       clientRef.current.close();
@@ -291,7 +468,7 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
 
   return (
     <DashboardContext.Provider
-      value={{ data, isLoading, error, uploadedAt, isWritable, isXmlSource, toggleWritable, uploadFile, loadDemo, clearData, createTransaction, deleteTransaction: deleteTransactionFn, editTransaction, bulkEditTransactions: bulkEditTransactionsFn, createAccount: createAccountFn, updateAccount: updateAccountFn, deleteAccountWithReallocation: deleteAccountWithReallocationFn, createCommodity: createCommodityFn, addPrice: addPriceFn, editPrice: editPriceFn, deletePrice: deletePriceFn, exportFile, setCurrency: setCurrencyFn }}
+      value={{ data, isLoading, error, uploadedAt, isWritable, isXmlSource, backend, postgresBookId, toggleWritable, uploadFile, openPostgresBook, importFileToPostgres, loadDemo, clearData, createTransaction, deleteTransaction: deleteTransactionFn, editTransaction, bulkEditTransactions: bulkEditTransactionsFn, createAccount: createAccountFn, updateAccount: updateAccountFn, deleteAccountWithReallocation: deleteAccountWithReallocationFn, createCommodity: createCommodityFn, addPrice: addPriceFn, editPrice: editPriceFn, deletePrice: deletePriceFn, exportFile, setCurrency: setCurrencyFn }}
     >
       {children}
     </DashboardContext.Provider>
