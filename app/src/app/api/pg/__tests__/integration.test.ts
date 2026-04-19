@@ -334,3 +334,124 @@ describe.skipIf(!connection)("API routes (integration)", () => {
     expect(statusBody.exists).toBe(false);
   });
 });
+
+/**
+ * Regression coverage for issue #97: when gnudash reads a real GnuCash
+ * Postgres schema (the read-only interop path), `transactions.post_date` etc.
+ * are declared as native TIMESTAMP columns, not the compact YYYYMMDDHHmmss
+ * TEXT format the engine expects. The dump route must normalise those on the
+ * way out so the engine's `substr`-based month extraction keeps working.
+ */
+describe.skipIf(!connection)("dump route: read-only interop date normalisation", () => {
+  const rawSchema = `real_gnucash_${Math.random().toString(36).slice(2, 10)}`;
+
+  function jsonRequest(url: string, body: unknown): Request {
+    return new Request(url, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(body),
+    });
+  }
+
+  async function drop(): Promise<void> {
+    const client = new Client({ ...connection! });
+    await client.connect();
+    try {
+      await client.query(`DROP SCHEMA IF EXISTS ${rawSchema} CASCADE`);
+    } finally {
+      await client.end();
+    }
+  }
+
+  beforeAll(async () => {
+    await drop();
+    const client = new Client({ ...connection! });
+    await client.connect();
+    try {
+      // A minimal slice of GnuCash's real PG schema — only the columns the
+      // dump route needs to touch, with the native timestamp types GnuCash
+      // desktop writes. Enough to prove TO_CHAR normalisation kicks in.
+      await client.query(`CREATE SCHEMA ${rawSchema}`);
+      await client.query(`
+        CREATE TABLE ${rawSchema}.transactions (
+          guid TEXT PRIMARY KEY,
+          currency_guid TEXT NOT NULL,
+          num TEXT,
+          post_date TIMESTAMP,
+          enter_date TIMESTAMP,
+          description TEXT
+        )
+      `);
+      await client.query(`
+        CREATE TABLE ${rawSchema}.prices (
+          guid TEXT PRIMARY KEY,
+          commodity_guid TEXT NOT NULL,
+          currency_guid TEXT NOT NULL,
+          date TIMESTAMP,
+          source TEXT,
+          type TEXT,
+          value_num BIGINT NOT NULL,
+          value_denom BIGINT NOT NULL DEFAULT 100
+        )
+      `);
+      // A future-dated write-off plus a current-year transaction: the exact
+      // shape of data that exposed the bug in issue #97.
+      await client.query(
+        `INSERT INTO ${rawSchema}.transactions
+           (guid, currency_guid, post_date, enter_date, description)
+         VALUES
+           ('tx-now', 'cur', TIMESTAMP '2026-04-15 10:30:00', TIMESTAMP '2026-04-15 10:30:00', 'now'),
+           ('tx-future', 'cur', TIMESTAMP '2029-02-01 00:00:00', TIMESTAMP '2029-02-01 00:00:00', 'writeoff')`,
+      );
+      await client.query(
+        `INSERT INTO ${rawSchema}.prices
+           (guid, commodity_guid, currency_guid, date, value_num, value_denom)
+         VALUES ('p1', 'stk', 'cur', TIMESTAMP '2026-04-15 00:00:00', 100, 1)`,
+      );
+    } finally {
+      await client.end();
+    }
+  });
+
+  afterAll(drop);
+
+  it("wraps TIMESTAMP columns with TO_CHAR so the client sees compact YYYYMMDDHHmmss", async () => {
+    const res = await dumpPOST(
+      jsonRequest("http://local/api/pg/book/dump", {
+        connection,
+        schema: rawSchema,
+      }),
+    );
+    expect(res.status).toBe(200);
+
+    const buf = Buffer.from(await res.arrayBuffer());
+    const decompressed = await new Response(
+      new Blob([new Uint8Array(buf)]).stream().pipeThrough(
+        new DecompressionStream("gzip"),
+      ),
+    ).arrayBuffer();
+    const payload = JSON.parse(new TextDecoder().decode(decompressed)) as {
+      tables: {
+        transactions: { guid: string; post_date: string; enter_date: string }[];
+        prices: { guid: string; date: string }[];
+      };
+    };
+
+    const txns = payload.tables.transactions;
+    const now = txns.find((t) => t.guid === "tx-now");
+    const future = txns.find((t) => t.guid === "tx-future");
+    expect(now?.post_date).toBe("20260415103000");
+    expect(now?.enter_date).toBe("20260415103000");
+    expect(future?.post_date).toBe("20290201000000");
+    expect(future?.enter_date).toBe("20290201000000");
+
+    // Prices.date must also land in compact form — it feeds `sqlMonth` too.
+    expect(payload.tables.prices[0]?.date).toBe("20260415000000");
+
+    // And the shape the chart code would see must round-trip through
+    // `substr(col, 1, 4) || '-' || substr(col, 5, 2)` to produce a valid
+    // YYYY-MM string (not "2026--0").
+    const month = `${now!.post_date.substring(0, 4)}-${now!.post_date.substring(4, 6)}`;
+    expect(month).toBe("2026-04");
+  });
+});

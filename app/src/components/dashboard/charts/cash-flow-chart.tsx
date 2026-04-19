@@ -179,7 +179,11 @@ export function CashFlowChart({ series, currency, externalPeriod, externalCustom
                     if (typeof label !== "string") return label;
                     const [y, m] = label.split("-");
                     const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-                    return `${months[parseInt(m) - 1]} ${y}`;
+                    // Fall back to the raw label if the month segment doesn't
+                    // parse (e.g. malformed YYYY-MM from upstream). Avoids
+                    // rendering "undefined YYYY" when the input is garbage.
+                    const name = months[parseInt(m) - 1];
+                    return name ? `${name} ${y}` : label;
                   }}
                   contentStyle={{
                     backgroundColor: "var(--popover)",
