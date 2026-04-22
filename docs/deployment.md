@@ -98,11 +98,10 @@ The `NEXT_OUTPUT=export` flag is required — without it the build produces the 
 
 ## 1.2 Docker (nginx — recommended)
 
-Included `Dockerfile` (repo root) does the build + nginx packaging with COOP/COEP pre-configured:
+Included `Dockerfile` (repo root) does the build + nginx packaging with COOP/COEP pre-configured. Build from the **repo root**, not `app/` — the Dockerfile pins `NEXT_OUTPUT=export` and expects the whole repo as its build context:
 
 ```bash
-# From the app/ directory
-cd app
+# From the repo root
 docker build -t gnudash .
 docker run -p 8080:80 --restart unless-stopped gnudash
 ```
@@ -117,7 +116,7 @@ Minimal compose for just the Local-mode nginx container (distinct from the `dock
 services:
   gnudash:
     build:
-      context: ./app
+      context: .
       dockerfile: Dockerfile
     ports:
       - "8080:80"
@@ -184,7 +183,7 @@ Headers come from `app/public/_headers` (same file used by Cloudflare Pages).
 Self-hosted PaaS; GnuDash deploys as a Docker container.
 
 1. New resource → **Dockerfile** build pack → point at the repo.
-2. **Dockerfile location**: `app/Dockerfile` (or `/Dockerfile` for repo-root context).
+2. **Dockerfile location**: `/Dockerfile` (repo-root context).
 3. **Exposed port**: `80`.
 4. Save and deploy.
 
@@ -219,7 +218,7 @@ Container Manager + Docker Compose, no CLI required.
    ```
 5. Copy via File Station:
    - `GnuDash/app/out/*` → `site/` inside the project folder
-   - `GnuDash/app/nginx.conf` → next to `docker-compose.yml`
+   - `GnuDash/nginx.conf` → next to `docker-compose.yml`
 6. Back to Container Manager → Project → **Start**.
 7. Open `http://YOUR-NAS-IP:8080`.
 
@@ -231,7 +230,7 @@ Container Manager + Docker Compose, no CLI required.
 ssh admin@YOUR-NAS-IP
 cd /volume1/docker
 git clone https://github.com/QuirkyTurtle94/GnuDash.git
-cd GnuDash/app
+cd GnuDash
 docker build -t gnudash .
 docker run -d -p 8080:80 --restart unless-stopped --name gnudash gnudash
 ```
