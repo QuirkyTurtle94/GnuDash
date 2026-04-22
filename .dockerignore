@@ -1,0 +1,37 @@
+# Build context for both Dockerfile (static/nginx) and Dockerfile.standalone
+# (Server/Postgres). Keep this tight — everything listed here is excluded from
+# the context Docker uploads to the daemon.
+
+# Version control
+.git
+.gitignore
+.github
+
+# Dependencies (always reinstalled inside the image)
+node_modules
+**/node_modules
+
+# Build outputs (regenerated inside the image)
+**/.next
+**/out
+**/dist
+**/test-results
+**/screenshots
+**/tsconfig.tsbuildinfo
+
+# Repo-scoped files the image never needs
+docs
+plan
+scripts
+gnucash-source
+*.md
+Design.pen
+
+# Other Docker artefacts (don't include siblings in their own context)
+docker-compose.yml
+Dockerfile.standalone
+
+# Editor / OS cruft
+.vscode
+.idea
+.DS_Store
