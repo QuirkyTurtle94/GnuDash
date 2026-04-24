@@ -74,6 +74,16 @@ export function SankeyECharts({ data, currency, bottomBarLeft }: SankeyEChartsPr
   const effectiveScale = autoScale * zoom;
   const visibleHeight = idealHeight * effectiveScale;
 
+  // The CSS `transform: scale(effectiveScale)` on the inner container shrinks
+  // every child proportionally — including SVG labels. When autoScale < 1
+  // (common at HD-ready resolutions where containerHeight < idealHeight), a
+  // 12px base label renders at effective ~6px and becomes unreadable. Compute
+  // a pre-inflated base so that after the CSS scale it lands back at ~12px.
+  // Only compensate for autoScale, not user-driven `zoom` — zoom should scale
+  // visibly, which is the whole point of it.
+  const LABEL_BASE_PX = 12;
+  const compensatedLabelFontSize = Math.ceil(LABEL_BASE_PX / autoScale);
+
   const exportImage = useCallback(
     (format: "png" | "svg") => {
       const instance = chartRef.current?.getEchartsInstance();
@@ -115,6 +125,13 @@ export function SankeyECharts({ data, currency, bottomBarLeft }: SankeyEChartsPr
     tooltip: {
       trigger: "item",
       triggerOn: "mousemove",
+      // Render the tooltip as a body-level element so the parent container's
+      // CSS `transform: scale(...)` doesn't shrink it along with the chart
+      // (issue #97 — tooltip became unreadable at HD-ready where autoScale
+      // drops below ~0.5).
+      appendToBody: true,
+      textStyle: { fontSize: 13 },
+      extraCssText: "font-size: 13px; line-height: 1.4;",
       formatter: (params: Record<string, unknown>) => {
         const d = params.data as Record<string, unknown> | undefined;
         if (!d) return "";
@@ -153,7 +170,7 @@ export function SankeyECharts({ data, currency, bottomBarLeft }: SankeyEChartsPr
           curveness: 0.5,
         },
         label: {
-          fontSize: 12,
+          fontSize: compensatedLabelFontSize,
           fontFamily: "Inter, system-ui, sans-serif",
           color: "#6F767E",
           formatter: (params: { data?: { label?: string; name?: string }; value?: number }) => {
