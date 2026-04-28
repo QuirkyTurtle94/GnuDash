@@ -229,7 +229,7 @@ export function IncomeOverview({ monthlyIncome, categoryColors, currency, linkTo
                 </p>
               </div>
               <div className="relative h-[180px] w-[180px]">
-                <ResponsiveContainer width="100%" height="100%">
+                <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={1}>
                   <PieChart>
                     <Pie
                       data={pieData}

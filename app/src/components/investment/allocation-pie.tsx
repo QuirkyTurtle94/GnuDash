@@ -104,7 +104,7 @@ export function AllocationPie({ items, currency, selectedTicker, onSelect, group
                 <p className="text-[11px] text-[#9A9FA5]">Total value</p>
               </div>
               <div className="relative h-[170px] w-[170px]">
-                <ResponsiveContainer width="100%" height="100%">
+                <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={1}>
                   <PieChart>
                     <Pie
                       data={pieData}

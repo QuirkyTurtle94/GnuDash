@@ -107,8 +107,8 @@ export function InvestmentPerformance({ investments, currency }: InvestmentPerfo
         </div>
 
         {/* Chart */}
-        <div className="h-[280px]">
-          <ResponsiveContainer width="100%" height="100%">
+        <div className="h-[280px] w-full min-w-0">
+          <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={1}>
             <BarChart data={chartData} margin={{ top: 5, right: 5, bottom: 0, left: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="var(--chart-grid)" vertical={false} />
               <XAxis

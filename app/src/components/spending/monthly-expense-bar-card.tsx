@@ -128,8 +128,8 @@ export function MonthlyExpenseBarCard({
         {barData.length === 0 ? (
           <p className="py-8 text-center text-sm text-[#9A9FA5]">No data for this period</p>
         ) : (
-          <div className="h-[260px]">
-            <ResponsiveContainer width="100%" height="100%">
+          <div className="h-[260px] w-full min-w-0">
+            <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={1}>
               <BarChart data={barData} margin={{ top: 4, right: 4, bottom: 0, left: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#EFEFEF" vertical={false} />
                 <XAxis

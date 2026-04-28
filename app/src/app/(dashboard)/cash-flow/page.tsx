@@ -250,8 +250,8 @@ function CashFlowBarChart({ filters }: { filters: SankeyFilterState }) {
         </div>
 
         {chartData.length > 1 ? (
-          <div className="h-[220px]">
-            <ResponsiveContainer width="100%" height="100%">
+          <div className="h-[220px] w-full min-w-0">
+            <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={1}>
               <ComposedChart data={chartData} margin={{ top: 5, right: 5, bottom: 0, left: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#EFEFEF" vertical={false} />
                 <XAxis

@@ -1,4 +1,5 @@
 import type { NextConfig } from "next";
+import path from "path";
 
 // Default build target is the standalone Node.js server, which the Postgres
 // backend (issue #48) needs for its API routes. Set `NEXT_OUTPUT=export` at
@@ -25,6 +26,14 @@ const nextConfig: NextConfig = {
   // "Too many open files" with Turbopack, increase your OS file descriptor
   // limit instead (see docs/deployment.md).
   webpack: (config) => {
+    // Ensure module resolution always includes this app's dependencies,
+    // even when tooling is started from the repository root.
+    config.resolve = config.resolve ?? {};
+    config.resolve.modules = [
+      ...(config.resolve.modules ?? []),
+      path.resolve(__dirname, "node_modules"),
+    ];
+
     config.watchOptions = {
       ...config.watchOptions,
       ignored: ["**/__tests__/**", "**/__snapshots__/**", "**/fixtures/**"],
