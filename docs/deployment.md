@@ -96,6 +96,8 @@ NEXT_OUTPUT=export npm run build
 
 The `NEXT_OUTPUT=export` flag is required — without it the build produces the standalone Node.js bundle for the Server version, which static hosts can't serve. The build wrapper (`scripts/next-build.mjs`) also hides the Server tab from the upload screen in this mode so users don't hit a tab whose Connect button would 404.
 
+**Bundler:** the wrapper passes `--webpack` to `next build` by default. Next.js 16's Turbopack builder panics inside container builds (PostCSS worker IPC times out at 30s, most reliably under rootless Podman / fuse-overlayfs and arm64). To opt back in to Turbopack on a host where it works, set `NEXT_BUILDER=turbopack npm run build`.
+
 ## 1.2 Docker (nginx — recommended)
 
 Included `Dockerfile` (repo root) does the build + nginx packaging with COOP/COEP pre-configured. Build from the **repo root**, not `app/` — the Dockerfile pins `NEXT_OUTPUT=export` and expects the whole repo as its build context:
