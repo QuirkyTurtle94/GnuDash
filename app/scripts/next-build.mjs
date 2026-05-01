@@ -65,9 +65,21 @@ process.on("SIGTERM", () => {
   process.exit(143);
 });
 
+// Bundler selection: Next.js 16 defaults `next build` to Turbopack, but it
+// panics inside containerised builds (issue #103) — the PostCSS worker spawns
+// a child Node process and times out at the hard-coded 30s connect deadline,
+// most reliably under rootless Podman / fuse-overlayfs and arm64 emulation.
+// Webpack does not have that worker model and finishes cleanly. Default to
+// webpack so `docker build` / `podman build` work out of the box; let power
+// users who want Turbopack's speed opt back in with NEXT_BUILDER=turbopack.
+const buildArgs = ["build"];
+if (process.env.NEXT_BUILDER !== "turbopack") {
+  buildArgs.push("--webpack");
+}
+
 // Invoke next via the local bin. `shell: true` on Windows picks the right
 // extension (.cmd vs .ps1); Unix shells resolve `next` via PATH already.
-const child = spawn("next", ["build"], {
+const child = spawn("next", buildArgs, {
   stdio: "inherit",
   shell: platform() === "win32",
 });
