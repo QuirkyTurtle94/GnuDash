@@ -1,4 +1,5 @@
 import type { PreparedQuery } from "../../db/adapter";
+import { coerceBigInts } from "../../db/bigint-coerce";
 import type { WritableDbAdapter, RunResult } from "./writable-adapter";
 
 /**
@@ -52,11 +53,14 @@ export function createWritableWasmAdapter(
       return {
         all(...params: unknown[]): unknown[] {
           const bind = params.length > 0 ? (params as unknown[]) : undefined;
-          return db.selectObjects(sql, bind);
+          return db
+            .selectObjects(sql, bind)
+            .map((row) => coerceBigInts(row as Record<string, unknown>));
         },
         get(...params: unknown[]): unknown | undefined {
           const bind = params.length > 0 ? (params as unknown[]) : undefined;
-          return db.selectObject(sql, bind);
+          const row = db.selectObject(sql, bind);
+          return row ? coerceBigInts(row as Record<string, unknown>) : undefined;
         },
       };
     },

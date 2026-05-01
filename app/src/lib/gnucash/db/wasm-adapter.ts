@@ -4,15 +4,7 @@
  */
 import type { Database as WasmDatabase, BindingSpec } from "@sqlite.org/sqlite-wasm";
 import type { DbAdapter, PreparedQuery } from "./adapter";
-
-function coerceBigInts(obj: Record<string, unknown>): Record<string, unknown> {
-  for (const key in obj) {
-    if (typeof obj[key] === "bigint") {
-      obj[key] = Number(obj[key]);
-    }
-  }
-  return obj;
-}
+import { coerceBigInts } from "./bigint-coerce";
 
 export function createWasmAdapter(db: WasmDatabase): DbAdapter {
   return {
