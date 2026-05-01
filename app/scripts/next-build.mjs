@@ -10,9 +10,23 @@
  * using the same `NEXT_OUTPUT=export npm run build` command from PR 1 / the
  * deployment guide without having to know about this script.
  */
-import { existsSync, renameSync } from "node:fs";
+import { existsSync, renameSync, cpSync, rmSync } from "node:fs";
 import { spawn } from "node:child_process";
 import { platform } from "node:os";
+
+// Docker overlayfs returns EXDEV when renaming a path that lives in a lower
+// (read-only) layer to a destination that has to be created in the upper
+// layer — see issue #101. Fall back to copy-then-remove on EXDEV; keep the
+// atomic rename on host filesystems where it works.
+const moveDir = (src, dest) => {
+  try {
+    renameSync(src, dest);
+  } catch (err) {
+    if (err.code !== "EXDEV") throw err;
+    cpSync(src, dest, { recursive: true });
+    rmSync(src, { recursive: true, force: true });
+  }
+};
 
 // Park OUTSIDE src/app/ — Next scans every descendant for route handlers
 // regardless of folder name, so hiding under src/app/ is not enough.
@@ -28,13 +42,13 @@ process.env.NEXT_PUBLIC_HAS_SERVER_BACKEND = shouldPark ? "false" : "true";
 
 let parked = false;
 if (shouldPark && existsSync(API_DIR)) {
-  renameSync(API_DIR, PARKED_DIR);
+  moveDir(API_DIR, PARKED_DIR);
   parked = true;
 }
 
 const restore = () => {
   if (parked && existsSync(PARKED_DIR)) {
-    renameSync(PARKED_DIR, API_DIR);
+    moveDir(PARKED_DIR, API_DIR);
     parked = false;
   }
 };

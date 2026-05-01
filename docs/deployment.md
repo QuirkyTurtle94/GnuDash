@@ -108,6 +108,8 @@ docker run -p 8080:80 --restart unless-stopped gnudash
 
 Open [http://localhost:8080](http://localhost:8080). Change `-p 8080:80` to remap the host port; `80` inside the container is fixed.
 
+**Podman / Buildah / Kaniko:** drop-in. Substitute `podman build .` / `podman run …` for the docker commands above; the same `Dockerfile` is used. The build script tolerates overlay filesystems that return `EXDEV` on cross-layer renames (common under rootless Podman with `fuse-overlayfs`), so no extra flags are needed.
+
 ### Docker Compose
 
 Minimal compose for just the Local-mode nginx container (distinct from the `docker-compose.yml` at the repo root, which is for Server mode):
