@@ -223,6 +223,16 @@ function CashFlowBarChart({ filters }: { filters: SankeyFilterState }) {
 
   const currency = data.currency;
   const totalNet = chartData.reduce((s, d) => s + d.net, 0);
+  const totalInflow = chartData.reduce((s, d) => s + d.inflow, 0);
+  const totalSavingsRate = (() => {
+    const months = chartData.map((d) => d.month).sort();
+    const firstMonth = months[0];
+    const lastMonth = months[months.length - 1];
+    const nwEnd = netWorthMap.get(lastMonth);
+    const nwStart = netWorthMap.get(prevCalMonth(firstMonth));
+    if (totalInflow <= 0 || nwEnd === undefined || nwStart === undefined) return null;
+    return Math.max(-100, Math.min(100, ((nwEnd - nwStart) / totalInflow) * 100));
+  })();
 
   return (
     <Card className="shadow-sm border-[#EFEFEF]">
