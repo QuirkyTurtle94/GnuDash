@@ -207,13 +207,17 @@ function CashFlowBarChart({ filters }: { filters: SankeyFilterState }) {
     }
     return [...monthMap.entries()]
       .sort(([a], [b]) => a.localeCompare(b))
-      .map(([month, { inflow, outflow }]) => ({
-        month,
-        inflow,
-        outflow,
-        net: inflow - outflow,
-      }));
-  }, [activeInflow, activeOutflow, validMonths]);
+      .map(([month, { inflow, outflow }]) => {
+        const prevMonth = prevCalMonth(month);
+        const nw = netWorthMap.get(month);
+        const nwPrev = netWorthMap.get(prevMonth);
+        const savingsRate =
+          inflow > 0 && nw !== undefined && nwPrev !== undefined
+            ? Math.max(-100, Math.min(100, ((nw - nwPrev) / inflow) * 100))
+            : null;
+        return { month, inflow, outflow, net: inflow - outflow, savingsRate };
+      });
+  }, [activeInflow, activeOutflow, validMonths, netWorthMap]);
 
   if (!data || chartData.length === 0) return null;
 
