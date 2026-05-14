@@ -287,7 +287,7 @@ function CashFlowBarChart({ filters }: { filters: SankeyFilterState }) {
         </div>
 
         {chartData.length > 1 ? (
-          <div className="h-[220px] w-full min-w-0">
+          <div className="h-55 w-full min-w-0">
             <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={1}>
               <ComposedChart data={chartData} margin={{ top: 5, right: 5, bottom: 0, left: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#EFEFEF" vertical={false} />
@@ -299,17 +299,31 @@ function CashFlowBarChart({ filters }: { filters: SankeyFilterState }) {
                   tickLine={false}
                 />
                 <YAxis
+                  yAxisId="amount"
                   tickFormatter={(v) => formatCurrencyShort(v, currency)}
                   tick={{ fontSize: 11, fill: "#9A9FA5" }}
                   axisLine={false}
                   tickLine={false}
                   width={50}
                 />
+                <YAxis
+                  yAxisId="rate"
+                  orientation="right"
+                  domain={[-100, 100]}
+                  tickFormatter={(v: number) => `${v.toFixed(0)}%`}
+                  tick={{ fontSize: 11, fill: "#9A9FA5" }}
+                  axisLine={false}
+                  tickLine={false}
+                  width={36}
+                />
                 <Tooltip
-                  formatter={(value, name) => [
-                    formatCurrency(Number(value), currency),
-                    String(name).charAt(0).toUpperCase() + String(name).slice(1),
-                  ]}
+                  formatter={(value, name) => {
+                    if (name === "savingsRate") return [`${Number(value).toFixed(1)}%`, "Savings rate"];
+                    return [
+                      formatCurrency(Number(value), currency),
+                      String(name).charAt(0).toUpperCase() + String(name).slice(1),
+                    ];
+                  }}
                   labelFormatter={(label) => {
                     if (typeof label !== "string") return label;
                     const [y, m] = label.split("-");
@@ -323,9 +337,10 @@ function CashFlowBarChart({ filters }: { filters: SankeyFilterState }) {
                     fontSize: "13px",
                   }}
                 />
-                <Bar dataKey="inflow" fill="#3B6B8A" radius={[3, 3, 0, 0]} barSize={14} />
-                <Bar dataKey="outflow" fill="#F87171" radius={[3, 3, 0, 0]} barSize={14} />
-                <Line type="monotone" dataKey="net" stroke="#1A1D1F" strokeWidth={2} strokeDasharray="6 4" dot={false} />
+                <Bar yAxisId="amount" dataKey="inflow" fill="#3B6B8A" radius={[3, 3, 0, 0]} barSize={14} />
+                <Bar yAxisId="amount" dataKey="outflow" fill="#F87171" radius={[3, 3, 0, 0]} barSize={14} />
+                <Line yAxisId="amount" type="monotone" dataKey="net" stroke="#1A1D1F" strokeWidth={2} strokeDasharray="6 4" dot={false} />
+                <Line yAxisId="rate" type="monotone" dataKey="savingsRate" stroke="#6C9B8B" strokeWidth={2} dot={false} connectNulls />
               </ComposedChart>
             </ResponsiveContainer>
           </div>
