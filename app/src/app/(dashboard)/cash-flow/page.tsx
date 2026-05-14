@@ -280,6 +280,10 @@ function CashFlowBarChart({ filters }: { filters: SankeyFilterState }) {
             <div className="h-0.5 w-4 border-t-2 border-dashed border-[#1A1D1F]" />
             <span className="text-xs text-[#6F767E]">Net</span>
           </div>
+          <div className="flex items-center gap-1.5">
+            <div className="h-0.5 w-4 border-t-2 border-solid border-[#6C9B8B]" />
+            <span className="text-xs text-[#6F767E]">Savings rate</span>
+          </div>
         </div>
 
         {chartData.length > 1 ? (
