@@ -184,6 +184,12 @@ function CashFlowBarChart({ filters }: { filters: SankeyFilterState }) {
     [activeCashFlow, period, customRange],
   );
 
+  const netWorthMap = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const row of data?.netWorthSeries ?? []) map.set(row.month, row.netWorth);
+    return map;
+  }, [data]);
+
   const chartData = useMemo(() => {
     // Aggregate inflow/outflow by month
     const monthMap = new Map<string, { inflow: number; outflow: number }>();
