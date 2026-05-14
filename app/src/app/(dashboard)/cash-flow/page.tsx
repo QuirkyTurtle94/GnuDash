@@ -237,12 +237,9 @@ function CashFlowBarChart({ filters }: { filters: SankeyFilterState }) {
   return (
     <Card className="shadow-sm border-[#EFEFEF]">
       <CardHeader className="flex flex-row items-center justify-between pb-2">
-        <div>
-          <CardTitle className="text-lg font-semibold text-[#1A1D1F]">
-            Monthly Cash Flow
-          </CardTitle>
-          <p className="text-xs text-[#9A9FA5]">Net cash flow</p>
-        </div>
+        <CardTitle className="text-lg font-semibold text-[#1A1D1F]">
+          Monthly Cash Flow
+        </CardTitle>
         <PeriodSelector
           period={period}
           labels={SANKEY_PERIOD_LABELS}
