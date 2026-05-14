@@ -250,19 +250,22 @@ function CashFlowBarChart({ filters }: { filters: SankeyFilterState }) {
         />
       </CardHeader>
       <CardContent>
-        <div className="mb-1 flex items-baseline gap-3">
-          <span className="text-3xl font-bold tracking-tight text-[#1A1D1F]" data-v>
-            {formatCurrency(totalNet, currency)}
-          </span>
-          {totalSavingsRate !== null && (
-            <span className={`text-lg font-semibold ${totalSavingsRate >= 0 ? "text-[#6C9B8B]" : "text-[#F87171]"}`}>
-              {totalSavingsRate >= 0 ? "+" : ""}{totalSavingsRate.toFixed(1)}%
+        <div className="mb-4 flex gap-8">
+          <div>
+            <p className="text-xs text-[#9A9FA5]">Net cash flow</p>
+            <span className="text-3xl font-bold tracking-tight text-[#1A1D1F]" data-v>
+              {formatCurrency(totalNet, currency)}
             </span>
+          </div>
+          {totalSavingsRate !== null && (
+            <div>
+              <p className="text-xs text-[#9A9FA5]">Savings rate</p>
+              <span className={`text-3xl font-bold tracking-tight ${totalSavingsRate >= 0 ? "text-[#6C9B8B]" : "text-[#F87171]"}`} data-v>
+                {totalSavingsRate >= 0 ? "+" : ""}{totalSavingsRate.toFixed(1)}%
+              </span>
+            </div>
           )}
         </div>
-        {totalSavingsRate !== null && (
-          <p className="mb-1 text-xs text-[#9A9FA5]">savings rate</p>
-        )}
 
         <div className="mb-4 flex items-center gap-5">
           <div className="flex items-center gap-1.5">
