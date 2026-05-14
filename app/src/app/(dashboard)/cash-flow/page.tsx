@@ -184,55 +184,52 @@ function CashFlowBarChart({ filters }: { filters: SankeyFilterState }) {
     [activeCashFlow, period, customRange],
   );
 
-  const netWorthMap = useMemo(() => {
-    const map = new Map<string, number>();
-    for (const row of data?.netWorthSeries ?? []) map.set(row.month, row.netWorth);
+  // Outflows to asset/investment accounts are savings, not spending
+  const topLevelTypeMap = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const acc of data?.accounts ?? []) map.set(acc.name, acc.type);
     return map;
   }, [data]);
 
+  const SAVINGS_TYPES = new Set(["ASSET", "STOCK", "MUTUAL"]);
+
   const chartData = useMemo(() => {
-    // Aggregate inflow/outflow by month
-    const monthMap = new Map<string, { inflow: number; outflow: number }>();
+    const monthMap = new Map<string, { inflow: number; outflow: number; spendingOutflow: number }>();
     for (const row of activeInflow) {
       if (!validMonths.has(row.month)) continue;
-      const entry = monthMap.get(row.month) ?? { inflow: 0, outflow: 0 };
+      const entry = monthMap.get(row.month) ?? { inflow: 0, outflow: 0, spendingOutflow: 0 };
       entry.inflow += row.amount;
       monthMap.set(row.month, entry);
     }
     for (const row of activeOutflow) {
       if (!validMonths.has(row.month)) continue;
-      const entry = monthMap.get(row.month) ?? { inflow: 0, outflow: 0 };
+      const entry = monthMap.get(row.month) ?? { inflow: 0, outflow: 0, spendingOutflow: 0 };
       entry.outflow += row.amount;
+      if (!SAVINGS_TYPES.has(topLevelTypeMap.get(row.pathParts[0]) ?? ""))
+        entry.spendingOutflow += row.amount;
       monthMap.set(row.month, entry);
     }
     return [...monthMap.entries()]
       .sort(([a], [b]) => a.localeCompare(b))
-      .map(([month, { inflow, outflow }]) => {
-        const prevMonth = prevCalMonth(month);
-        const nw = netWorthMap.get(month);
-        const nwPrev = netWorthMap.get(prevMonth);
-        const savingsRate =
-          inflow > 0 && nw !== undefined && nwPrev !== undefined
-            ? Math.max(-100, Math.min(100, ((nw - nwPrev) / inflow) * 100))
-            : null;
-        return { month, inflow, outflow, net: inflow - outflow, savingsRate };
-      });
-  }, [activeInflow, activeOutflow, validMonths, netWorthMap]);
+      .map(([month, { inflow, outflow, spendingOutflow }]) => ({
+        month,
+        inflow,
+        outflow,
+        spendingOutflow,
+        net: inflow - outflow,
+        savingsRate: inflow > 0 ? Math.max(-100, Math.min(100, ((inflow - spendingOutflow) / inflow) * 100)) : null,
+      }));
+  }, [activeInflow, activeOutflow, validMonths, topLevelTypeMap]);
 
   if (!data || chartData.length === 0) return null;
 
   const currency = data.currency;
   const totalNet = chartData.reduce((s, d) => s + d.net, 0);
   const totalInflow = chartData.reduce((s, d) => s + d.inflow, 0);
-  const totalSavingsRate = (() => {
-    const months = chartData.map((d) => d.month).sort();
-    const firstMonth = months[0];
-    const lastMonth = months[months.length - 1];
-    const nwEnd = netWorthMap.get(lastMonth);
-    const nwStart = netWorthMap.get(prevCalMonth(firstMonth));
-    if (totalInflow <= 0 || nwEnd === undefined || nwStart === undefined) return null;
-    return Math.max(-100, Math.min(100, ((nwEnd - nwStart) / totalInflow) * 100));
-  })();
+  const totalSpendingOutflow = chartData.reduce((s, d) => s + d.spendingOutflow, 0);
+  const totalSavingsRate = totalInflow > 0
+    ? Math.max(-100, Math.min(100, ((totalInflow - totalSpendingOutflow) / totalInflow) * 100))
+    : null;
 
   return (
     <Card className="shadow-sm border-[#EFEFEF]">
