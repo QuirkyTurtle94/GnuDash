@@ -364,6 +364,14 @@ function CashFlowBarChart({ filters }: { filters: SankeyFilterState }) {
                 {formatCurrency(chartData[0]?.net ?? 0, currency)}
               </p>
             </div>
+            {totalSavingsRate !== null && (
+              <div className="flex-1 rounded-xl bg-[#F4F5F7] p-4">
+                <p className="text-xs text-[#9A9FA5]">Savings rate</p>
+                <p className={`mt-1 text-xl font-bold ${totalSavingsRate >= 0 ? "text-[#6C9B8B]" : "text-[#F87171]"}`} data-v>
+                  {totalSavingsRate >= 0 ? "+" : ""}{totalSavingsRate.toFixed(1)}%
+                </p>
+              </div>
+            )}
           </div>
         )}
       </CardContent>
