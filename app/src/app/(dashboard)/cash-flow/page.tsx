@@ -151,6 +151,11 @@ function CashFlowSankeySection({ filters }: { filters: SankeyFilterState }) {
 
 // ── Monthly Cash Flow Bar Chart ─────────────────────────────────────
 
+function prevCalMonth(month: string): string {
+  const [y, m] = month.split("-").map(Number);
+  return m === 1 ? `${y - 1}-12` : `${y}-${String(m - 1).padStart(2, "0")}`;
+}
+
 function formatMonthLabel(month: string): string {
   const [year, m] = month.split("-");
   const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
