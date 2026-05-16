@@ -26,9 +26,21 @@ import {
   buildSankeyData,
   toEChartsFormat,
   getTopLevelCategories,
+  getMonthsForPeriod,
   SANKEY_PERIOD_LABELS,
   type SankeyPeriod,
 } from "@/lib/sankey-utils";
+import { formatCurrency, formatCurrencyShort } from "@/lib/format";
+import {
+  ComposedChart,
+  Bar,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+} from "recharts";
 
 const SankeyECharts = dynamic(
   () => import("@/components/sankey/sankey-echarts").then((m) => ({ default: m.SankeyECharts })),
@@ -366,12 +378,20 @@ function BudgetPanelInner({
 
 // ── Sankey section ──────────────────────────────────────────────────
 
-function SankeySection() {
+function SankeySection({
+  period,
+  setPeriod,
+  customRange,
+  setCustomRange,
+}: {
+  period: SankeyPeriod;
+  setPeriod: (p: SankeyPeriod) => void;
+  customRange: CustomRange | null;
+  setCustomRange: (r: CustomRange) => void;
+}) {
   const { data } = useDashboard();
   const { excludeClosing } = useClosing();
 
-  const [period, setPeriod] = useState<SankeyPeriod>("last-6m");
-  const [customRange, setCustomRange] = useState<CustomRange | null>(null);
   const [depth, setDepth] = useState(1);
 
   const activeIncome = excludeClosing && data?.monthlyIncomeByCategoryExcludingClosing
@@ -463,6 +483,232 @@ function SankeySection() {
             currency={data.currency}
             bottomBarLeft={<DepthSlider depth={depth} onChange={setDepth} />}
           />
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+// ── Monthly Income / Expense bar chart ──────────────────────────────
+
+function formatMonthLabel(month: string): string {
+  const [year, m] = month.split("-");
+  const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  return `${months[parseInt(m) - 1] ?? m} '${year.slice(2)}`;
+}
+
+// Bar chart of monthly INCOME vs EXPENSE totals (true account-type categories,
+// not cash flow), plus a savings rate line on a right-hand axis. Shares the
+// period/customRange state with the Sankey so the two controls stay in sync.
+function IncomeExpenseBarChart({
+  period,
+  setPeriod,
+  customRange,
+  setCustomRange,
+}: {
+  period: SankeyPeriod;
+  setPeriod: (p: SankeyPeriod) => void;
+  customRange: CustomRange | null;
+  setCustomRange: (r: CustomRange) => void;
+}) {
+  const { data } = useDashboard();
+  const { excludeClosing } = useClosing();
+
+  const activeIncome = excludeClosing && data?.monthlyIncomeByCategoryExcludingClosing
+    ? data.monthlyIncomeByCategoryExcludingClosing : data?.monthlyIncomeByCategory ?? [];
+  const activeExpenses = excludeClosing && data?.monthlyExpensesByCategoryExcludingClosing
+    ? data.monthlyExpensesByCategoryExcludingClosing : data?.monthlyExpensesByCategory ?? [];
+  const activeCashFlow = excludeClosing && data?.cashFlowSeriesExcludingClosing
+    ? data.cashFlowSeriesExcludingClosing : data?.cashFlowSeries ?? [];
+
+  const dataRange = useMemo(
+    () => getDataRange(activeCashFlow) ?? { min: "2020-01", max: "2026-01" },
+    [activeCashFlow],
+  );
+
+  const validMonths = useMemo(
+    () => getMonthsForPeriod(activeCashFlow, period, customRange ?? undefined),
+    [activeCashFlow, period, customRange],
+  );
+
+  const chartData = useMemo(() => {
+    const monthMap = new Map<string, { income: number; expense: number }>();
+    for (const row of activeIncome) {
+      if (!validMonths.has(row.month)) continue;
+      const entry = monthMap.get(row.month) ?? { income: 0, expense: 0 };
+      entry.income += row.amount;
+      monthMap.set(row.month, entry);
+    }
+    for (const row of activeExpenses) {
+      if (!validMonths.has(row.month)) continue;
+      const entry = monthMap.get(row.month) ?? { income: 0, expense: 0 };
+      entry.expense += row.amount;
+      monthMap.set(row.month, entry);
+    }
+    return [...monthMap.entries()]
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([month, { income, expense }]) => ({
+        month,
+        income,
+        expense,
+        net: income - expense,
+        // Savings rate is null when income is zero — denominator undefined.
+        // No clamp: a month spending 3x income shows the real -200%.
+        savingsRate: income > 0 ? ((income - expense) / income) * 100 : null,
+      }));
+  }, [activeIncome, activeExpenses, validMonths]);
+
+  if (!data || chartData.length === 0) return null;
+
+  const currency = data.currency;
+  const totalIncome = chartData.reduce((s, d) => s + d.income, 0);
+  const totalExpense = chartData.reduce((s, d) => s + d.expense, 0);
+  const totalNet = totalIncome - totalExpense;
+  // Period rate is recomputed from totals, not averaged from monthly rates,
+  // so a small-income month can't disproportionately drag the headline.
+  const totalSavingsRate = totalIncome > 0 ? ((totalIncome - totalExpense) / totalIncome) * 100 : null;
+
+  const netColor = totalNet >= 0 ? "#6C9B8B" : "#F87171";
+  const rateColor = totalSavingsRate !== null && totalSavingsRate >= 0 ? "#6C9B8B" : "#F87171";
+
+  return (
+    <Card className="shadow-sm border-[#EFEFEF]">
+      <CardHeader className="flex flex-row items-center justify-between pb-2">
+        <CardTitle className="text-lg font-semibold text-[#1A1D1F]">
+          Monthly Income vs Expense
+        </CardTitle>
+        <PeriodSelector
+          period={period}
+          labels={SANKEY_PERIOD_LABELS}
+          onChange={setPeriod}
+          customRange={customRange}
+          onCustomRangeChange={setCustomRange}
+          dataRange={dataRange}
+        />
+      </CardHeader>
+      <CardContent>
+        <div className="mb-4 flex gap-8">
+          <div>
+            <p className="text-xs text-[#9A9FA5]">Net</p>
+            <span className={`text-3xl font-bold tracking-tight`} style={{ color: netColor }} data-v>
+              {formatCurrency(totalNet, currency)}
+            </span>
+          </div>
+          {totalSavingsRate !== null && (
+            <div>
+              <p className="text-xs text-[#9A9FA5]">Savings rate</p>
+              <span className="text-3xl font-bold tracking-tight" style={{ color: rateColor }} data-v>
+                {totalSavingsRate >= 0 ? "+" : ""}{totalSavingsRate.toFixed(1)}%
+              </span>
+            </div>
+          )}
+        </div>
+
+        <div className="mb-4 flex items-center gap-5">
+          <div className="flex items-center gap-1.5">
+            <div className="h-2.5 w-2.5 rounded-sm bg-[#3B6B8A]" />
+            <span className="text-xs text-[#6F767E]">Income</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <div className="h-2.5 w-2.5 rounded-sm bg-[#F87171]" />
+            <span className="text-xs text-[#6F767E]">Expense</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <div className="h-0.5 w-4 border-t-2 border-dashed border-[#1A1D1F]" />
+            <span className="text-xs text-[#6F767E]">Net</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <div className="h-0.5 w-4 border-t-2 border-solid" style={{ borderColor: rateColor }} />
+            <span className="text-xs text-[#6F767E]">Savings rate</span>
+          </div>
+        </div>
+
+        {chartData.length > 1 ? (
+          <div className="h-[220px]">
+            <ResponsiveContainer width="100%" height="100%">
+              <ComposedChart data={chartData} margin={{ top: 5, right: 5, bottom: 0, left: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#EFEFEF" vertical={false} />
+                <XAxis
+                  dataKey="month"
+                  tickFormatter={formatMonthLabel}
+                  tick={{ fontSize: 11, fill: "#9A9FA5" }}
+                  axisLine={false}
+                  tickLine={false}
+                />
+                <YAxis
+                  yAxisId="amount"
+                  tickFormatter={(v) => formatCurrencyShort(v, currency)}
+                  tick={{ fontSize: 11, fill: "#9A9FA5" }}
+                  axisLine={false}
+                  tickLine={false}
+                  width={50}
+                />
+                <YAxis
+                  yAxisId="rate"
+                  orientation="right"
+                  tickFormatter={(v: number) => `${v.toFixed(0)}%`}
+                  tick={{ fontSize: 11, fill: "#9A9FA5" }}
+                  axisLine={false}
+                  tickLine={false}
+                  width={42}
+                />
+                <Tooltip
+                  formatter={(value, name) => {
+                    if (name === "savingsRate") return [`${Number(value).toFixed(1)}%`, "Savings rate"];
+                    return [
+                      formatCurrency(Number(value), currency),
+                      String(name).charAt(0).toUpperCase() + String(name).slice(1),
+                    ];
+                  }}
+                  labelFormatter={(label) => {
+                    if (typeof label !== "string") return label;
+                    const [y, m] = label.split("-");
+                    const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+                    return `${months[parseInt(m) - 1]} ${y}`;
+                  }}
+                  contentStyle={{
+                    backgroundColor: "white",
+                    border: "1px solid #EFEFEF",
+                    borderRadius: "10px",
+                    fontSize: "13px",
+                  }}
+                />
+                <Bar yAxisId="amount" dataKey="income" fill="#3B6B8A" radius={[3, 3, 0, 0]} barSize={14} />
+                <Bar yAxisId="amount" dataKey="expense" fill="#F87171" radius={[3, 3, 0, 0]} barSize={14} />
+                <Line yAxisId="amount" type="monotone" dataKey="net" stroke="#1A1D1F" strokeWidth={2} strokeDasharray="6 4" dot={false} />
+                <Line yAxisId="rate" type="monotone" dataKey="savingsRate" stroke={rateColor} strokeWidth={2} dot={false} connectNulls />
+              </ComposedChart>
+            </ResponsiveContainer>
+          </div>
+        ) : (
+          <div className="flex gap-4 pt-2">
+            <div className="flex-1 rounded-xl bg-[#F4F5F7] p-4">
+              <p className="text-xs text-[#9A9FA5]">Income</p>
+              <p className="mt-1 text-xl font-bold text-[#3B6B8A]" data-v>
+                {formatCurrency(chartData[0]?.income ?? 0, currency)}
+              </p>
+            </div>
+            <div className="flex-1 rounded-xl bg-[#F4F5F7] p-4">
+              <p className="text-xs text-[#9A9FA5]">Expense</p>
+              <p className="mt-1 text-xl font-bold text-[#F87171]" data-v>
+                {formatCurrency(chartData[0]?.expense ?? 0, currency)}
+              </p>
+            </div>
+            <div className="flex-1 rounded-xl bg-[#F4F5F7] p-4">
+              <p className="text-xs text-[#9A9FA5]">Net</p>
+              <p className="mt-1 text-xl font-bold" style={{ color: netColor }} data-v>
+                {formatCurrency(chartData[0]?.net ?? 0, currency)}
+              </p>
+            </div>
+            {totalSavingsRate !== null && (
+              <div className="flex-1 rounded-xl bg-[#F4F5F7] p-4">
+                <p className="text-xs text-[#9A9FA5]">Savings rate</p>
+                <p className="mt-1 text-xl font-bold" style={{ color: rateColor }} data-v>
+                  {totalSavingsRate >= 0 ? "+" : ""}{totalSavingsRate.toFixed(1)}%
+                </p>
+              </div>
+            )}
+          </div>
         )}
       </CardContent>
     </Card>
@@ -637,6 +883,13 @@ function IncomeExpensesContent() {
   const [period, setPeriod] = useState<TimePeriod>("last-12m");
   const [customRange, setCustomRange] = useState<CustomRange | null>(null);
 
+  // Shared between the new IncomeExpenseBarChart and the Sankey at the top
+  // of the page — both period selectors are bound to this state so they stay
+  // in sync. Separate from the page-wide `period` (TimePeriod) above, which
+  // drives the lower side-column / transactions sections.
+  const [topPeriod, setTopPeriod] = useState<SankeyPeriod>("last-6m");
+  const [topCustomRange, setTopCustomRange] = useState<CustomRange | null>(null);
+
   // Lifted selection state so pie charts and transaction table share it
   const [incomeCategory, setIncomeCategory] = useState<string | null>(null);
   const [incomeMonth, setIncomeMonth] = useState<string | null>(null);
@@ -669,8 +922,22 @@ function IncomeExpensesContent() {
 
   return (
     <div className="flex flex-col gap-4 sm:gap-6">
-      {/* Sankey diagram at top */}
-      <SankeySection />
+      {/* Monthly income vs expense (with savings rate) — sits above the Sankey
+          and shares its period selector. */}
+      <IncomeExpenseBarChart
+        period={topPeriod}
+        setPeriod={setTopPeriod}
+        customRange={topCustomRange}
+        setCustomRange={setTopCustomRange}
+      />
+
+      {/* Sankey diagram — shares period state with the chart above. */}
+      <SankeySection
+        period={topPeriod}
+        setPeriod={setTopPeriod}
+        customRange={topCustomRange}
+        setCustomRange={setTopCustomRange}
+      />
 
       {/* Page header with shared period selector */}
       <div className="flex items-center justify-between gap-3">
