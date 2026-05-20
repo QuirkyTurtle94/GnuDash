@@ -56,6 +56,8 @@
   --chart-grid: #EFEFEF;
   --chart-axis-tick: #9A9FA5;
   --chart-axis-line: rgba(26, 29, 31, 0.3);
+  --chart-net-line: #1A1D1F;
+  --chart-cost-basis: #D4DAE0;
   --card: oklch(1 0 0);
   --card-foreground: oklch(0.145 0 0);
   --popover: oklch(1 0 0);
@@ -94,6 +96,8 @@
   --chart-grid: rgba(255, 255, 255, 0.08);
   --chart-axis-tick: rgba(255, 255, 255, 0.55);
   --chart-axis-line: rgba(255, 255, 255, 0.4);
+  --chart-net-line: rgba(255, 255, 255, 0.78);
+  --chart-cost-basis: rgba(255, 255, 255, 0.3);
   --card: oklch(0.205 0 0);
   --card-foreground: oklch(0.985 0 0);
   --popover: oklch(0.205 0 0);
@@ -146,6 +150,7 @@
 .dark .hover\:bg-\[\#F4F5F7\]:hover                                  { background-color: var(--muted); }
 .dark .bg-\[\#F9FAFB\]                                               { background-color: var(--muted); }
 .dark .hover\:bg-\[\#F9FAFB\]:hover                                  { background-color: var(--muted); }
+.dark .bg-\[\#FAFBFC\]                                               { background-color: color-mix(in oklch, var(--muted), white 4%); }
 .dark .bg-\[\#EFEFEF\]                                               { background-color: var(--muted); }
 .dark .hover\:bg-\[\#EFEFEF\]:hover                                  { background-color: color-mix(in oklch, var(--muted), white 10%); }
 .dark .bg-\[\#EBF5EC\]                                               { background-color: color-mix(in oklch, var(--muted), #6C9B8B 12%); }
@@ -160,6 +165,7 @@
 
 /* Neutral borders */
 .dark .border-\[\#EFEFEF\]                                           { border-color: var(--border); }
+.dark .border-\[\#1A1D1F\]                                           { border-color: var(--chart-net-line); }
 .dark .border-\[\#D4DAE0\]                                           { border-color: var(--border); }
 .dark .border-\[\#D1D5DB\]                                           { border-color: var(--border); }
 

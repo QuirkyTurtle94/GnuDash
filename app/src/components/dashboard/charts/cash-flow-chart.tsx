@@ -146,7 +146,7 @@ export function CashFlowChart({ series, currency, externalPeriod, externalCustom
             <span className="text-xs text-[#6F767E]">Expense</span>
           </div>
           <div className="flex items-center gap-1.5">
-            <div className="h-0.5 w-4 border-t-2 border-dashed border-[#1A1D1F]" />
+            <div className="h-0.5 w-4 border-t-2 border-dashed" style={{ borderColor: "var(--chart-net-line)" }} />
             <span className="text-xs text-[#6F767E]">Net</span>
           </div>
         </div>
@@ -198,7 +198,7 @@ export function CashFlowChart({ series, currency, externalPeriod, externalCustom
                 <Line
                   type="monotone"
                   dataKey="net"
-                  stroke="currentColor"
+                  stroke="var(--chart-net-line)"
                   strokeWidth={2}
                   strokeDasharray="6 4"
                   dot={false}
