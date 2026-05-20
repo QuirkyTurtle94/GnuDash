@@ -144,7 +144,7 @@ export function InvestmentPerformance({ investments, currency }: InvestmentPerfo
                   </span>
                 )}
               />
-              <Bar dataKey="costBasis" fill="#D4DAE0" radius={[3, 3, 0, 0]} barSize={16} />
+              <Bar dataKey="costBasis" fill="var(--chart-cost-basis)" radius={[3, 3, 0, 0]} barSize={16} />
               <Bar dataKey="marketValue" radius={[3, 3, 0, 0]} barSize={16}>
                 {chartData.map((entry, index) => (
                   <Cell

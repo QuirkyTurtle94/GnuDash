@@ -614,7 +614,7 @@ function IncomeExpenseBarChart({
             <span className="text-xs text-[#6F767E]">Expense</span>
           </div>
           <div className="flex items-center gap-1.5">
-            <div className="h-0.5 w-4 border-t-2 border-dashed border-[#1A1D1F]" />
+            <div className="h-0.5 w-4 border-t-2 border-dashed" style={{ borderColor: "var(--chart-net-line)" }} />
             <span className="text-xs text-[#6F767E]">Net</span>
           </div>
           <div className="flex items-center gap-1.5">
@@ -627,18 +627,18 @@ function IncomeExpenseBarChart({
           <div className="h-[220px]">
             <ResponsiveContainer width="100%" height="100%">
               <ComposedChart data={chartData} margin={{ top: 5, right: 5, bottom: 0, left: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#EFEFEF" vertical={false} />
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--chart-grid)" vertical={false} />
                 <XAxis
                   dataKey="month"
                   tickFormatter={formatMonthLabel}
-                  tick={{ fontSize: 11, fill: "#9A9FA5" }}
+                  tick={{ fontSize: 11, fill: "var(--chart-axis-tick)" }}
                   axisLine={false}
                   tickLine={false}
                 />
                 <YAxis
                   yAxisId="amount"
                   tickFormatter={(v) => formatCurrencyShort(v, currency)}
-                  tick={{ fontSize: 11, fill: "#9A9FA5" }}
+                  tick={{ fontSize: 11, fill: "var(--chart-axis-tick)" }}
                   axisLine={false}
                   tickLine={false}
                   width={50}
@@ -647,7 +647,7 @@ function IncomeExpenseBarChart({
                   yAxisId="rate"
                   orientation="right"
                   tickFormatter={(v: number) => `${v.toFixed(0)}%`}
-                  tick={{ fontSize: 11, fill: "#9A9FA5" }}
+                  tick={{ fontSize: 11, fill: "var(--chart-axis-tick)" }}
                   axisLine={false}
                   tickLine={false}
                   width={42}
@@ -667,15 +667,16 @@ function IncomeExpenseBarChart({
                     return `${months[parseInt(m) - 1]} ${y}`;
                   }}
                   contentStyle={{
-                    backgroundColor: "white",
-                    border: "1px solid #EFEFEF",
+                    backgroundColor: "var(--popover)",
+                    color: "var(--popover-foreground)",
+                    border: "1px solid var(--border)",
                     borderRadius: "10px",
                     fontSize: "13px",
                   }}
                 />
                 <Bar yAxisId="amount" dataKey="income" fill="#3B6B8A" radius={[3, 3, 0, 0]} barSize={14} />
                 <Bar yAxisId="amount" dataKey="expense" fill="#F87171" radius={[3, 3, 0, 0]} barSize={14} />
-                <Line yAxisId="amount" type="monotone" dataKey="net" stroke="#1A1D1F" strokeWidth={2} strokeDasharray="6 4" dot={false} />
+                <Line yAxisId="amount" type="monotone" dataKey="net" stroke="var(--chart-net-line)" strokeWidth={2} strokeDasharray="6 4" dot={false} />
                 <Line yAxisId="rate" type="monotone" dataKey="savingsRate" stroke={rateColor} strokeWidth={2} dot={false} connectNulls />
               </ComposedChart>
             </ResponsiveContainer>

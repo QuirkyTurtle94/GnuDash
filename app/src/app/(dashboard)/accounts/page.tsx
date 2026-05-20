@@ -38,19 +38,19 @@ const ACCOUNT_TYPE_LABELS: Record<string, string> = {
 };
 
 const TYPE_COLORS: Record<string, string> = {
-  ASSET: "bg-emerald-50 text-emerald-700",
-  BANK: "bg-emerald-50 text-emerald-700",
-  CASH: "bg-emerald-50 text-emerald-700",
-  STOCK: "bg-blue-50 text-blue-700",
-  MUTUAL: "bg-blue-50 text-blue-700",
-  INCOME: "bg-teal-50 text-teal-700",
-  EXPENSE: "bg-amber-50 text-amber-700",
-  LIABILITY: "bg-red-50 text-red-700",
-  CREDIT: "bg-red-50 text-red-700",
-  PAYABLE: "bg-red-50 text-red-700",
-  EQUITY: "bg-purple-50 text-purple-700",
-  RECEIVABLE: "bg-cyan-50 text-cyan-700",
-  TRADING: "bg-gray-50 text-gray-700",
+  ASSET: "bg-emerald-50 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-200",
+  BANK: "bg-emerald-50 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-200",
+  CASH: "bg-emerald-50 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-200",
+  STOCK: "bg-blue-50 text-blue-700 dark:bg-blue-500/15 dark:text-blue-200",
+  MUTUAL: "bg-blue-50 text-blue-700 dark:bg-blue-500/15 dark:text-blue-200",
+  INCOME: "bg-teal-50 text-teal-700 dark:bg-teal-500/15 dark:text-teal-200",
+  EXPENSE: "bg-amber-50 text-amber-700 dark:bg-amber-500/15 dark:text-amber-200",
+  LIABILITY: "bg-red-50 text-red-700 dark:bg-red-500/15 dark:text-red-200",
+  CREDIT: "bg-red-50 text-red-700 dark:bg-red-500/15 dark:text-red-200",
+  PAYABLE: "bg-red-50 text-red-700 dark:bg-red-500/15 dark:text-red-200",
+  EQUITY: "bg-purple-50 text-purple-700 dark:bg-purple-500/15 dark:text-purple-200",
+  RECEIVABLE: "bg-cyan-50 text-cyan-700 dark:bg-cyan-500/15 dark:text-cyan-200",
+  TRADING: "bg-gray-50 text-gray-700 dark:bg-gray-500/15 dark:text-gray-200",
 };
 
 // ── Helpers ──────────────────────────────────────────────────────
@@ -362,7 +362,7 @@ function AccountRow({
   return (
     <>
       <tr
-        className={`group border-b border-[#EFEFEF] transition-colors cursor-pointer hover:bg-[#F9FAFB] ${isTopLevel ? "bg-[#FAFBFC]" : ""}`}
+        className={`group border-b border-[#EFEFEF] transition-colors cursor-pointer hover:bg-[#F9FAFB] ${isTopLevel ? "bg-[#FAFBFC] dark:bg-muted" : ""}`}
         onClick={() => {
           if (hasChildren) {
             onToggle(account.guid);
