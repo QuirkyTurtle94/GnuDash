@@ -1,4 +1,8 @@
 import type { NextConfig } from "next";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
+const appDir = path.dirname(fileURLToPath(import.meta.url));
 
 // Default build target is the standalone Node.js server, which the Postgres
 // backend (issue #48) needs for its API routes. Set `NEXT_OUTPUT=export` at
@@ -10,6 +14,7 @@ const output: NextConfig["output"] =
 
 const nextConfig: NextConfig = {
   output,
+  outputFileTracingRoot: appDir,
   // better-sqlite3 is a native module and `pg` pulls in optional native bits
   // (pg-native). Keep them as external commonjs requires at runtime instead
   // of letting the bundler try to inline them — both are only used by the
@@ -18,7 +23,9 @@ const nextConfig: NextConfig = {
   images: {
     unoptimized: true,
   },
-  turbopack: {},
+  turbopack: {
+    root: appDir,
+  },
   // Exclude test directories from webpack's file watcher to reduce open file
   // descriptors during development (helps avoid EMFILE on Linux with low ulimits).
   // Note: Turbopack does not currently support watch exclusions — if you hit
