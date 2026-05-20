@@ -2,6 +2,9 @@
 node_modules/
 .pnp/
 .pnp.js
+# The npm project lives in app/. A root lockfile makes Next infer the wrong
+# workspace root and can cause dev mode to watch too much of the repository.
+/package-lock.json
 
 # Build
 .next/
