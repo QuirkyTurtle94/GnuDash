@@ -1,5 +1,4 @@
 import type { MonthlyExpenseByCategory, MonthlyCashFlow } from "@/lib/types/gnucash";
-import { formatCurrencyShort } from "@/lib/format";
 import { type CustomRange, dateToMonth } from "@/lib/period-utils";
 
 // ── Library-agnostic intermediate format ──────────────────────────────
@@ -290,7 +289,7 @@ export function buildSankeyData(opts: BuildOptions): SankeyData {
 
 export interface EChartsSankeyNode {
   name: string;
-  label: string;
+  displayLabel: string;
   itemStyle: { color: string };
   depth?: number;
 }
@@ -308,7 +307,7 @@ export function toEChartsFormat(
   return {
     nodes: data.nodes.map((n) => ({
       name: n.id,
-      label: n.label,
+      displayLabel: n.label,
       itemStyle: { color: n.color },
       ...(n.depth !== undefined ? { depth: n.depth } : {}),
     })),
