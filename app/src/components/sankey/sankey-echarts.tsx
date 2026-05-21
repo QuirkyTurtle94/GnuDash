@@ -22,6 +22,10 @@ const ZOOM_STEP = 0.1;
 const MINOR_NODE_SHARE = 0.02;
 const MINOR_NODE_LIMIT = 10;
 
+function formatRichText(value: string): string {
+  return value.replace(/[{}|]/g, " ");
+}
+
 function computeIdealHeight(data: EChartsSankeyData): number {
   const targetOf = new Set<string>();
   const sourceOf = new Set<string>();
@@ -70,6 +74,18 @@ function computeNodeValues(data: EChartsSankeyData): Map<string, number> {
   return values;
 }
 
+function computeTerminalNodeNames(data: EChartsSankeyData): Set<string> {
+  const sourceOf = new Set<string>();
+  const targetOf = new Set<string>();
+
+  for (const link of data.links) {
+    sourceOf.add(link.source);
+    targetOf.add(link.target);
+  }
+
+  return new Set(data.nodes.filter((node) => targetOf.has(node.name) && !sourceOf.has(node.name)).map((node) => node.name));
+}
+
 function isAggregateNode(name: string): boolean {
   return (
     name === "total-income" ||
@@ -91,13 +107,15 @@ export function SankeyECharts({ data, currency, bottomBarLeft }: SankeyEChartsPr
   const chartRef = useRef<ReactEChartsCore>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const previousScaleRef = useRef(1);
-  const [containerHeight, setContainerHeight] = useState(600);
-  const [containerWidth, setContainerWidth] = useState(800);
+  const [containerBoxHeight, setContainerBoxHeight] = useState(600);
+  const [viewportHeight, setViewportHeight] = useState(600);
+  const [viewportWidth, setViewportWidth] = useState(800);
   const [zoom, setZoom] = useState(1);
   const [isExpanded, setIsExpanded] = useState(false);
 
   const idealHeight = useMemo(() => computeIdealHeight(data), [data]);
   const nodeValues = useMemo(() => computeNodeValues(data), [data]);
+  const terminalNodeNames = useMemo(() => computeTerminalNodeNames(data), [data]);
   const minorNodes = useMemo(() => {
     const largestNodeValue = Math.max(...Array.from(nodeValues.values()), 0);
     if (largestNodeValue <= 0) return [];
@@ -116,11 +134,19 @@ export function SankeyECharts({ data, currency, bottomBarLeft }: SankeyEChartsPr
 
   useEffect(() => {
     function measure() {
-      if (!containerRef.current) return;
-      const rect = containerRef.current.getBoundingClientRect();
+      const el = containerRef.current;
+      if (!el) return;
+
+      const rect = el.getBoundingClientRect();
+      const style = window.getComputedStyle(el);
+      const borderX = parseFloat(style.borderLeftWidth) + parseFloat(style.borderRightWidth);
+      const borderY = parseFloat(style.borderTopWidth) + parseFloat(style.borderBottomWidth);
       const available = window.innerHeight - rect.top - 80;
-      setContainerHeight(Math.max(300, available));
-      setContainerWidth(Math.max(300, rect.width));
+      const nextBoxHeight = Math.max(300, Math.floor(available));
+
+      setContainerBoxHeight(nextBoxHeight);
+      setViewportHeight(Math.max(0, Math.floor(nextBoxHeight - borderY)));
+      setViewportWidth(Math.max(300, Math.floor(el.clientWidth || rect.width - borderX)));
     }
 
     measure();
@@ -136,9 +162,9 @@ export function SankeyECharts({ data, currency, bottomBarLeft }: SankeyEChartsPr
     };
   }, [isExpanded]);
 
-  const autoScale = Math.min(1, containerHeight / idealHeight);
+  const autoScale = Math.min(1, viewportHeight / idealHeight);
   const effectiveScale = autoScale * zoom;
-  const chartBaseWidth = containerWidth / autoScale;
+  const chartBaseWidth = viewportWidth / autoScale;
   const scaledChartWidth = chartBaseWidth * effectiveScale;
   const scaledChartHeight = idealHeight * effectiveScale;
 
@@ -152,7 +178,9 @@ export function SankeyECharts({ data, currency, bottomBarLeft }: SankeyEChartsPr
   const LABEL_BASE_PX = 12;
   const compensatedLabelFontSize = Math.ceil(LABEL_BASE_PX / autoScale);
   const compensatedLabelLineHeight = Math.ceil(15 / autoScale);
-  const compensatedLabelWidth = Math.ceil(160 / autoScale);
+  const compensatedStackedLabelWidth = Math.ceil(160 / autoScale);
+  const compensatedInlineLabelNameWidth = Math.ceil(112 / autoScale);
+  const compensatedInlineLabelValueWidth = Math.ceil(64 / autoScale);
 
   const exportImage = useCallback(
     (format: "png" | "svg") => {
@@ -236,7 +264,7 @@ export function SankeyECharts({ data, currency, bottomBarLeft }: SankeyEChartsPr
     });
 
     return () => window.cancelAnimationFrame(frameId);
-  }, [containerHeight, containerWidth, isExpanded]);
+  }, [viewportHeight, viewportWidth, isExpanded]);
 
   const option: echarts.EChartsCoreOption = {
     tooltip: {
@@ -291,16 +319,54 @@ export function SankeyECharts({ data, currency, bottomBarLeft }: SankeyEChartsPr
           hideOverlap: true,
         },
         label: {
-          fontSize: compensatedLabelFontSize,
-          lineHeight: compensatedLabelLineHeight,
           fontFamily: "Inter, system-ui, sans-serif",
           color: "#6F767E",
-          width: compensatedLabelWidth,
-          overflow: "truncate",
           formatter: (params: { data?: { displayLabel?: string; name?: string }; value?: number }) => {
+            const name = params.data?.name ?? "";
             const label = params.data?.displayLabel ?? params.data?.name ?? "";
             const value = params.value ?? 0;
-            return `${label}\n${formatCurrencyShort(value, currency)}`;
+            const richLabel = formatRichText(label);
+            const richValue = formatRichText(formatCurrencyShort(value, currency));
+
+            if (terminalNodeNames.has(name)) {
+              return `{nodeNameInline|${richLabel}} {nodeValueInline|${richValue}}`;
+            }
+
+            return `{nodeNameStacked|${richLabel}}\n{nodeValueStacked|${richValue}}`;
+          },
+          rich: {
+            nodeNameStacked: {
+              color: "#4C5661",
+              fontSize: compensatedLabelFontSize,
+              fontWeight: 500,
+              lineHeight: compensatedLabelLineHeight,
+              width: compensatedStackedLabelWidth,
+              overflow: "truncate",
+            },
+            nodeValueStacked: {
+              color: "#9A9FA5",
+              fontSize: Math.max(10, Math.round(compensatedLabelFontSize * 0.9)),
+              fontWeight: 500,
+              lineHeight: compensatedLabelLineHeight,
+              width: compensatedStackedLabelWidth,
+              overflow: "truncate",
+            },
+            nodeNameInline: {
+              color: "#4C5661",
+              fontSize: compensatedLabelFontSize,
+              fontWeight: 500,
+              lineHeight: compensatedLabelLineHeight,
+              width: compensatedInlineLabelNameWidth,
+              overflow: "truncate",
+            },
+            nodeValueInline: {
+              color: "#9A9FA5",
+              fontSize: Math.max(10, Math.round(compensatedLabelFontSize * 0.9)),
+              fontWeight: 500,
+              lineHeight: compensatedLabelLineHeight,
+              width: compensatedInlineLabelValueWidth,
+              overflow: "truncate",
+            },
           },
         },
       },
@@ -312,7 +378,7 @@ export function SankeyECharts({ data, currency, bottomBarLeft }: SankeyEChartsPr
       <div
         ref={containerRef}
         className="overflow-auto rounded-lg border border-[#EFEFEF] bg-white"
-        style={{ height: `${containerHeight}px` }}
+        style={{ height: `${containerBoxHeight}px` }}
       >
         <div
           style={{
