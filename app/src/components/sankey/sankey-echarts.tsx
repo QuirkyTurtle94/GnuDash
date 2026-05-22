@@ -13,8 +13,12 @@ import { formatCurrencyShort } from "@/lib/format";
 echarts.use([SankeyChart, TooltipComponent, SVGRenderer, CanvasRenderer]);
 
 const NODE_MIN_HEIGHT = 30;
-const NODE_GAP = 12;
-const PX_PER_NODE = NODE_MIN_HEIGHT + NODE_GAP + 16;
+const LABEL_BASE_PX = 12;
+const LABEL_LINE_HEIGHT = 15;
+const STACKED_LABEL_LINES = 2;
+const LABEL_BLOCK_HEIGHT = LABEL_LINE_HEIGHT * STACKED_LABEL_LINES;
+const NODE_GAP = 24;
+const PX_PER_NODE = Math.max(NODE_MIN_HEIGHT, LABEL_BLOCK_HEIGHT) + NODE_GAP + 4;
 const CHART_PADDING = 40;
 const ZOOM_MIN = 0.5;
 const ZOOM_MAX = 3;
@@ -142,7 +146,7 @@ export function SankeyECharts({ data, currency, bottomBarLeft }: SankeyEChartsPr
       const borderX = parseFloat(style.borderLeftWidth) + parseFloat(style.borderRightWidth);
       const borderY = parseFloat(style.borderTopWidth) + parseFloat(style.borderBottomWidth);
       const available = window.innerHeight - rect.top - 80;
-      const nextBoxHeight = Math.max(300, Math.floor(available));
+      const nextBoxHeight = isExpanded ? Math.max(300, Math.floor(available)) : idealHeight;
 
       setContainerBoxHeight(nextBoxHeight);
       setViewportHeight(Math.max(0, Math.floor(nextBoxHeight - borderY)));
@@ -160,27 +164,17 @@ export function SankeyECharts({ data, currency, bottomBarLeft }: SankeyEChartsPr
       resizeObserver.disconnect();
       window.removeEventListener("resize", measure);
     };
-  }, [isExpanded]);
+  }, [idealHeight, isExpanded]);
 
-  const autoScale = Math.min(1, viewportHeight / idealHeight);
-  const effectiveScale = autoScale * zoom;
-  const chartBaseWidth = viewportWidth / autoScale;
+  const effectiveScale = zoom;
+  const chartBaseWidth = viewportWidth;
   const scaledChartWidth = chartBaseWidth * effectiveScale;
   const scaledChartHeight = idealHeight * effectiveScale;
-
-  // The CSS `transform: scale(effectiveScale)` on the inner container shrinks
-  // every child proportionally — including SVG labels. When autoScale < 1
-  // (common at HD-ready resolutions where containerHeight < idealHeight), a
-  // 12px base label renders at effective ~6px and becomes unreadable. Compute
-  // a pre-inflated base so that after the CSS scale it lands back at ~12px.
-  // Only compensate for autoScale, not user-driven `zoom` — zoom should scale
-  // visibly, which is the whole point of it.
-  const LABEL_BASE_PX = 12;
-  const compensatedLabelFontSize = Math.ceil(LABEL_BASE_PX / autoScale);
-  const compensatedLabelLineHeight = Math.ceil(15 / autoScale);
-  const compensatedStackedLabelWidth = Math.ceil(160 / autoScale);
-  const compensatedInlineLabelNameWidth = Math.ceil(112 / autoScale);
-  const compensatedInlineLabelValueWidth = Math.ceil(64 / autoScale);
+  const compensatedLabelFontSize = LABEL_BASE_PX;
+  const compensatedLabelLineHeight = LABEL_LINE_HEIGHT;
+  const compensatedStackedLabelWidth = 160;
+  const compensatedInlineLabelNameWidth = 112;
+  const compensatedInlineLabelValueWidth = 64;
 
   const exportImage = useCallback(
     (format: "png" | "svg") => {
@@ -270,10 +264,8 @@ export function SankeyECharts({ data, currency, bottomBarLeft }: SankeyEChartsPr
     tooltip: {
       trigger: "item",
       triggerOn: "mousemove",
-      // Render the tooltip as a body-level element so the parent container's
-      // CSS `transform: scale(...)` doesn't shrink it along with the chart
-      // (issue #97 — tooltip became unreadable at HD-ready where autoScale
-      // drops below ~0.5).
+      // Render the tooltip as a body-level element so zooming the chart with
+      // CSS `transform: scale(...)` doesn't shrink or enlarge the tooltip.
       appendToBody: true,
       textStyle: { fontSize: 13 },
       extraCssText: "font-size: 13px; line-height: 1.4;",
@@ -316,7 +308,6 @@ export function SankeyECharts({ data, currency, bottomBarLeft }: SankeyEChartsPr
         },
         labelLayout: {
           moveOverlap: "shiftY",
-          hideOverlap: true,
         },
         label: {
           fontFamily: "Inter, system-ui, sans-serif",
@@ -409,11 +400,7 @@ export function SankeyECharts({ data, currency, bottomBarLeft }: SankeyEChartsPr
       <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-3">
           <span className="min-w-12 whitespace-nowrap text-xs text-[#9A9FA5]">
-            {zoom !== 1
-              ? `${Math.round(effectiveScale * 100)}%`
-              : autoScale < 1
-                ? `Fit ${Math.round(autoScale * 100)}% · Shift + scroll to zoom`
-                : "Shift + scroll to zoom"}
+            {zoom !== 1 ? `${Math.round(effectiveScale * 100)}%` : "Shift + scroll to zoom"}
           </span>
           <div className="flex items-center gap-1.5">
             <button
