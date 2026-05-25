@@ -10,7 +10,7 @@
 # routes needed by the Server backend; the static-only nginx Dockerfile
 # (./Dockerfile) does NOT — use this file for self-hosted Postgres setups.
 
-FROM --platform=$BUILDPLATFORM node:20-alpine@sha256:f598378b5240225e6beab68fa9f356db1fb8efe55173e6d4d8153113bb8f333c AS build
+FROM --platform=$BUILDPLATFORM node:24-alpine@sha256:2bdb65ed1dab192432bc31c95f94155ca5ad7fc1392fb7eb7526ab682fa5bf14 AS build
 
 WORKDIR /app
 # Copy the app package manifests first so npm ci can be cached across builds
@@ -26,13 +26,17 @@ COPY app/ ./
 RUN npm run build
 
 
-FROM node:20-alpine@sha256:f598378b5240225e6beab68fa9f356db1fb8efe55173e6d4d8153113bb8f333c AS runtime
+FROM node:24-alpine@sha256:2bdb65ed1dab192432bc31c95f94155ca5ad7fc1392fb7eb7526ab682fa5bf14 AS runtime
 
 WORKDIR /app
 ENV NODE_ENV=production
 # Next.js listens on $PORT (defaults to 3000 in the standalone server).
 ENV PORT=3000
 ENV HOSTNAME=0.0.0.0
+
+# The runtime image only needs the Node executable. Removing npm/npx avoids
+# shipping npm's dependency tree and its scanner noise in production.
+RUN rm -rf /usr/local/lib/node_modules/npm /usr/local/bin/npm /usr/local/bin/npx
 
 # The standalone output bundles only the runtime deps Next traced, so we
 # don't need a separate `npm ci --omit=dev` — just copy the pre-wired tree.
