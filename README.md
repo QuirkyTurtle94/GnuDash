@@ -71,6 +71,14 @@ Full walkthrough — reverse-proxy / TLS, existing-GnuCash read-only mode, troub
 
 Charts are fully interactive — click any bar or segment to drill down into breakdowns and individual transactions. The accounts page uses a tabbed, GnuCash-style interface where double-clicking an account opens its transaction register in a new tab. Transaction editing uses the same GNUCash SQLite schema, so exported files open seamlessly in GNUCash desktop.
 
+## Documentation
+
+- **[Documentation index](docs/README.md)** — user and technical docs in one place
+- **[User Guide](docs/user-guide.md)** — first upload, navigation, reports, budgets, investments, accounts, editing, supported data sources, and troubleshooting
+- **[Deployment Guide](docs/deployment.md)** — static hosting, standalone Node.js, Docker, reverse proxy, TLS, and optional Postgres backend
+- **[Architecture](docs/architecture.md)** — data flow, storage backends, parsing, query engine, and write path
+- **[GNUCash SQL Schema](docs/gnucash-sql-schema.md)** and **[SQL Queries](docs/gnucash-sql-queries.md)** — developer reference for the underlying book data
+
 ## Screenshots
 
 <table>
@@ -176,6 +184,10 @@ app/
 │       └── types/        # TypeScript type definitions
 ├── scripts/              # Playwright screenshot automation
 docs/
+├── README.md             # Documentation index
+├── user-guide.md         # User-facing guide and troubleshooting
+├── deployment.md         # Static, standalone, Docker, and Postgres deployment
+├── architecture.md       # System design and data flow
 ├── gnucash-sql-schema.md # GNUCash SQLite schema reference
 └── gnucash-sql-queries.md # SQL query reference
 ```
