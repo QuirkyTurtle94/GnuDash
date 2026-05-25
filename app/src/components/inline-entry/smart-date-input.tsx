@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect } from "react";
 
 /**
  * Detects whether the user's locale uses month-first (US) or day-first format.
@@ -145,13 +145,13 @@ export function SmartDateInput({ value, onChange, onKeyDown, inputRef, className
   // The raw text the user is typing (shown while focused)
   const [rawText, setRawText] = useState("");
   const [isFocused, setIsFocused] = useState(false);
-  const localeOrder = useRef(detectLocaleOrder());
-  const separator = useRef(detectLocaleSeparator());
+  const [localeOrder] = useState<"mdy" | "dmy">(() => detectLocaleOrder());
+  const [separator] = useState(() => detectLocaleSeparator());
 
   // Placeholder hint showing the expected format
-  const placeholder = localeOrder.current === "mdy"
-    ? `mm${separator.current}dd${separator.current}yy`
-    : `dd${separator.current}mm${separator.current}yy`;
+  const placeholder = localeOrder === "mdy"
+    ? `mm${separator}dd${separator}yy`
+    : `dd${separator}mm${separator}yy`;
 
   const handleFocus = useCallback((e: React.FocusEvent<HTMLInputElement>) => {
     setIsFocused(true);
@@ -172,14 +172,14 @@ export function SmartDateInput({ value, onChange, onKeyDown, inputRef, className
       setIsFocused(false);
       return;
     }
-    const parsed = parsePartialDate(trimmed, localeOrder.current);
+    const parsed = parsePartialDate(trimmed, localeOrder);
     if (parsed) {
       onChange(parsed);
       lastUsedDate = parsed;
     }
     // If parse failed, revert to previous value
     setIsFocused(false);
-  }, [rawText, onChange]);
+  }, [rawText, onChange, localeOrder]);
 
   const handleBlur = useCallback(() => {
     commitDate();

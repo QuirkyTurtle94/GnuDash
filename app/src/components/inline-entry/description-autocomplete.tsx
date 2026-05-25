@@ -46,7 +46,7 @@ export function DescriptionAutocomplete({
   className,
 }: Props) {
   const [highlightIndex, setHighlightIndex] = useState(-1);
-  const [showDropdown, setShowDropdown] = useState(false);
+  const [dropdownDismissed, setDropdownDismissed] = useState(false);
   const [dropdownPos, setDropdownPos] = useState<{ top: number; left: number; width: number } | null>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -105,16 +105,11 @@ export function DescriptionAutocomplete({
     return matches.slice(0, 10);
   }, [value, quickFillIndex]);
 
-  // Show/hide dropdown based on suggestions
-  useEffect(() => {
-    if (suggestions.length > 0 && value.trim()) {
-      setShowDropdown(true);
-      setHighlightIndex(0);
-    } else {
-      setShowDropdown(false);
-      setHighlightIndex(-1);
-    }
-  }, [suggestions, value]);
+  const showDropdown = !dropdownDismissed && suggestions.length > 0 && Boolean(value.trim());
+  const activeHighlightIndex =
+    showDropdown && suggestions.length > 0
+      ? Math.min(Math.max(highlightIndex, 0), suggestions.length - 1)
+      : -1;
 
   // Update dropdown position when shown
   useEffect(() => {
@@ -136,7 +131,7 @@ export function DescriptionAutocomplete({
         dropdownRef.current && !dropdownRef.current.contains(e.target as Node) &&
         inputRef.current && !inputRef.current.contains(e.target as Node)
       ) {
-        setShowDropdown(false);
+        setDropdownDismissed(true);
       }
     }
     document.addEventListener("mousedown", handleClick);
@@ -148,7 +143,7 @@ export function DescriptionAutocomplete({
       const match = suggestions[index];
       onChange(match.description);
       onConfirm(match);
-      setShowDropdown(false);
+      setDropdownDismissed(true);
     }
   }, [suggestions, onChange, onConfirm]);
 
@@ -166,8 +161,8 @@ export function DescriptionAutocomplete({
       }
       if (e.key === "Tab") {
         // Confirm the highlighted suggestion, then let Tab propagate for field navigation
-        if (highlightIndex >= 0) {
-          confirmSuggestion(highlightIndex);
+        if (activeHighlightIndex >= 0) {
+          confirmSuggestion(activeHighlightIndex);
         }
         // Don't prevent default - let the parent handle Tab navigation
         onKeyDown(e);
@@ -175,14 +170,14 @@ export function DescriptionAutocomplete({
       }
       if (e.key === "Enter") {
         e.preventDefault();
-        if (highlightIndex >= 0) {
-          confirmSuggestion(highlightIndex);
+        if (activeHighlightIndex >= 0) {
+          confirmSuggestion(activeHighlightIndex);
         }
         return;
       }
       if (e.key === "Escape") {
         e.preventDefault();
-        setShowDropdown(false);
+        setDropdownDismissed(true);
         return;
       }
     }
@@ -204,11 +199,15 @@ export function DescriptionAutocomplete({
         ref={inputRef}
         type="text"
         value={value}
-        onChange={(e) => onChange(e.target.value)}
+        onChange={(e) => {
+          setDropdownDismissed(false);
+          setHighlightIndex(0);
+          onChange(e.target.value);
+        }}
         onKeyDown={handleKeyDown}
         onFocus={(e) => {
           e.target.select();
-          if (suggestions.length > 0 && value.trim()) setShowDropdown(true);
+          if (suggestions.length > 0 && value.trim()) setDropdownDismissed(false);
         }}
         placeholder="Description"
         className={className}
@@ -231,7 +230,7 @@ export function DescriptionAutocomplete({
               <button
                 key={match.description}
                 className={`flex w-full items-center justify-between gap-3 px-3 py-1.5 text-left text-xs transition-colors ${
-                  i === highlightIndex ? "bg-[#3B6B8A]/10 text-[#1A1D1F]" : "text-[#6F767E] hover:bg-[#F4F5F7]"
+                  i === activeHighlightIndex ? "bg-[#3B6B8A]/10 text-[#1A1D1F]" : "text-[#6F767E] hover:bg-[#F4F5F7]"
                 }`}
                 onMouseDown={(e) => {
                   e.preventDefault(); // Don't blur the input

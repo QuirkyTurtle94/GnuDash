@@ -82,10 +82,7 @@ export default function InvestmentPage() {
   const [selectedTicker, setSelectedTicker] = useState<string | null>(null);
   const [grouped, setGrouped] = useState(true);
 
-  if (!data) return null;
-
-  const c = data.currency;
-  const allHoldings = data.investments ?? [];
+  const allHoldings = data?.investments ?? [];
   const activeHoldings = useMemo(
     () => allHoldings.filter((h) => Math.abs(h.marketValue) >= 0.01 || Math.abs(h.sharesHeld) >= 0.0001),
     [allHoldings]
@@ -93,6 +90,10 @@ export default function InvestmentPage() {
 
   const allItems = useMemo(() => (grouped ? toGrouped(allHoldings) : toUngrouped(allHoldings)), [allHoldings, grouped]);
   const activeItems = useMemo(() => (grouped ? filterActive(toGrouped(allHoldings)) : filterActive(toUngrouped(allHoldings))), [allHoldings, grouped]);
+
+  if (!data) return null;
+
+  const c = data.currency;
 
   return (
     <div className="flex flex-col gap-4 sm:gap-6">

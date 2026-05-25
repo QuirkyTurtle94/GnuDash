@@ -55,7 +55,7 @@ export function AccountLedger({
   const [duplicateError, setDuplicateError] = useState<string | null>(null);
   const entryRef = useRef<InlineEntryHandle | null>(null);
   const [search, setSearch] = useState("");
-  const [page, setPage] = useState(0);
+  const [pageState, setPageState] = useState({ key: "", page: 0 });
   const [sortField, setSortField] = useState<SortField>("date");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
   const [expandedTx, setExpandedTx] = useState<Set<string>>(new Set());
@@ -80,7 +80,6 @@ export function AccountLedger({
       setSortField(field);
       setSortDir(field === "date" ? "asc" : "desc");
     }
-    setPage(0);
   }
 
   // Filter transactions to those involving this account, and compute running balance
@@ -151,9 +150,8 @@ export function AccountLedger({
     return { rows: sorted, runningBalance: balance };
   }, [data, account.guid, search, sortField, sortDir, isCredit]);
 
-  // Reset page on search change
-  const filterKey = search;
-  useMemo(() => setPage(0), [filterKey]);
+  const filterKey = `${search}-${sortField}-${sortDir}`;
+  const page = pageState.key === filterKey ? pageState.page : 0;
 
   if (!data) return null;
 
@@ -305,14 +303,14 @@ export function AccountLedger({
               </span>
               <div className="flex gap-1">
                 <button
-                  onClick={() => setPage((p) => Math.max(0, p - 1))}
+                  onClick={() => setPageState({ key: filterKey, page: Math.max(0, page - 1) })}
                   disabled={page === 0}
                   className="rounded-md border border-[#EFEFEF] px-2.5 py-1 text-xs text-[#6F767E] transition-colors hover:bg-[#F4F5F7] disabled:opacity-30 disabled:hover:bg-transparent"
                 >
                   Prev
                 </button>
                 <button
-                  onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
+                  onClick={() => setPageState({ key: filterKey, page: Math.min(totalPages - 1, page + 1) })}
                   disabled={page >= totalPages - 1}
                   className="rounded-md border border-[#EFEFEF] px-2.5 py-1 text-xs text-[#6F767E] transition-colors hover:bg-[#F4F5F7] disabled:opacity-30 disabled:hover:bg-transparent"
                 >

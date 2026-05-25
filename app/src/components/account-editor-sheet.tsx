@@ -71,13 +71,11 @@ function SimpleCombobox({
   placeholder: string;
 }) {
   const selected = items.find((i) => i.guid === value);
-  const [query, setQuery] = useState(selected?.label ?? "");
+  const selectedLabel = selected?.label ?? "";
+  const [draftQuery, setDraftQuery] = useState(selectedLabel);
   const [open, setOpen] = useState(false);
   const listRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    setQuery(selected?.label ?? "");
-  }, [selected]);
+  const query = open ? draftQuery : selectedLabel;
 
   const filtered = useMemo(() => {
     if (!query.trim()) return items.slice(0, 50);
@@ -94,8 +92,8 @@ function SimpleCombobox({
         <input
           type="text"
           value={query}
-          onChange={(e) => { setQuery(e.target.value); setOpen(true); if (!e.target.value) onChange("", ""); }}
-          onFocus={() => setOpen(true)}
+          onChange={(e) => { setDraftQuery(e.target.value); setOpen(true); if (!e.target.value) onChange("", ""); }}
+          onFocus={() => { setDraftQuery(selectedLabel); setOpen(true); }}
           onBlur={() => setTimeout(() => setOpen(false), 200)}
           placeholder={placeholder}
           className="h-8 w-full rounded-md border border-[#EFEFEF] bg-white pl-7 pr-2 text-xs text-[#1A1D1F] placeholder:text-[#9A9FA5] focus:border-[#3B6B8A] focus:outline-none focus:ring-1 focus:ring-[#3B6B8A]"
@@ -107,7 +105,7 @@ function SimpleCombobox({
             <div
               key={item.guid}
               onMouseDown={(e) => e.preventDefault()}
-              onClick={() => { onChange(item.guid, item.label); setQuery(item.label); setOpen(false); }}
+              onClick={() => { onChange(item.guid, item.label); setDraftQuery(item.label); setOpen(false); }}
               className={`cursor-pointer px-2.5 py-1.5 text-xs hover:bg-[#3B6B8A]/10 ${item.guid === value ? "font-medium text-[#3B6B8A]" : "text-[#1A1D1F]"}`}
             >
               <div>{item.label}</div>
@@ -258,7 +256,7 @@ export function AccountEditorSheet({
     setSaveError(null);
 
     try {
-      let finalCommodityGuid = commodityGuid;
+      const finalCommodityGuid = commodityGuid;
 
       // Create new commodity if needed
       if (showNewCommodity && isInvestment) {
