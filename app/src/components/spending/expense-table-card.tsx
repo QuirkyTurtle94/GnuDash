@@ -40,7 +40,7 @@ function compareTx(a: ExpenseTransaction, b: ExpenseTransaction, field: SortFiel
 
 export function ExpenseTableCard({ transactions, currency, title = "Expenses" }: ExpenseTableCardProps) {
   const { period, customRange, selectedCategory, selectedMonth, selectedAccount, excluded } = useSpendingFilter();
-  const [page, setPage] = useState(0);
+  const [pageState, setPageState] = useState({ key: "", page: 0 });
   const [sortField, setSortField] = useState<SortField>("date");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
 
@@ -51,11 +51,10 @@ export function ExpenseTableCard({ transactions, currency, title = "Expenses" }:
       setSortField(field);
       setSortDir(field === "amount" ? "desc" : "asc");
     }
-    setPage(0);
   }
 
   // Reset page when filters change
-  const filterKey = `${period}-${customRange?.start}-${customRange?.end}-${selectedCategory}-${selectedMonth}-${selectedAccount}-${[...excluded].join(",")}`;
+  const filterKey = `${period}-${customRange?.start}-${customRange?.end}-${selectedCategory}-${selectedMonth}-${selectedAccount}-${[...excluded].join(",")}-${sortField}-${sortDir}`;
 
   const filtered = useMemo(() => {
     const validMonths = new Set(selectedMonth ? [selectedMonth] : getMonthsForPeriod(period, customRange ?? undefined));
@@ -87,9 +86,7 @@ export function ExpenseTableCard({ transactions, currency, title = "Expenses" }:
     }).sort((a, b) => compareTx(a, b, sortField, sortDir));
   }, [transactions, period, customRange, selectedCategory, selectedMonth, selectedAccount, excluded, sortField, sortDir]);
 
-  // Reset page when filters change
-  useMemo(() => setPage(0), [filterKey]);
-
+  const page = pageState.key === filterKey ? pageState.page : 0;
   const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
   const pageData = filtered.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
 
@@ -150,14 +147,14 @@ export function ExpenseTableCard({ transactions, currency, title = "Expenses" }:
                 </span>
                 <div className="flex gap-1">
                   <button
-                    onClick={() => setPage((p) => Math.max(0, p - 1))}
+                    onClick={() => setPageState({ key: filterKey, page: Math.max(0, page - 1) })}
                     disabled={page === 0}
                     className="rounded-md border border-[#EFEFEF] px-2.5 py-1 text-xs text-[#6F767E] transition-colors hover:bg-[#F4F5F7] disabled:opacity-30 disabled:hover:bg-transparent"
                   >
                     Prev
                   </button>
                   <button
-                    onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
+                    onClick={() => setPageState({ key: filterKey, page: Math.min(totalPages - 1, page + 1) })}
                     disabled={page >= totalPages - 1}
                     className="rounded-md border border-[#EFEFEF] px-2.5 py-1 text-xs text-[#6F767E] transition-colors hover:bg-[#F4F5F7] disabled:opacity-30 disabled:hover:bg-transparent"
                   >

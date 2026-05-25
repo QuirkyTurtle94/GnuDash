@@ -53,12 +53,11 @@ function AccountCombobox({
   value: { guid: string; path: string };
   onChange: (account: FlatAccount | null) => void;
 }) {
-  const [query, setQuery] = useState(value.path);
+  const [draftQuery, setDraftQuery] = useState(value.path);
   const [open, setOpen] = useState(false);
   const [highlightIndex, setHighlightIndex] = useState(0);
   const listRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => { setQuery(value.path); }, [value.path]);
+  const query = open ? draftQuery : value.path;
 
   const filtered = useMemo(() => {
     if (!query.trim()) return accounts.slice(0, 50);
@@ -84,7 +83,7 @@ function AccountCombobox({
   const selectItem = useCallback(
     (item: FlatAccount) => {
       onChange(item);
-      setQuery(item.fullPath);
+      setDraftQuery(item.fullPath);
       setOpen(false);
     },
     [onChange]
@@ -92,7 +91,7 @@ function AccountCombobox({
 
   function handleKeyDown(e: React.KeyboardEvent) {
     if (!open) {
-      if (e.key === "ArrowDown" || e.key === "Enter") { setOpen(true); e.preventDefault(); }
+      if (e.key === "ArrowDown" || e.key === "Enter") { setDraftQuery(value.path); setOpen(true); e.preventDefault(); }
       return;
     }
     switch (e.key) {
@@ -117,12 +116,12 @@ function AccountCombobox({
           type="text"
           value={query}
           onChange={(e) => {
-            setQuery(e.target.value);
+            setDraftQuery(e.target.value);
             setOpen(true);
             setHighlightIndex(0);
             if (!e.target.value) onChange(null);
           }}
-          onFocus={() => setOpen(true)}
+          onFocus={() => { setDraftQuery(value.path); setOpen(true); }}
           onBlur={() => setTimeout(() => setOpen(false), 200)}
           onKeyDown={handleKeyDown}
           placeholder="Search accounts..."

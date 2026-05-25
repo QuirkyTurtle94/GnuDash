@@ -5,6 +5,14 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatCurrency } from "@/lib/format";
 import type { BudgetCategoryRow } from "@/lib/types/gnucash";
 
+function SortIcon({ active, sortAsc }: { active: boolean; sortAsc: boolean }) {
+  return (
+    <svg className={`ml-1 inline h-3 w-3 ${active ? "text-[#6C9B8B]" : "text-[#9A9FA5]"}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={sortAsc ? "M5 15l7-7 7 7" : "M19 9l-7 7-7-7"} />
+    </svg>
+  );
+}
+
 export function VarianceTable({
   categories,
   currency,
@@ -53,12 +61,6 @@ export function VarianceTable({
     }
   }
 
-  const SortIcon = ({ active }: { active: boolean }) => (
-    <svg className={`ml-1 inline h-3 w-3 ${active ? "text-[#6C9B8B]" : "text-[#9A9FA5]"}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={sortAsc ? "M5 15l7-7 7 7" : "M19 9l-7 7-7-7"} />
-    </svg>
-  );
-
   return (
     <Card>
       <CardHeader>
@@ -69,16 +71,16 @@ export function VarianceTable({
           <thead>
             <tr className="border-b border-[#EFEFEF] text-left text-xs text-[#9A9FA5]">
               <th className="cursor-pointer pb-2 pr-4 font-medium" onClick={() => toggleSort("name")}>
-                Category<SortIcon active={sortKey === "name"} />
+                Category<SortIcon active={sortKey === "name"} sortAsc={sortAsc} />
               </th>
               <th className="cursor-pointer pb-2 pr-4 text-right font-medium" onClick={() => toggleSort("budgeted")}>
-                {isIncome ? "Target" : "Budgeted"}<SortIcon active={sortKey === "budgeted"} />
+                {isIncome ? "Target" : "Budgeted"}<SortIcon active={sortKey === "budgeted"} sortAsc={sortAsc} />
               </th>
               <th className="cursor-pointer pb-2 pr-4 text-right font-medium" onClick={() => toggleSort("actual")}>
-                Actual<SortIcon active={sortKey === "actual"} />
+                Actual<SortIcon active={sortKey === "actual"} sortAsc={sortAsc} />
               </th>
               <th className="cursor-pointer pb-2 pr-4 text-right font-medium" onClick={() => toggleSort("variance")}>
-                Variance<SortIcon active={sortKey === "variance"} />
+                Variance<SortIcon active={sortKey === "variance"} sortAsc={sortAsc} />
               </th>
               <th className="pb-2 text-right font-medium">%</th>
             </tr>

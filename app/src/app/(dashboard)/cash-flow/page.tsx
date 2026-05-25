@@ -333,7 +333,7 @@ const TX_PAGE_SIZE = 25;
 function CashFlowTransactions({ filters }: { filters: SankeyFilterState }) {
   const { data } = useDashboard();
   const { excludeClosing } = useClosing();
-  const [page, setPage] = useState(0);
+  const [pageState, setPageState] = useState({ key: "", page: 0 });
 
   const { period, customRange, selectedInflow, selectedOutflow } = filters;
 
@@ -375,7 +375,7 @@ function CashFlowTransactions({ filters }: { filters: SankeyFilterState }) {
 
   // Reset page when filters change
   const filterKey = `${period}-${customRange?.start}-${customRange?.end}-${Array.from(allSelected).sort().join(",")}`;
-  useMemo(() => setPage(0), [filterKey]);
+  const page = pageState.key === filterKey ? pageState.page : 0;
 
   if (!data || filtered.length === 0) return null;
 
@@ -439,14 +439,14 @@ function CashFlowTransactions({ filters }: { filters: SankeyFilterState }) {
             </span>
             <div className="flex gap-1">
               <button
-                onClick={() => setPage((p) => Math.max(0, p - 1))}
+                onClick={() => setPageState({ key: filterKey, page: Math.max(0, page - 1) })}
                 disabled={page === 0}
                 className="rounded-md border border-[#EFEFEF] px-2.5 py-1 text-xs text-[#6F767E] transition-colors hover:bg-[#F4F5F7] disabled:opacity-30"
               >
                 Prev
               </button>
               <button
-                onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
+                onClick={() => setPageState({ key: filterKey, page: Math.min(totalPages - 1, page + 1) })}
                 disabled={page >= totalPages - 1}
                 className="rounded-md border border-[#EFEFEF] px-2.5 py-1 text-xs text-[#6F767E] transition-colors hover:bg-[#F4F5F7] disabled:opacity-30"
               >
@@ -563,15 +563,6 @@ function CashFlowBudgetContent({ data }: { data: NonNullable<ReturnType<typeof u
     }
   }, []);
 
-  if (!cashFlowData || cashFlowData.budgets.length === 0) {
-    return (
-      <div className="flex flex-col gap-4 sm:gap-6">
-        <h2 className="text-lg font-semibold text-[#1A1D1F] sm:text-xl">Cash Flow Budget</h2>
-        <NoBudgetState message="Create a budget in GNUCash to see your cash flow vs budget here. Go to Actions > Budget > New Budget in GNUCash." />
-      </div>
-    );
-  }
-
   const ytdVarianceMap = useMemo(() => {
     if (!activeBudgetData || viewMode !== "monthly") return new Map<string, number>();
     const source = isInflow ? activeBudgetData.inflowCategories : activeBudgetData.outflowCategories;
@@ -589,6 +580,15 @@ function CashFlowBudgetContent({ data }: { data: NonNullable<ReturnType<typeof u
     }
     return map;
   }, [activeBudgetData, viewMode, selectedMonth, yearStr, isInflow]);
+
+  if (!cashFlowData || cashFlowData.budgets.length === 0) {
+    return (
+      <div className="flex flex-col gap-4 sm:gap-6">
+        <h2 className="text-lg font-semibold text-[#1A1D1F] sm:text-xl">Cash Flow Budget</h2>
+        <NoBudgetState message="Create a budget in GNUCash to see your cash flow vs budget here. Go to Actions > Budget > New Budget in GNUCash." />
+      </div>
+    );
+  }
 
   const c = data.currency;
   const hasInflows = allInflowCategories.length > 0;
