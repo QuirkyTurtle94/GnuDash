@@ -9,7 +9,7 @@ import { parseGnuCashDate, sqlMonth } from "../shared/dates";
  * All monetary values are converted to base currency.
  */
 export function computeInvestments(ctx: ParseContext): InvestmentHolding[] {
-  const { db, commodityMap, prices, latestPrices, latestPriceInfo, fxRates } = ctx;
+  const { db, commodityMap, prices, latestPrices, fxRates } = ctx;
 
   // Price 12 months ago per commodity
   const twelveMonthsAgo = new Date();
@@ -137,7 +137,7 @@ export function computeInvestmentValueSeries(ctx: ParseContext): MonthlyInvestme
 
   const result: MonthlyInvestmentValue[] = [];
 
-  for (const [accountGuid, monthlyData] of accountMonthly) {
+  for (const monthlyData of accountMonthly.values()) {
     const firstEntry = [...monthlyData.values()][0];
     if (!firstEntry) continue;
     const commodity = commodityMap.get(firstEntry.commodity_guid);

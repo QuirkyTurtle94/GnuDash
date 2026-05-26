@@ -82,7 +82,7 @@ export default function InvestmentPage() {
   const [selectedTicker, setSelectedTicker] = useState<string | null>(null);
   const [grouped, setGrouped] = useState(true);
 
-  const allHoldings = data?.investments ?? [];
+  const allHoldings = useMemo(() => data?.investments ?? [], [data?.investments]);
   const activeHoldings = useMemo(
     () => allHoldings.filter((h) => Math.abs(h.marketValue) >= 0.01 || Math.abs(h.sharesHeld) >= 0.0001),
     [allHoldings]

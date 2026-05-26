@@ -13,7 +13,7 @@ import { sqlMonth } from "../shared/dates";
  * multi-currency accounts. Investment values fluctuate with price history.
  */
 export function computeNetWorthSeries(ctx: ParseContext): MonthlyNetWorth[] {
-  const { db, baseCurrencyGuid, fxRates, commodityMap } = ctx;
+  const { db, fxRates, commodityMap } = ctx;
 
   // Monthly changes for non-investment accounts using quantity + FX conversion
   const nonInvRows = db

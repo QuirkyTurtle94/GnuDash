@@ -116,8 +116,8 @@ export function SpendingOverview({ monthlyExpenses, categoryColors, currency, li
     return max;
   }, [monthlyExpenses]);
 
-  const { categories, total } = useMemo(() => {
-    if (!monthlyExpenses) return { categories: [], total: 0 };
+  const categories = useMemo(() => {
+    if (!monthlyExpenses) return [];
 
     const validMonths = new Set(getMonthsForPeriod(period, customRange, monthlyExpenses));
     const drillParts = drillPath ? drillPath.split(":") : null;
@@ -164,8 +164,7 @@ export function SpendingOverview({ monthlyExpenses, categoryColors, currency, li
 
     if (drillPath) assignShades(cats);
 
-    const t = cats.reduce((sum, c) => sum + c.amount, 0);
-    return { categories: cats, total: t };
+    return cats;
   }, [monthlyExpenses, categoryColors, period, customRange, depth, drillPath]);
 
   // Active categories (not excluded) and their total

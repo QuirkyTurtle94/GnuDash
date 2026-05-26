@@ -31,8 +31,8 @@ export function SpendingPieCard({ monthlyExpenses, categoryColors, currency, tit
   const drillDepth = drillParts ? drillParts.length : 0;
   const monthCount = selectedMonth ? 1 : getMonthsForPeriod(period, customRange ?? undefined).length;
 
-  const { categories, total } = useMemo(() => {
-    if (!monthlyExpenses) return { categories: [], total: 0 };
+  const categories = useMemo(() => {
+    if (!monthlyExpenses) return [];
 
     const validMonths = new Set(selectedMonth ? [selectedMonth] : getMonthsForPeriod(period, customRange ?? undefined));
     const totals = new Map<string, number>();
@@ -74,8 +74,7 @@ export function SpendingPieCard({ monthlyExpenses, categoryColors, currency, tit
     // When drilled into a category, generate different shades for subcategories
     if (selectedCategory) assignShades(cats);
 
-    const t = cats.reduce((sum, c) => sum + c.amount, 0);
-    return { categories: cats, total: t };
+    return cats;
   }, [monthlyExpenses, categoryColors, period, customRange, selectedCategory, selectedMonth, drillDepth]);
 
   const { activeCategories, activeTotal } = useMemo(() => {
@@ -100,17 +99,6 @@ export function SpendingPieCard({ monthlyExpenses, categoryColors, currency, tit
     }
     return significant;
   }, [activeCategories, activeTotal]);
-
-  const canDrill = useCallback((fullPath: string) => {
-    if (!monthlyExpenses || !fullPath) return false;
-    const validMonths = new Set(selectedMonth ? [selectedMonth] : getMonthsForPeriod(period, customRange ?? undefined));
-    const parts = fullPath.split(":");
-    return monthlyExpenses.some(
-      (row) => row.pathParts && row.pathParts.length > parts.length &&
-        validMonths.has(row.month) &&
-        row.pathParts.slice(0, parts.length).join(":") === fullPath
-    );
-  }, [monthlyExpenses, period, customRange, selectedMonth]);
 
   const handleSliceClick = useCallback((data: { fullPath: string }) => {
     if (!data.fullPath) return;
@@ -215,7 +203,6 @@ export function SpendingPieCard({ monthlyExpenses, categoryColors, currency, tit
             {/* Category list */}
             <div className="flex flex-1 flex-col justify-center gap-1.5 overflow-y-auto">
               {categories.map((cat) => {
-                const drillable = canDrill(cat.fullPath);
                 const isExcluded = excluded.has(cat.fullPath);
                 const isSelected = selectedAccount === cat.fullPath;
                 return (

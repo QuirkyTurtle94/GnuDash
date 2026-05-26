@@ -11,8 +11,8 @@ import {
 import { Button } from "@/components/ui/button";
 import { useDashboard } from "@/lib/dashboard-context";
 import { Plus, Trash2, AlertCircle, Check, Search } from "lucide-react";
-import type { AccountNode, LedgerTransaction } from "@/lib/types/gnucash";
-import type { CreateTransactionPayload, EditTransactionPayload } from "@/lib/gnucash/worker/messages";
+import type { LedgerTransaction } from "@/lib/types/gnucash";
+import type { CreateTransactionPayload } from "@/lib/gnucash/worker/messages";
 import { formatCurrency } from "@/lib/format";
 import { type FlatAccount, flattenAccounts, fuzzyMatch, isInvestmentType, ACCOUNT_TYPE_LABELS } from "@/lib/transaction-helpers";
 
@@ -198,8 +198,6 @@ function InvestmentSplitRow({
   accounts: FlatAccount[];
   currency: string;
 }) {
-  // Track which two fields the user has filled in to auto-compute the third
-  const [pendingField, setPendingField] = useState<InvestmentField | null>(null);
   const [showRecalcPicker, setShowRecalcPicker] = useState(false);
   // Store the value the user just typed that triggered the conflict
   const pendingValue = useRef<{ field: InvestmentField; value: string } | null>(null);
@@ -263,7 +261,6 @@ function InvestmentSplitRow({
     // If all three are already filled and user edits one, ask which to recalculate
     if (allThreeFilled(split.shares, split.price, split.total) && parseNum(value) !== null) {
       pendingValue.current = { field, value };
-      setPendingField(field);
       setShowRecalcPicker(true);
       return;
     }
@@ -283,13 +280,11 @@ function InvestmentSplitRow({
     onUpdate(updates);
     setShowRecalcPicker(false);
     pendingValue.current = null;
-    setPendingField(null);
   }
 
   function handleRecalcCancel() {
     setShowRecalcPicker(false);
     pendingValue.current = null;
-    setPendingField(null);
   }
 
   return (

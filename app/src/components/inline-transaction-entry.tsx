@@ -4,8 +4,8 @@ import { useState, useRef, useCallback, useMemo, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { useDashboard } from "@/lib/dashboard-context";
 import { type FlatAccount, flattenAccounts, buildCurrencySplitPayload, isInvestmentType, evalExpr } from "@/lib/transaction-helpers";
-import type { AccountNode, LedgerTransaction, LedgerSplit } from "@/lib/types/gnucash";
-import type { CreateTransactionPayload, EditTransactionPayload } from "@/lib/gnucash/worker/messages";
+import type { AccountNode, LedgerTransaction } from "@/lib/types/gnucash";
+import type { CreateTransactionPayload } from "@/lib/gnucash/worker/messages";
 import { DescriptionAutocomplete, type QuickFillMatch } from "@/components/inline-entry/description-autocomplete";
 import { AccountAutocomplete } from "@/components/inline-entry/account-autocomplete";
 import { SplitEntryRows, type SplitEntryRow } from "@/components/inline-entry/split-entry-rows";
@@ -98,11 +98,11 @@ export function InlineTransactionEntry({ account, transactions, colSpan, editing
   const valueRef = useRef<HTMLInputElement>(null);
   const submitRef = useRef<() => void>(() => {});
 
-  const fieldRefs: Record<FieldName, React.RefObject<HTMLInputElement | null>> = {
+  const fieldRefs = useMemo<Record<FieldName, React.RefObject<HTMLInputElement | null>>>(() => ({
     date: dateRef, num: numRef, description: descriptionRef,
     transfer: transferRef, increase: increaseRef, decrease: decreaseRef,
     shares: sharesRef, price: priceRef, value: valueRef,
-  };
+  }), []);
 
   const flatAccounts = useMemo(() => {
     if (!data) return [];
@@ -160,6 +160,27 @@ export function InlineTransactionEntry({ account, transactions, colSpan, editing
     setIsDirty(false);
   }, [editingTransaction, account.guid, isCredit]);
 
+  /** Reset without refocusing (used for click-away) */
+  const resetFormQuiet = useCallback(() => {
+    setDate(getDefaultDate());
+    setNum("");
+    setDescription("");
+    setTransferAccountGuid("");
+    setTransferAccountPath("");
+    setIncrease("");
+    setDecrease("");
+    setForeignAmount("");
+    setShares("");
+    setPrice("");
+    setValue("");
+    setIsBuy(true);
+    setShowRecalcPicker(false);
+    setIsMultiSplit(false);
+    setExtraSplits([]);
+    setError(null);
+    setIsDirty(false);
+  }, []);
+
   // ── Click-away detection ───────────────────────────────────────
 
   useEffect(() => {
@@ -188,7 +209,7 @@ export function InlineTransactionEntry({ account, transactions, colSpan, editing
 
     document.addEventListener("mousedown", handleMouseDown);
     return () => document.removeEventListener("mousedown", handleMouseDown);
-  }, [isDirty, isEditing, onCancelEdit]);
+  }, [isDirty, isEditing, onCancelEdit, resetFormQuiet]);
 
   // ── Focus helpers ──────────────────────────────────────────────
 
@@ -200,28 +221,7 @@ export function InlineTransactionEntry({ account, transactions, colSpan, editing
         el.select();
       }
     });
-  }, []);
-
-  /** Reset without refocusing (used for click-away) */
-  const resetFormQuiet = useCallback(() => {
-    setDate(getDefaultDate());
-    setNum("");
-    setDescription("");
-    setTransferAccountGuid("");
-    setTransferAccountPath("");
-    setIncrease("");
-    setDecrease("");
-    setForeignAmount("");
-    setShares("");
-    setPrice("");
-    setValue("");
-    setIsBuy(true);
-    setShowRecalcPicker(false);
-    setIsMultiSplit(false);
-    setExtraSplits([]);
-    setError(null);
-    setIsDirty(false);
-  }, []);
+  }, [fieldRefs]);
 
   // ── Investment auto-compute ────────────────────────────────────
 

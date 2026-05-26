@@ -34,7 +34,7 @@ export function SplitEntryRows({
   currency,
   colSpan,
 }: Props) {
-  const { totalDebit, totalCredit, isBalanced, imbalance } = useMemo(() => {
+  const { isBalanced, imbalance } = useMemo(() => {
     let totalDebit = 0;
     let totalCredit = 0;
     for (const s of splits) {

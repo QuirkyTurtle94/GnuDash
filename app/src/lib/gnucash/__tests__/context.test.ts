@@ -18,7 +18,9 @@ describe("buildParseContext", () => {
 
   it("snapshot: full context shape (excluding db)", () => {
     const ctx = getTestContext();
-    const { db, fxRates, ...rest } = ctx;
+    const rest = { ...ctx };
+    delete (rest as Partial<typeof ctx>).db;
+    delete (rest as Partial<typeof ctx>).fxRates;
 
     // Convert maps/sets to plain objects for snapshot stability
     const snapshot = {

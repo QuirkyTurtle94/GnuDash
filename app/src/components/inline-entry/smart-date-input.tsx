@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 
 /**
  * Detects whether the user's locale uses month-first (US) or day-first format.
@@ -142,6 +142,8 @@ interface Props {
 }
 
 export function SmartDateInput({ value, onChange, onKeyDown, inputRef, className }: Props) {
+  const initialValueRef = useRef(value);
+  const initialOnChangeRef = useRef(onChange);
   // The raw text the user is typing (shown while focused)
   const [rawText, setRawText] = useState("");
   const [isFocused, setIsFocused] = useState(false);
@@ -195,10 +197,10 @@ export function SmartDateInput({ value, onChange, onKeyDown, inputRef, className
 
   // Set initial value from lastUsedDate if available
   useEffect(() => {
-    if (!value && lastUsedDate) {
-      onChange(lastUsedDate);
+    if (!initialValueRef.current && lastUsedDate) {
+      initialOnChangeRef.current(lastUsedDate);
     }
-  }, []); // Only on mount
+  }, []);
 
   return (
     <input

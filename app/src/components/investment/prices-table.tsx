@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from "react";
 import { Card, CardContent } from "@/components/ui/card";
-import { formatCurrency, formatAmount } from "@/lib/format";
+import { formatAmount } from "@/lib/format";
 import { useDashboard } from "@/lib/dashboard-context";
 import { parseGnuCashDate } from "@/lib/gnucash/shared/dates";
 import type { GnuCashPrice, CommodityInfo } from "@/lib/types/gnucash";
@@ -306,7 +306,7 @@ export function PricesTable({ currency, selectedTicker }: Props) {
                   try {
                     await deletePrice({ priceGuid: deletingPrice.guid });
                     setDeletingPrice(null);
-                  } catch (err) {
+                  } catch {
                     // stay open on error
                   }
                 }}

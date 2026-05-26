@@ -166,7 +166,6 @@ function BudgetPanel({ isIncome }: { isIncome: boolean }) {
     return <NoBudgetState />;
   }
 
-  const yearStr = selectedYear.toString();
   const activeBudgetGuid = selectedBudget ?? budgetData.budgets[0]?.guid ?? "";
   const activeBudgetData = budgetData.categoriesByBudget[activeBudgetGuid];
 
@@ -218,7 +217,6 @@ function BudgetPanel({ isIncome }: { isIncome: boolean }) {
       setSelectedMonth={setSelectedMonth}
       selectedYear={selectedYear}
       setSelectedYear={setSelectedYear}
-      selectedBudget={selectedBudget}
       setSelectedBudget={setSelectedBudget}
       drillPath={drillPath}
       setDrillPath={setManualDrillPath}
@@ -239,7 +237,6 @@ function BudgetPanelInner({
   setSelectedMonth,
   selectedYear,
   setSelectedYear,
-  selectedBudget,
   setSelectedBudget,
   drillPath,
   setDrillPath,
@@ -256,7 +253,6 @@ function BudgetPanelInner({
   setSelectedMonth: (m: number) => void;
   selectedYear: number;
   setSelectedYear: (y: number) => void;
-  selectedBudget: string | null;
   setSelectedBudget: (g: string | null) => void;
   drillPath: string[];
   setDrillPath: React.Dispatch<React.SetStateAction<string[]>>;
@@ -394,16 +390,36 @@ function SankeySection({
 
   const [depth, setDepth] = useState(1);
 
-  const activeIncome = excludeClosing && data?.monthlyIncomeByCategoryExcludingClosing
-    ? data.monthlyIncomeByCategoryExcludingClosing : data?.monthlyIncomeByCategory ?? [];
-  const activeExpenses = excludeClosing && data?.monthlyExpensesByCategoryExcludingClosing
-    ? data.monthlyExpensesByCategoryExcludingClosing : data?.monthlyExpensesByCategory ?? [];
-  const activeCashFlow = excludeClosing && data?.cashFlowSeriesExcludingClosing
-    ? data.cashFlowSeriesExcludingClosing : data?.cashFlowSeries ?? [];
-  const activeIncomeColors = excludeClosing && data?.incomeCategoryColorsExcludingClosing
-    ? data.incomeCategoryColorsExcludingClosing : data?.incomeCategoryColors ?? {};
-  const activeExpenseColors = excludeClosing && data?.expenseCategoryColorsExcludingClosing
-    ? data.expenseCategoryColorsExcludingClosing : data?.expenseCategoryColors ?? {};
+  const activeIncome = useMemo(
+    () => excludeClosing && data?.monthlyIncomeByCategoryExcludingClosing
+      ? data.monthlyIncomeByCategoryExcludingClosing
+      : data?.monthlyIncomeByCategory ?? [],
+    [data, excludeClosing],
+  );
+  const activeExpenses = useMemo(
+    () => excludeClosing && data?.monthlyExpensesByCategoryExcludingClosing
+      ? data.monthlyExpensesByCategoryExcludingClosing
+      : data?.monthlyExpensesByCategory ?? [],
+    [data, excludeClosing],
+  );
+  const activeCashFlow = useMemo(
+    () => excludeClosing && data?.cashFlowSeriesExcludingClosing
+      ? data.cashFlowSeriesExcludingClosing
+      : data?.cashFlowSeries ?? [],
+    [data, excludeClosing],
+  );
+  const activeIncomeColors = useMemo(
+    () => excludeClosing && data?.incomeCategoryColorsExcludingClosing
+      ? data.incomeCategoryColorsExcludingClosing
+      : data?.incomeCategoryColors ?? {},
+    [data, excludeClosing],
+  );
+  const activeExpenseColors = useMemo(
+    () => excludeClosing && data?.expenseCategoryColorsExcludingClosing
+      ? data.expenseCategoryColorsExcludingClosing
+      : data?.expenseCategoryColors ?? {},
+    [data, excludeClosing],
+  );
 
   const incomeCategories = useMemo(() => getTopLevelCategories(activeIncome), [activeIncome]);
   const expenseCategories = useMemo(() => getTopLevelCategories(activeExpenses), [activeExpenses]);
@@ -413,15 +429,14 @@ function SankeySection({
   const [initialized, setInitialized] = useState(false);
 
   useEffect(() => {
-    if (!initialized && incomeCategories.length > 0) {
+    if (initialized || incomeCategories.length === 0) return;
+    const timeout = window.setTimeout(() => {
       setSelectedIncome(new Set(incomeCategories));
       setSelectedExpense(new Set(expenseCategories));
       setInitialized(true);
-    }
+    }, 0);
+    return () => window.clearTimeout(timeout);
   }, [incomeCategories, expenseCategories, initialized]);
-
-  const incomeKey = Array.from(selectedIncome).sort().join(",");
-  const expenseKey = Array.from(selectedExpense).sort().join(",");
 
   const dataRange = useMemo(
     () => getDataRange(activeCashFlow) ?? { min: "2020-01", max: "2026-01" },
@@ -442,8 +457,7 @@ function SankeySection({
       selectedExpenseCategories: selectedExpense,
       customRange: customRange ?? undefined,
     });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [data, period, customRange, depth, incomeKey, expenseKey, initialized, excludeClosing]);
+  }, [activeCashFlow, activeExpenseColors, activeExpenses, activeIncome, activeIncomeColors, customRange, data, depth, initialized, period, selectedExpense, selectedIncome]);
 
   const echartsData = useMemo(
     () => (sankeyData ? toEChartsFormat(sankeyData, "source", "#9A9FA5") : null),
@@ -514,12 +528,24 @@ function IncomeExpenseBarChart({
   const { data } = useDashboard();
   const { excludeClosing } = useClosing();
 
-  const activeIncome = excludeClosing && data?.monthlyIncomeByCategoryExcludingClosing
-    ? data.monthlyIncomeByCategoryExcludingClosing : data?.monthlyIncomeByCategory ?? [];
-  const activeExpenses = excludeClosing && data?.monthlyExpensesByCategoryExcludingClosing
-    ? data.monthlyExpensesByCategoryExcludingClosing : data?.monthlyExpensesByCategory ?? [];
-  const activeCashFlow = excludeClosing && data?.cashFlowSeriesExcludingClosing
-    ? data.cashFlowSeriesExcludingClosing : data?.cashFlowSeries ?? [];
+  const activeIncome = useMemo(
+    () => excludeClosing && data?.monthlyIncomeByCategoryExcludingClosing
+      ? data.monthlyIncomeByCategoryExcludingClosing
+      : data?.monthlyIncomeByCategory ?? [],
+    [data, excludeClosing],
+  );
+  const activeExpenses = useMemo(
+    () => excludeClosing && data?.monthlyExpensesByCategoryExcludingClosing
+      ? data.monthlyExpensesByCategoryExcludingClosing
+      : data?.monthlyExpensesByCategory ?? [],
+    [data, excludeClosing],
+  );
+  const activeCashFlow = useMemo(
+    () => excludeClosing && data?.cashFlowSeriesExcludingClosing
+      ? data.cashFlowSeriesExcludingClosing
+      : data?.cashFlowSeries ?? [],
+    [data, excludeClosing],
+  );
 
   const dataRange = useMemo(
     () => getDataRange(activeCashFlow) ?? { min: "2020-01", max: "2026-01" },
@@ -901,9 +927,19 @@ function IncomeExpensesContent() {
   const [expenseAccount, setExpenseAccount] = useState<string | null>(null);
   const [expenseExcluded, setExpenseExcluded] = useState<Set<string>>(new Set());
 
-  const toggleIncomeExcluded = useCallback((fp: string) => setIncomeExcluded((prev) => { const n = new Set(prev); n.has(fp) ? n.delete(fp) : n.add(fp); return n; }), []);
+  const toggleIncomeExcluded = useCallback((fp: string) => setIncomeExcluded((prev) => {
+    const n = new Set(prev);
+    if (n.has(fp)) n.delete(fp);
+    else n.add(fp);
+    return n;
+  }), []);
   const clearIncomeExcluded = useCallback(() => setIncomeExcluded(new Set()), []);
-  const toggleExpenseExcluded = useCallback((fp: string) => setExpenseExcluded((prev) => { const n = new Set(prev); n.has(fp) ? n.delete(fp) : n.add(fp); return n; }), []);
+  const toggleExpenseExcluded = useCallback((fp: string) => setExpenseExcluded((prev) => {
+    const n = new Set(prev);
+    if (n.has(fp)) n.delete(fp);
+    else n.add(fp);
+    return n;
+  }), []);
   const clearExpenseExcluded = useCallback(() => setExpenseExcluded(new Set()), []);
 
   const incomeSelection: SelectionState = {

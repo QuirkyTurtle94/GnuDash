@@ -86,7 +86,6 @@ export function evalExpr(input: string): string {
   if (/^-?\d+(\.\d+)?$/.test(trimmed)) return trimmed;
   if (!/^[\d.+\-*/() ]+$/.test(trimmed)) return trimmed;
   try {
-    // eslint-disable-next-line no-new-func
     const result = new Function(`"use strict"; return (${trimmed});`)();
     if (typeof result === "number" && isFinite(result)) {
       return String(Math.round(result * 10000) / 10000);

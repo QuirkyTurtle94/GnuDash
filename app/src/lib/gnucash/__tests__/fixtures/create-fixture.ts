@@ -15,7 +15,7 @@ const db = new Database(FIXTURE_PATH);
 // Helper: deterministic GUIDs
 // -------------------------------------------------------------------
 let guidCounter = 0;
-function guid(label: string): string {
+function guid(): string {
   guidCounter++;
   // Pad to 32 hex chars (GNUCash uses 32-char hex GUIDs)
   const hex = guidCounter.toString(16).padStart(8, "0");

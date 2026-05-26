@@ -53,25 +53,6 @@ const TYPE_COLORS: Record<string, string> = {
   TRADING: "bg-gray-50 text-gray-700 dark:bg-gray-500/15 dark:text-gray-200",
 };
 
-// ── Helpers ──────────────────────────────────────────────────────
-
-/** Recursively find an AccountNode by GUID */
-function findAccount(nodes: AccountNode[], guid: string): AccountNode | null {
-  for (const n of nodes) {
-    if (n.guid === guid) return n;
-    const found = findAccount(n.children, guid);
-    if (found) return found;
-  }
-  return null;
-}
-
-/** Build full path for an account by walking up to root */
-function buildFullPath(account: AccountNode, allAccounts: AccountNode[]): string {
-  // The AccountNode already has fullPath on it from the tree builder, but it may not
-  // be set for all nodes. Use the name as fallback.
-  return account.fullPath || account.name;
-}
-
 // ── Main Component ───────────────────────────────────────────────
 
 export default function AccountsPage() {

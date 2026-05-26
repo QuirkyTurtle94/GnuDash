@@ -16,7 +16,7 @@ interface HoldingsTableProps {
 type SortKey = "ticker" | "marketValue" | "costBasis" | "gainLoss" | "gainLossPct";
 type SortDir = "asc" | "desc";
 
-export function HoldingsTable({ activeItems, allItems, currency, selectedTicker, grouped }: HoldingsTableProps) {
+export function HoldingsTable({ activeItems, allItems, currency, selectedTicker }: HoldingsTableProps) {
   const [sortKey, setSortKey] = useState<SortKey>("marketValue");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
   const [showZero, setShowZero] = useState(false);
