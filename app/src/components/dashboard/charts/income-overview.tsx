@@ -96,8 +96,8 @@ export function IncomeOverview({ monthlyIncome, categoryColors, currency, linkTo
   const [drillPath, setDrillPath] = useState<string | null>(null);
   const [excluded, setExcluded] = useState<Set<string>>(new Set());
 
-  const { categories, total } = useMemo(() => {
-    if (!monthlyIncome) return { categories: [], total: 0 };
+  const categories = useMemo(() => {
+    if (!monthlyIncome) return [];
     const validMonths = new Set(getMonthsForPeriod(period, customRange, monthlyIncome));
     const drillParts = drillPath ? drillPath.split(":") : null;
     const drillDepth = drillParts ? drillParts.length : 0;
@@ -132,7 +132,7 @@ export function IncomeOverview({ monthlyIncome, categoryColors, currency, linkTo
 
     if (drillPath) assignShades(cats);
 
-    return { categories: cats, total: cats.reduce((s, c) => s + c.amount, 0) };
+    return cats;
   }, [monthlyIncome, categoryColors, period, customRange, drillPath]);
 
   const { activeCategories, activeTotal } = useMemo(() => {

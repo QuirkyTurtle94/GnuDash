@@ -12,7 +12,6 @@ import type {
   UpcomingBill,
   ExpenseTransaction,
   LedgerTransaction,
-  LedgerSplit,
   BudgetData,
   BudgetCategoryRow,
 } from "@/lib/types/gnucash";
@@ -474,7 +473,7 @@ export function generateDemoData(): DashboardData {
   const budgetData = generateBudgetData(
     expenseAccounts, incomeAccounts, expenseRanges, incomeRanges,
     monthlyExpensesByCategory, monthlyIncomeByCategory,
-    months, currentYear, guid, rand
+    months, currentYear, guid
   );
 
   return {
@@ -566,7 +565,6 @@ function generateBudgetData(
   months: string[],
   currentYear: number,
   guidFn: () => string,
-  rand: () => number,
 ): BudgetData {
   const budgetGuid = guidFn();
   const yearStr = currentYear.toString();

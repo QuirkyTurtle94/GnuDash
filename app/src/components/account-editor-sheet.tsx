@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useRef, useEffect, useCallback } from "react";
+import { useState, useMemo, useRef, useEffect } from "react";
 import {
   Sheet,
   SheetContent,
@@ -10,8 +10,8 @@ import {
 } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { useDashboard } from "@/lib/dashboard-context";
-import { Search, Check, Plus } from "lucide-react";
-import type { AccountNode, CommodityInfo } from "@/lib/types/gnucash";
+import { Search, Plus } from "lucide-react";
+import type { AccountNode } from "@/lib/types/gnucash";
 
 // ── Constants ───────────────────────────────────────────────────
 
@@ -137,7 +137,6 @@ export function AccountEditorSheet({
   const [name, setName] = useState("");
   const [accountType, setAccountType] = useState("EXPENSE");
   const [parentGuid, setParentGuid] = useState("");
-  const [parentPath, setParentPath] = useState("");
   const [commodityGuid, setCommodityGuid] = useState("");
   const [code, setCode] = useState("");
   const [description, setDescription] = useState("");
@@ -160,7 +159,7 @@ export function AccountEditorSheet({
     return flattenAccounts(data.accounts);
   }, [data]);
 
-  const commodities = data?.commodities ?? [];
+  const commodities = useMemo(() => data?.commodities ?? [], [data?.commodities]);
   const isInvestment = INVESTMENT_TYPES.has(accountType);
 
   // Filter commodities based on account type
@@ -189,8 +188,6 @@ export function AccountEditorSheet({
       setName(editingAccount.name);
       setAccountType(editingAccount.type);
       setParentGuid(editingAccount.parentGuid ?? "");
-      const parent = accounts.find((a) => a.guid === editingAccount.parentGuid);
-      setParentPath(parent?.fullPath ?? "");
       setCommodityGuid(editingAccount.commodityGuid);
       setCode(""); // code not on AccountNode, will be preserved in DB
       setDescription("");
@@ -204,7 +201,7 @@ export function AccountEditorSheet({
         setCommodityGuid(data.currencyGuid);
       }
     }
-  }, [editingAccount, open, accounts, data]);
+  }, [editingAccount, open, data?.currencyGuid]);
 
   // When type changes, reset commodity if switching between investment/currency
   useEffect(() => {
@@ -222,13 +219,12 @@ export function AccountEditorSheet({
       }
       setShowNewCommodity(false);
     }
-  }, [accountType]);
+  }, [commodities, commodityGuid, data?.currencyGuid, isInvestment]);
 
   function resetForm() {
     setName("");
     setAccountType("EXPENSE");
     setParentGuid("");
-    setParentPath("");
     setCommodityGuid(data?.currencyGuid ?? "");
     setCode("");
     setDescription("");

@@ -283,7 +283,6 @@ export function AccountLedger({
                       onEdit={(tx) => setEditingTxGuid(tx.guid)}
                       onDelete={isWritable ? (guid) => setDeletingGuid(guid) : undefined}
                       onDuplicate={isWritable ? (tx) => { setDuplicatingTx(tx); setDuplicateDate(new Date().toISOString().slice(0, 10)); setDuplicateError(null); } : undefined}
-                      transferSplits={row.transferSplits}
                       accountSplit={row.accountSplit}
                       baseCurrency={data.currency}
                     />
@@ -435,7 +434,6 @@ function RegisterRow({
   onEdit,
   onDelete,
   onDuplicate,
-  transferSplits,
   accountSplit,
   baseCurrency,
 }: {
@@ -453,7 +451,6 @@ function RegisterRow({
   onEdit?: (tx: LedgerTransaction) => void;
   onDelete?: (guid: string) => void;
   onDuplicate?: (tx: LedgerTransaction) => void;
-  transferSplits: LedgerSplit[];
   accountSplit: LedgerSplit;
   baseCurrency: string;
 }) {

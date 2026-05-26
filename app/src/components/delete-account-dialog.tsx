@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useRef, useEffect, useCallback } from "react";
+import { useState, useMemo, useRef, useCallback } from "react";
 import { useDashboard } from "@/lib/dashboard-context";
 import { AlertTriangle, Search, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -69,14 +69,13 @@ export function DeleteAccountDialog({
 }) {
   const { data, deleteAccountWithReallocation } = useDashboard();
   const [targetGuid, setTargetGuid] = useState("");
-  const [targetPath, setTargetPath] = useState("");
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const listRef = useRef<HTMLDivElement>(null);
 
-  const allowedTypes = TYPE_FAMILIES[account.type] ?? [account.type];
+  const allowedTypes = useMemo(() => TYPE_FAMILIES[account.type] ?? [account.type], [account.type]);
   const { children: childCount, totalDescendants } = countDescendants(account);
 
   const targets = useMemo(() => {
@@ -94,7 +93,6 @@ export function DeleteAccountDialog({
 
   const selectTarget = useCallback((t: { guid: string; fullPath: string }) => {
     setTargetGuid(t.guid);
-    setTargetPath(t.fullPath);
     setQuery(t.fullPath);
     setOpen(false);
   }, []);
@@ -148,7 +146,7 @@ export function DeleteAccountDialog({
               <input
                 type="text"
                 value={query}
-                onChange={(e) => { setQuery(e.target.value); setOpen(true); if (!e.target.value) { setTargetGuid(""); setTargetPath(""); } }}
+                onChange={(e) => { setQuery(e.target.value); setOpen(true); if (!e.target.value) setTargetGuid(""); }}
                 onFocus={() => setOpen(true)}
                 onBlur={() => setTimeout(() => setOpen(false), 200)}
                 placeholder="Search for target account..."

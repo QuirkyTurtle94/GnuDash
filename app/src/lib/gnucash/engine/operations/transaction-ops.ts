@@ -3,7 +3,6 @@
  */
 
 import type { WritableDbAdapter } from "../db/writable-adapter";
-import { generateGuid } from "../guid";
 import { formatGnuCashDate } from "../../shared/dates";
 
 interface TransactionUpdate {

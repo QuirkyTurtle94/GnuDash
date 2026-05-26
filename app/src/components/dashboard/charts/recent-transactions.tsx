@@ -11,12 +11,6 @@ function formatAmount(value: number, currency: string): string {
   return `${prefix}${value < 0 ? "-" : ""}${formatted.replace("-", "")}`;
 }
 
-function formatDate(dateStr: string): string {
-  const date = new Date(dateStr);
-  const days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-  return `${days[date.getDay()]} ${date.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}`;
-}
-
 function formatShortDate(dateStr: string): string {
   const date = new Date(dateStr);
   return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
