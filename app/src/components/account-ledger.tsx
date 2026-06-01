@@ -98,8 +98,8 @@ export function AccountLedger({
     const matching: { tx: LedgerTransaction; accountSplit: LedgerSplit; transferSplits: LedgerSplit[] }[] = [];
 
     for (const tx of data.ledgerTransactions) {
-      const accountSplit = tx.splits.find((s) => s.accountGuid === account.guid);
-      if (!accountSplit) continue;
+      const accountSplits = tx.splits.filter((s) => s.accountGuid === account.guid);
+      if (accountSplits.length === 0) continue;
 
       if (searchLower) {
         const descMatch = tx.description.toLowerCase().includes(searchLower);
@@ -113,7 +113,17 @@ export function AccountLedger({
         if (!descMatch && !numMatch && !splitMatch) continue;
       }
 
-      const transferSplits = tx.splits.filter((s) => s !== accountSplit);
+      const [firstAccountSplit, ...otherAccountSplits] = accountSplits;
+      const accountSplit: LedgerSplit = {
+        ...firstAccountSplit,
+        amount: accountSplits.reduce((sum, s) => sum + s.amount, 0),
+        quantity: accountSplits.reduce((sum, s) => sum + s.quantity, 0),
+        memo: accountSplits.map((s) => s.memo).filter(Boolean).join("; "),
+        reconcileState: otherAccountSplits.find((s) => s.reconcileState !== firstAccountSplit.reconcileState)?.reconcileState
+          ? "n"
+          : firstAccountSplit.reconcileState,
+      };
+      const transferSplits = tx.splits.filter((s) => s.accountGuid !== account.guid);
       matching.push({ tx, accountSplit, transferSplits });
     }
 
