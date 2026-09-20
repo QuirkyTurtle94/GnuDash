@@ -61,13 +61,13 @@ export function BalancePie({
     if (groupByType) {
       const byType = new Map<string, number>();
       for (const b of balances) {
-        byType.set(b.type, (byType.get(b.type) ?? 0) + Math.abs(b.value));
+        byType.set(b.type, (byType.get(b.type) ?? 0) + b.value);
       }
       return [...byType.entries()]
         .map(([type, amount], i) => ({
           name: TYPE_LABELS[type] ?? type,
           key: type,
-          amount,
+          amount: Math.abs(amount),
           color: colorPalette[i % colorPalette.length],
         }))
         .filter((e) => e.amount >= 0.01)
@@ -79,13 +79,13 @@ export function BalancePie({
         const parts = b.fullPath.split(":");
         // Use second segment (first is the root type account like "Assets")
         const topLevel = parts.length > 1 ? parts[1] : parts[0];
-        byParent.set(topLevel, (byParent.get(topLevel) ?? 0) + Math.abs(b.value));
+        byParent.set(topLevel, (byParent.get(topLevel) ?? 0) + b.value);
       }
       return [...byParent.entries()]
         .map(([name, amount], i) => ({
           name,
           key: name,
-          amount,
+          amount: Math.abs(amount),
           color: colorPalette[i % colorPalette.length],
         }))
         .filter((e) => e.amount >= 0.01)
