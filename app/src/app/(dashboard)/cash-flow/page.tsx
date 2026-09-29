@@ -440,9 +440,7 @@ function CashFlowTransactions({ filters }: { filters: SankeyFilterState }) {
             </thead>
             <tbody>
               {pageData.map((tx) => {
-                // Find the BANK/CASH split(s) to show the cash amount
-                const cashSplits = tx.splits.filter((s) => BANK_CASH.has(s.accountType));
-                const cashAmount = cashSplits.reduce((sum, s) => sum + s.quantity, 0);
+                const cashAmount = tx.cashAmount;
                 // Find the primary non-cash counterparty for the account column
                 const counterparty = tx.splits.find((s) => !BANK_CASH.has(s.accountType) && s.accountType !== "EQUITY");
 
