@@ -10,7 +10,7 @@ import { parseGnuCashDate, formatISODate } from "../shared/dates";
  * Ordered by post_date descending.
  */
 export function getLedgerTransactions(ctx: ParseContext): LedgerTransaction[] {
-  const { db, accountMap, commodityMap } = ctx;
+  const { db, accountMap, commodityMap, fxRates } = ctx;
 
   const rows = db
     .prepare(
@@ -46,7 +46,7 @@ export function getLedgerTransactions(ctx: ParseContext): LedgerTransaction[] {
 
   const txMap = new Map<
     string,
-    { date: string; description: string; num: string; splits: LedgerSplit[] }
+    { date: string; description: string; num: string; cashAmount: number; splits: LedgerSplit[] }
   >();
 
   for (const row of rows) {
@@ -65,9 +65,18 @@ export function getLedgerTransactions(ctx: ParseContext): LedgerTransaction[] {
       commodityMnemonic: commodity?.mnemonic ?? "",
     };
 
+    // Match the cash-flow charts: convert each cash account quantity before summing.
+    const rate = account && commodity?.namespace === "CURRENCY"
+      ? fxRates.rate(account.commodity_guid)
+      : 1;
+    const cashAmount = account && (account.account_type === "BANK" || account.account_type === "CASH")
+      ? split.quantity * rate
+      : 0;
+
     const existing = txMap.get(row.tx_guid);
     if (existing) {
       existing.splits.push(split);
+      existing.cashAmount += cashAmount;
     } else {
       const dateStr = formatISODate(parseGnuCashDate(row.post_date));
       txMap.set(row.tx_guid, {
@@ -75,13 +84,14 @@ export function getLedgerTransactions(ctx: ParseContext): LedgerTransaction[] {
         description: row.description,
         num: row.num ?? "",
         splits: [split],
+        cashAmount,
       });
     }
   }
 
   const transactions: LedgerTransaction[] = [];
   for (const [guid, tx] of txMap) {
-    transactions.push({ guid, date: tx.date, description: tx.description, num: tx.num, splits: tx.splits });
+    transactions.push({ guid, date: tx.date, description: tx.description, num: tx.num, cashAmount: tx.cashAmount, splits: tx.splits });
   }
 
   return transactions;

@@ -3,6 +3,7 @@
 exports[`getLedgerTransactions > snapshot 1`] = `
 [
   {
+    "cashAmount": 3000,
     "date": "2025-03-28",
     "description": "Salary March",
     "guid": "00000021000000210000002100000021",
@@ -33,6 +34,7 @@ exports[`getLedgerTransactions > snapshot 1`] = `
     ],
   },
   {
+    "cashAmount": -40,
     "date": "2025-03-10",
     "description": "Thames Water",
     "guid": "00000028000000280000002800000028",
@@ -63,6 +65,7 @@ exports[`getLedgerTransactions > snapshot 1`] = `
     ],
   },
   {
+    "cashAmount": 3000,
     "date": "2025-02-28",
     "description": "Salary February",
     "guid": "00000020000000200000002000000020",
@@ -93,6 +96,7 @@ exports[`getLedgerTransactions > snapshot 1`] = `
     ],
   },
   {
+    "cashAmount": -4000,
     "date": "2025-02-20",
     "description": "Buy VWRL",
     "guid": "0000002b0000002b0000002b0000002b",
@@ -123,6 +127,7 @@ exports[`getLedgerTransactions > snapshot 1`] = `
     ],
   },
   {
+    "cashAmount": 500,
     "date": "2025-02-15",
     "description": "Freelance Project",
     "guid": "00000022000000220000002200000022",
@@ -153,6 +158,7 @@ exports[`getLedgerTransactions > snapshot 1`] = `
     ],
   },
   {
+    "cashAmount": -180,
     "date": "2025-02-10",
     "description": "Sainsburys Groceries",
     "guid": "00000024000000240000002400000024",
@@ -183,6 +189,7 @@ exports[`getLedgerTransactions > snapshot 1`] = `
     ],
   },
   {
+    "cashAmount": -90,
     "date": "2025-02-05",
     "description": "British Gas Electric",
     "guid": "00000027000000270000002700000027",
@@ -213,6 +220,7 @@ exports[`getLedgerTransactions > snapshot 1`] = `
     ],
   },
   {
+    "cashAmount": -45,
     "date": "2025-02-01",
     "description": "Credit Card Payment",
     "guid": "00000029000000290000002900000029",
@@ -243,6 +251,7 @@ exports[`getLedgerTransactions > snapshot 1`] = `
     ],
   },
   {
+    "cashAmount": 3000,
     "date": "2025-01-28",
     "description": "Salary January",
     "guid": "0000001f0000001f0000001f0000001f",
@@ -273,6 +282,7 @@ exports[`getLedgerTransactions > snapshot 1`] = `
     ],
   },
   {
+    "cashAmount": 0,
     "date": "2025-01-20",
     "description": "Pizza Express",
     "guid": "00000025000000250000002500000025",
@@ -303,6 +313,7 @@ exports[`getLedgerTransactions > snapshot 1`] = `
     ],
   },
   {
+    "cashAmount": -200,
     "date": "2025-01-15",
     "description": "Tesco Groceries",
     "guid": "00000023000000230000002300000023",
@@ -333,6 +344,7 @@ exports[`getLedgerTransactions > snapshot 1`] = `
     ],
   },
   {
+    "cashAmount": -5,
     "date": "2025-01-12",
     "description": "USD Transfer",
     "guid": "0000002c0000002c0000002c0000002c",
@@ -363,6 +375,7 @@ exports[`getLedgerTransactions > snapshot 1`] = `
     ],
   },
   {
+    "cashAmount": -1200,
     "date": "2025-01-10",
     "description": "Buy AAPL",
     "guid": "0000002a0000002a0000002a0000002a",
@@ -393,6 +406,7 @@ exports[`getLedgerTransactions > snapshot 1`] = `
     ],
   },
   {
+    "cashAmount": -85,
     "date": "2025-01-05",
     "description": "British Gas Electric",
     "guid": "00000026000000260000002600000026",
@@ -423,6 +437,7 @@ exports[`getLedgerTransactions > snapshot 1`] = `
     ],
   },
   {
+    "cashAmount": 5000,
     "date": "2025-01-01",
     "description": "Opening Balance",
     "guid": "0000001d0000001d0000001d0000001d",
@@ -453,6 +468,7 @@ exports[`getLedgerTransactions > snapshot 1`] = `
     ],
   },
   {
+    "cashAmount": 10000,
     "date": "2025-01-01",
     "description": "Opening Balance",
     "guid": "0000001e0000001e0000001e0000001e",

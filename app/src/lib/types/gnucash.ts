@@ -314,6 +314,8 @@ export interface LedgerSplit {
 
 /** A full ledger transaction with all its splits. */
 export interface LedgerTransaction {
+  /** Net BANK/CASH movement converted to the dashboard base currency. */
+  cashAmount: number;
   guid: string;
   date: string; // YYYY-MM-DD
   description: string;
